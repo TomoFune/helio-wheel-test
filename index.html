@@ -299,7 +299,13 @@
   .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
   #badge-line2 {
     font-size: 0.8rem; color: var(--ink-dim);
-    min-width: 0; overflow: hidden; white-space: nowrap;
+    /* text-overflow:ellipsis追加(2026-09-03、実機iPhoneで「出生図の
+       データの右側の[みたいなやつはなんだろう」より) -- overflow:hidden
+       だけだと、幅が足りない時に文字列の途中でぶつ切りになり(タイム
+       ゾーンの"(Asia/Tokyo)"の"("だけが中途半端に見える、等)、省略され
+       ていることが伝わらず壊れて見えていた。"…"で切れていることを
+       明示する。 */
+    min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
     display: flex; align-items: center;
   }
   .time-seg-row { display: inline-flex; align-items: center; }
@@ -1984,7 +1990,12 @@
     { key: "juno",            g: "⚵︎", name: "ジュノー" },
     { key: "vesta",           g: "⚶︎", name: "ベスタ" },
     { key: "chiron",          g: "⚷︎", name: "キロン" },
-    { key: "eris",            g: "⯰︎", name: "エリス" },
+    // エリスの正式な天文記号(U+2BF0)は、iOSの標準フォントに全く収録
+    // されておらず、VS-15を付けても(そもそも土台のグリフが無いため)
+    // 空白になって消えてしまう(2026-09-03、実機iPhoneで「エリスが
+    // 消えている」より)。他の準惑星の記号よりずっと対応状況が悪い
+    // ため、この1つだけ丸囲みの"E"(U+24BA、広く対応)に差し替えた。
+    { key: "eris",            g: "Ⓔ", name: "エリス" },
   ];
   const NATAL_MINOR = {
     ceres: 130.602188, pallas: 71.406816, juno: 232.6101, vesta: 16.30325,
