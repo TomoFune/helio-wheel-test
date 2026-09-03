@@ -1,4 +1,13 @@
 <!doctype html><html><meta charset="utf-8">
+<!-- viewport meta追加(2026-09-03、「スマホ版が、ひどかったです」より) --
+     Artifact版はホスト側のフレームが独自にviewportメタを注入してくれて
+     いた(Browser paneでの検証で問題が出なかったのはそのため)が、単体の
+     web/wheel.htmlにはこれが無かった -- viewportメタが無いモバイル
+     ブラウザは「PC用の広いページ」(既定約980px幅)だと仮定してレンダー
+     し、それを画面に収まるよう縮小表示するため、既に用意していた
+     @media(min-width:900px)のモバイル/デスクトップ切り替えが一切
+     機能せず、常にデスクトップ版が縮小されて表示されていた。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helio Wheel</title>
 <style>
   /* --aspect-neutral(合・セミセクスタイル・クインタイル等5種のアス
@@ -246,8 +255,28 @@
     position: relative;
   }
   .person-badge {
-    position: absolute; top: 14px; left: 16px; right: 16px; z-index: 5;
+    /* position:absolute -> static(2026-09-03、実機のスマホ幅で「スマホ
+       版が、ひどかったです」の調査中に発覚した重なりバグの修正) --
+       名前+日時が横並びの1行に収まらないほど幅が狭い実機(375px幅など)
+       では、下のbadge-line1/line2-rowが自然に2行へ折り返す(意図通りの
+       フォールバック挙動)。だが親要素側は絶対配置ぶん高さを無視するため、
+       .pane-tabsの固定margin-top(34px、1行想定でチューニングされた値)
+       では2行になった場合の実高さに足りず、バッジとタブが重なっていた。
+       絶対配置をやめて通常のフローに戻せば、何行に折り返しても後続の
+       要素が自動的に押し下げられる -- デスクトップ側は既に同じ理由で
+       position:staticへ上書き済み(トップバー統合時、同じくstatic化)
+       だったので、モバイル側もベースから同じ方針に揃えた。
+       left/right/z-indexはstaticでは意味を持たないため削除。 */
+    position: static;
     display: flex; align-items: center; gap: 6px;
+    /* width:100%+box-sizing(margin:14px 16px 0だけだと、.chart-stageの
+       flex-column子として「内容にフィットする幅」で中央寄せされる
+       だけになり、幅の制約が一切なくなって画面の外まではみ出していた
+       -- 実測で気づいて修正、2026-09-03)。親幅いっぱいを取った上で
+       左右の余白はpaddingで確保することで、中の.person-badge-linesが
+       正しい利用可能幅を認識し、必要な時だけ2行に折り返せるようにした。 */
+    width: 100%; box-sizing: border-box; padding: 0 16px;
+    margin-top: 14px;
   }
   .person-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
   /* 1行化(2026-09-01、「自分/年月日が二段になっている、一段にしたら
@@ -313,12 +342,12 @@
      see its comment for why two separate active-classes are needed. */
   .pane-tabs {
     display: flex; gap: 8px; width: 100%; max-width: 380px;
-    /* 58px -> 34px (2026-09-01、バッジが2段から1段になった分。「一段に
-       したら、その分円を大きくできませんか」より) -- 元の58pxは2段
-       (名前+日時、スクラブボタン込み)のバッジの実測高さに合わせた値。
-       1段になった今の実測クリアランスは実測32px分の余りがあったので、
-       58px-32px+8px(見た目の余白)=34pxに詰めた。 */
-    margin-top: 34px;
+    /* 58px -> 34px -> 14px(2026-09-03、person-badgeをposition:absolute
+       からstaticへ変更したのに合わせて更新) -- バッジが何行に折り返して
+       も(1行でも、幅が狭くて2行になっても)通常のフローで実高さぶん
+       自動的に押し下げられるようになったため、バッジの高さを見込んだ
+       固定マージンはもう不要になった。ここは純粋に見た目の呼吸代のみ。 */
+    margin-top: 14px;
   }
   .pane-tab-btn {
     flex: 1; padding: 8px 4px; border-radius: 999px;
@@ -836,7 +865,13 @@
        flexレイアウトに参加できないので、デスクトップではstaticに戻す
        (left/right/z-indexはstaticでは無意味になるが実害はないので
        そのまま)。 */
-    .person-badge { position: static; top: auto; }
+    /* width:100%/padding/margin-topはモバイル(#chart-stage内で通常
+       フローに乗せるため)専用の指定 -- デスクトップは#topbar-badge-slot
+       (トップバーの横並び行)の中に物理移動される(layoutBadgeForWidth()
+       参照)ので、幅いっぱいに広がると他のトップバー要素を押しのけて
+       しまう。ここで打ち消してコンテンツ幅に戻す(2026-09-03、モバイル
+       側のposition:absolute->static修正に合わせて追加)。 */
+    .person-badge { position: static; top: auto; width: auto; padding: 0; margin-top: 0; }
     #topbar-badge-slot { display: flex; align-items: center; }
     #topbar-badge-slot .person-badge { gap: 6px; }
     #topbar-badge-slot #badge-line1 { font-size: 0.78rem; }
