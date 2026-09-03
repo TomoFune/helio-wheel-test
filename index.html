@@ -1433,6 +1433,15 @@
         </div>
 
         <div class="panel-section conj-only-control">
+          <div class="panel-section-label">恒星名</div>
+          <div class="toggle-row">
+            <span class="field-label" style="margin-bottom:0;">円の中に恒星名を表示</span>
+            <div class="switch on" id="star-name-switch" onclick="toggleSwitch(this); drawConjunctionMarkers();"></div>
+          </div>
+          <p class="scrub-note" style="margin-top:8px;">オフにすると円の外側は★/◆マークだけになり、名前は「恒星の合」パネルでいつでも見られます(初期値はスマホ幅ではオフ、PC幅ではオンです)。</p>
+        </div>
+
+        <div class="panel-section conj-only-control">
           <div class="panel-section-label">アスペクト</div>
           <div class="toggle-row">
             <span class="field-label" style="margin-bottom:0;">円の中にアスペクト線を表示</span>
@@ -2274,6 +2283,14 @@
     // と同じsweepSameTierLabels(実際のチップ幅から必要な最小角度を計算
     // し、確定的に1回で押し広げる)に統一し、キャンバス拡張(viewBox
     // -50 -50 500 500)で得た余白ぶんSTAR_Rも外側へ移した。
+    // 恒星名を出すかマークだけにするかの切り替え(2026-09-03、「ぜんぶ
+    // 記号が小さくて、老眼には何も見えません」を受けての「スマホのとき
+    // は、円に恒星名乗っけるの、やめてみる？近くに合の星あるよ、という
+    // ★マークだけのっけてみる」という相談から実装) -- 名前を消しても、
+    // 情報自体は消さない(この関数のtitle要素によるホバー説明と、下の
+    // 「恒星の合」パネルのconj-groupsに常に出ている)ので、単に円周上の
+    // 表示密度だけを下げる。
+    const showNames = document.getElementById('star-name-switch')?.classList.contains('on');
     const slots = [];  // { body, h, labelText, color, i }
     summary.forEach(body => {
       const hits = body.hits.filter(h => checkedHits.has(body.key + '|' + h.key) && bestBodyForStar[h.key].bodyKey === body.key);
@@ -2282,7 +2299,8 @@
       hits.slice(0, maxSlots).forEach((h, i) => {
         const overflow = (i === maxSlots - 1) ? hits.length - maxSlots : 0;
         const shortName = h.short || h.name;
-        const labelText = (h.kind === "star" ? "★" : "◆") + shortName + (overflow > 0 ? ` 他${overflow}` : "");
+        const mark = h.kind === "star" ? "★" : "◆";
+        const labelText = showNames ? mark + shortName + (overflow > 0 ? ` 他${overflow}` : "") : mark;
         slots.push({ body, h, i, labelText, color: h.kind === "star" ? "var(--accent)" : "var(--aspect-soft)" });
       });
     });
@@ -3363,6 +3381,13 @@
   desktopMQ.addEventListener('change', layoutBadgeForWidth);
   layoutBadgeForWidth();
 
+  // 恒星名トグルの初期値: スマホ幅ではオフ(★マークのみ)、PC幅ではオン
+  // (フルネーム)。HTML側はデフォルトon(PC相当)なので、初回だけモバイル
+  // 幅なら外す(2026-09-03、恒星名トグル新設時)。ユーザーが手動で
+  // 切り替えた後の状態は、ここでは一切触らない(初回描画前の1回きり)。
+  if (!desktopMQ.matches) {
+    document.getElementById('star-name-switch')?.classList.remove('on');
+  }
   fillMinorBodyList();
   fillAspectTypeList();
   buildChart();
