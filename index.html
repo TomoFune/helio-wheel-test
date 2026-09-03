@@ -348,24 +348,19 @@
   .badge-scrub-btn:hover { border-color: var(--accent); }
   .badge-now-btn { font-size: 0.7rem; font-weight: 700; color: var(--accent-strong); margin-left: 2px; }
 
-  /* ---------- Pane switcher (2026-08-31, PCでは円+データを並べて一枚
-     で見たい/スマホでは円・度数・アスペクト・サビアンをタブで1つずつ、
-     という相談から) ----------
-     Mobile: .pane-tabs picks ONE of the 4 panes (wheel included) via
-     .mobile-active -- single-pane, matches the narrow-screen reality.
-     Desktop: .pane-tabs itself is hidden (円 doesn't need a tab, it's
-     always shown in its own column) and .data-panel-tabs -- a separate,
-     nearly-identical 3-button row living inside .data-panel -- instead
-     picks which of degrees/aspects/sabian shows via .data-active. Both
-     tab rows call the same setPane(), which keeps both states in sync;
-     see its comment for why two separate active-classes are needed. */
+  /* ---------- Pane switcher ----------
+     #pane-tabs(スマホ専用、円・度数・アスペクト・サビアンをタブで
+     1つずつ切り替えていた行)は7.70で#main-menu-panelの「表示」グループ
+     に統合し廃止(2026-09-03、「アスペクト/サビアンを見ている時に円へ
+     戻る手段が分かりにくい...ボタンいらなくない？」より)。DOM自体は
+     残しつつdisplay:noneで非表示にした(setPane()が
+     `.pane-tabs .pane-tab-btn`をquerySelectorAllしている箇所が、要素が
+     0件でも安全にno-opするため、JS側は無変更で済む)。
+     Desktop: .data-panel-tabs(度数/アスペクト/サビアンの3ボタン、
+     .data-panel内)が同じsetPane()を呼んで.data-activeを切り替える
+     (円は元々.chart-columnsで常時表示なので専用タブ不要)。 */
   .pane-tabs {
-    display: flex; gap: 8px; width: 100%; max-width: 380px;
-    /* 58px -> 34px -> 14px(2026-09-03、person-badgeをposition:absolute
-       からstaticへ変更したのに合わせて更新) -- バッジが何行に折り返して
-       も(1行でも、幅が狭くて2行になっても)通常のフローで実高さぶん
-       自動的に押し下げられるようになったため、バッジの高さを見込んだ
-       固定マージンはもう不要になった。ここは純粋に見た目の呼吸代のみ。 */
+    display: none; gap: 8px; width: 100%; max-width: 380px;
     margin-top: 14px;
   }
   .pane-tab-btn {
@@ -856,9 +851,6 @@
        .appのmax-width:780px前提でwheel-wrap 440px/data-panel 256pxに
        固定していたが、.appが可変になったのに合わせてこちらも可変にした
        (同じ「13インチでも狭い」相談より)。 */
-    .pane-tabs { display: none; }  /* 円タブは不要(常に表示されるので)、他の3つはdata-panel-tabsに役目を譲る */
-    /* .pane-tabsが消える分、.chart-columnsがバッジ避けの58pxマージンを
-       肩代わりする(.pane-tabsのコメント参照)。 */
     /* justify-content:flex-start、center でも space-between でもなく
        (2026-09-01の2回の相談を経ての最終形) -- centerは円+データパネル
        をひとまとまりの塊として中央に置くため円がいくら大きくなっても
@@ -1041,7 +1033,6 @@
     <div class="topbar-badge-slot" id="topbar-badge-slot"></div>
     <div class="topbar-actions">
       <button class="icon-btn" title="メニュー" onclick="openMainMenu()">☰</button>
-      <button class="icon-btn" id="theme-btn" title="テーマ切替" onclick="toggleTheme()">◐</button>
     </div>
   </div>
 
@@ -1230,12 +1221,35 @@
         <button class="icon-btn" onclick="closeAllPanels()">✕</button>
       </div>
       <div class="panel-body" style="display:flex; flex-direction:column; gap:8px;">
+        <!-- 7.70: 円/度数/アスペクト/サビアン(旧#pane-tabs、スマホ専用の
+             タブ列)をここに統合(2026-09-03、「サビアンとかアスペクトを
+             表示すると、円表示に戻るやつがないね...ボタンいらなくない？」
+             より) -- #pane-tabsはCSSでスマホでも非表示にし、代わりに
+             ここから同じsetPane()を呼ぶ。これで「アスペクト/サビアンを
+             見ている時に円へ戻る」操作が、他の設定項目と同じ「☰を開いて
+             選ぶ」という一貫した形になる。 -->
+        <div class="section-label" style="margin:0 0 -2px;">表示</div>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('wheel');"><span>円(チャート)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('degrees');"><span>度数</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('aspects');"><span>アスペクト</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('sabian');"><span>サビアン</span><span class="chevron">›</span></button>
+        <div class="section-label" style="margin:14px 0 -2px;">設定</div>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('mode-panel');"><span>図の種類(出生図/経過図/二重円)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('type-panel');"><span>種別(通常/日食図/月食図)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('ref-panel');"><span>起点(トロピカル/恒星)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('display-panel');"><span>表示オプション(度数・恒星名・アスペクト)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('sabian');"><span>サビアン</span><span class="chevron">›</span></button>
+        <!-- 7.71: トップバーの◐(テーマ切替)をここへ移動(2026-09-04、
+             「三本線のメニューの右にあるダークモード選択のアイコンは
+             Menuに入れてもいいのではないだろうか」より)。他のトグル
+             (度数表示・恒星名表示・アスペクト線)と見た目を揃えるため、
+             row-btn一覧の中でもここだけtoggle-row(スイッチ)にした。 -->
+        <div class="row-btn" style="cursor:default;">
+          <div class="toggle-row" style="width:100%;">
+            <span>ダークモード</span>
+            <div class="switch on" id="theme-switch" onclick="toggleThemeSwitch(this)"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1512,13 +1526,44 @@
 <div class="flow-note" id="pe-toast" style="opacity:0; transition:opacity 0.3s;"></div>
 
 <script>
+  // ---------- settings persistence (7.71、「まいかい表示する惑星とか、
+  // ダークモードとか、アスペクトのデフォルトを、決め打ちされていると、
+  // 自分の好みの基本設定で使えないの嫌だ」より) ----------
+  // ブラウザのlocalStorageに保存(端末・ブラウザごと、「デバイスごとに
+  // 設定できれば問題ない」と確認済み)。プライベートブラウジング等で
+  // localStorageが例外を投げるケースがあるため、読み書きとも必ず
+  // try/catchで包み、失敗しても機能自体(表示・切り替え)は壊さない。
+  const SETTINGS_PREFIX = 'helioWheel.';
+  function saveSetting(key, value) {
+    try { localStorage.setItem(SETTINGS_PREFIX + key, JSON.stringify(value)); } catch (e) {}
+  }
+  function loadSetting(key, fallback) {
+    try {
+      const raw = localStorage.getItem(SETTINGS_PREFIX + key);
+      return raw === null ? fallback : JSON.parse(raw);
+    } catch (e) { return fallback; }
+  }
+
   // ---------- theme ----------
-  function toggleTheme() {
+  // 3状態サイクル(dark/light/システム追従)だったのを、保存前提の
+  // シンプルな2択(ダーク/ライト)スイッチに変更(7.71、☰メニューへの
+  // 移動と同時) -- 「システム追従」は初回訪問(まだ何も保存されていない
+  // 時)だけ暗黙に有効(data-theme属性を付けない=CSSのprefers-color-
+  // schemeがそのまま効く)。一度でも明示的に切り替えたら、以後はその
+  // 選択を保存して常に使う。
+  function applyTheme(mode) {
     const root = document.documentElement;
-    const cur = root.getAttribute('data-theme');
-    if (cur === 'dark') root.setAttribute('data-theme', 'light');
-    else if (cur === 'light') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', 'dark');
+    if (mode === 'dark') root.setAttribute('data-theme', 'dark');
+    else if (mode === 'light') root.setAttribute('data-theme', 'light');
+    else root.removeAttribute('data-theme');
+    const sw = document.getElementById('theme-switch');
+    if (sw) sw.classList.toggle('on', mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+  }
+  function toggleThemeSwitch(el) {
+    el.classList.toggle('on');
+    const mode = el.classList.contains('on') ? 'dark' : 'light';
+    applyTheme(mode);
+    saveSetting('theme', mode);
   }
 
   // ---------- view switching ----------
@@ -1802,7 +1847,14 @@
     updateConjunctionUI();
   }
 
-  function toggleSwitch(el) { el.classList.toggle('on'); }
+  // 7.71: switch要素(度数表示/恒星名表示/アスペクト線/恒星の合)は全部
+  // このtoggleSwitch(el)経由でON/OFFされているため、ここ1箇所でel.idを
+  // キーに保存すれば4つ全部の記憶が済む(呼び出し元は元々の再描画呼び出し
+  // をそのまま維持、ここでは保存だけ追加)。
+  function toggleSwitch(el) {
+    el.classList.toggle('on');
+    if (el.id) saveSetting('switch:' + el.id, el.classList.contains('on'));
+  }
 
   // ---------- pane switcher (円/度数/アスペクト/サビアン) ----------
   // Two separate "active" classes because mobile and desktop mean
@@ -1856,6 +1908,7 @@
     el.classList.toggle('on');
     el.textContent = el.classList.contains('on') ? '✓' : '';
     if (el.classList.contains('on')) minorBodiesOn.add(key); else minorBodiesOn.delete(key);
+    saveSetting('minorBodiesOn', [...minorBodiesOn]);
     buildChart();
     updateConjunctionUI();
   }
@@ -1875,6 +1928,7 @@
     conjOrb = +v;
     document.getElementById('orb-value-2').textContent = conjOrb.toFixed(1) + '°';
     document.getElementById('orb-slider-panel').value = conjOrb;
+    saveSetting('conjOrb', conjOrb);
     updateConjunctionUI();
   }
 
@@ -1906,6 +1960,7 @@
     document.getElementById('menu-ref-label').textContent = label;
     currentRef = key;
     currentRefLabel = label;
+    saveSetting('currentRef', { key, label });
     buildChart();  // selection propagates immediately, no separate "apply" step
     closeAllPanels();
   }
@@ -2448,6 +2503,7 @@
     el.textContent = el.classList.contains('on') ? '✓' : '';
     const t = el.dataset.type;
     if (el.classList.contains('on')) aspectTypesOn.add(t); else aspectTypesOn.delete(t);
+    saveSetting('aspectTypesOn', [...aspectTypesOn]);
     redrawAspects();
   }
   function fillAspectTypeList() {
@@ -3334,13 +3390,62 @@
 
   // 恒星名トグルの初期値: スマホ幅ではオフ(★マークのみ)、PC幅ではオン
   // (フルネーム)。HTML側はデフォルトon(PC相当)なので、初回だけモバイル
-  // 幅なら外す(2026-09-03、恒星名トグル新設時)。ユーザーが手動で
-  // 切り替えた後の状態は、ここでは一切触らない(初回描画前の1回きり)。
+  // 幅なら外す(2026-09-03、恒星名トグル新設時)。保存済みの値がある場合は
+  // (下のrestoreSettings()で)そちらを優先し、この画面幅ベースの初期値は
+  // 「まだ一度も触ったことがない」場合だけのフォールバックにする。
   if (!desktopMQ.matches) {
     document.getElementById('star-name-switch')?.classList.remove('on');
   }
+  // 7.71: 保存済み設定の復元(localStorage) -- 「自分の好みの基本設定で
+  // 使えないの嫌だ」より。fillMinorBodyList()/fillAspectTypeList()より
+  // 前に呼び、Setの中身を復元済みの状態でそれらの一覧描画に反映させる。
+  function restoreSettings() {
+    applyTheme(loadSetting('theme', null));
+    ['wheel-degree-switch', 'aspect-switch', 'conj-switch', 'star-name-switch'].forEach((id) => {
+      const saved = loadSetting('switch:' + id, null);
+      if (saved === null) return;  // 未保存(初回)なら、HTML/画面幅ベースの初期値をそのまま使う
+      document.getElementById(id)?.classList.toggle('on', saved);
+    });
+    const savedMinor = loadSetting('minorBodiesOn', null);
+    if (savedMinor !== null) {
+      minorBodiesOn.clear();
+      savedMinor.forEach((k) => minorBodiesOn.add(k));
+    }
+    const savedAspectTypes = loadSetting('aspectTypesOn', null);
+    if (savedAspectTypes !== null) {
+      aspectTypesOn.clear();
+      savedAspectTypes.forEach((t) => aspectTypesOn.add(t));
+    }
+    const savedOrb = loadSetting('conjOrb', null);
+    if (savedOrb !== null) {
+      conjOrb = savedOrb;
+      const orbValue = document.getElementById('orb-value-2');
+      const orbSlider = document.getElementById('orb-slider-panel');
+      if (orbValue) orbValue.textContent = conjOrb.toFixed(1) + '°';
+      if (orbSlider) orbSlider.value = conjOrb;
+    }
+    const savedRef = loadSetting('currentRef', null);
+    if (savedRef !== null) {
+      currentRef = savedRef.key;
+      currentRefLabel = savedRef.label;
+      document.getElementById('menu-ref-label').textContent = savedRef.label;
+      document.querySelectorAll('.ref-item').forEach((item) => {
+        // onclick="pickRef(this,'key','label')" からkeyだけ拾う(専用の
+        // data属性を持たせていない既存markup前提の簡易マッチ)。
+        const isMatch = item.getAttribute('onclick')?.includes("'" + savedRef.key + "'");
+        item.classList.toggle('selected', !!isMatch);
+      });
+    }
+  }
+  restoreSettings();
   fillMinorBodyList();
   fillAspectTypeList();
+  // updateWheelDegreeVisibility()だけは、CSSクラスの切り替えのみでbuildChart()
+  // が内部的に呼んでいないため(redrawAspects()/drawConjunctionMarkers()は
+  // buildChart()が自分で呼ぶので、恒星名・アスペクト線・恒星の合トグルは
+  // 復元後の最初のbuildChart()で自動的に反映される)、ここだけ明示的に
+  // 呼んで復元済みのスイッチ状態を反映させる。
+  updateWheelDegreeVisibility();
   buildChart();
   updateBadge();
 
