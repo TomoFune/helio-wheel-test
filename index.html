@@ -173,7 +173,6 @@
     color: var(--ink-faint);
     letter-spacing: 0.08em;
   }
-  .topbar-menu-slot { display: none; }  /* populated + shown only at desktop -- see layoutHeaderForWidth() and the media query */
   .topbar-badge-slot { display: none; }  /* populated + shown only at desktop -- see layoutBadgeForWidth() and the media query */
   .topbar-actions { display: flex; gap: 10px; align-items: center; }
   .icon-btn {
@@ -319,6 +318,17 @@
        #badge-line2をブロック化しても実機で見た目の崩れは無いことを確認
        済み。 */
   }
+  #current-state-line {
+    /* 7.69: 旧#settings-menuの図/起点/恒星の合ボタン(値を見せる役目
+       だった3つ)の現在値だけを、メニュー一本化後もバッジ直下に残す
+       (押しても何も起きない、単なる常時表示のテキスト行)。
+       flex-basis:100%は、親.person-badge-lines(display:flex;flex-wrap:
+       wrap)の中で、badge-line1/badge-line2-rowの続きに詰めて並ぶのでは
+       なく、必ず独立した行として折り返させるための指定。 */
+    flex-basis: 100%;
+    font-size: 0.74rem; color: var(--ink-faint);
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
   .time-seg-row { display: inline-flex; align-items: center; }
   .time-seg {
     font: inherit; font-family: "Space Mono", "JetBrains Mono", monospace;
@@ -337,14 +347,6 @@
   }
   .badge-scrub-btn:hover { border-color: var(--accent); }
   .badge-now-btn { font-size: 0.7rem; font-weight: 700; color: var(--accent-strong); margin-left: 2px; }
-
-  /* ネイタル/トランジット/二重円 (2026-08-31, .display-tabsという専用の
-     帯をやめてsettings-menuの.menu-btnに合流させた -- 見た目は他の設定
-     ボタンと揃えつつ、選択中のものだけ色を付けて分かるようにする)。 */
-  .menu-btn.active {
-    background: var(--accent); border-color: var(--accent); color: var(--bg-sunken);
-  }
-  .menu-btn.active:hover { color: var(--bg-sunken); }
 
   /* ---------- Pane switcher (2026-08-31, PCでは円+データを並べて一枚
      で見たい/スマホでは円・度数・アスペクト・サビアンをタブで1つずつ、
@@ -392,37 +394,6 @@
   .wheel-wrap svg { width: 100%; height: 100%; overflow: visible; }
   .wheel-wrap { border-radius: 50%; }
   .wheel-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
-
-  /* A menu bar directly under the topbar (Stargazer/AstroGoldの参考通り、
-     設定への入り口はチャート表示域の外に分離) -- not centered/capped like
-     the chart content below it, since it's meant to read as part of the
-     app chrome, the same way .topbar spans full width. */
-  .settings-menu {
-    display: flex; flex-wrap: wrap; gap: 6px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--line);
-    flex-shrink: 0;
-    /* Stacks directly under the sticky .topbar (69px: 18+36+14px padding/
-       icon-height + 1px border) -- see the comment on .topbar for why
-       both are sticky+opaque together. */
-    position: sticky; top: 69px; z-index: 14;
-    background: var(--bg);
-  }
-  .menu-btn {
-    padding: 7px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-elevated);
-    color: var(--ink-dim);
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, opacity 0.15s;
-  }
-  .menu-btn:hover { border-color: var(--accent); color: var(--ink); }
-  .menu-btn span { color: inherit; }
-  /* モバイルはフルラベルのまま(タップ精度優先) -- short-labelはデスク
-     トップの.menu-btn-compact専用、下のmin-width:900pxブロックで切替。 */
-  .menu-btn-compact .short-label { display: none; }
 
   .legend-grid {
     width: 100%;
@@ -834,20 +805,11 @@
        into the same short-viewport budget the wheel's own height cap
        above is fighting for, so trimming it here buys the wheel a bit
        more room too, not just a tidier header). */
-    .settings-menu { padding: 8px 30px; }
-    .menu-btn { padding: 5px 10px; font-size: 0.76rem; }
-
-    /* #settings-menu's buttons move up next to the brand (2026-09-01,
-       "日輪の右側に起点とかのメニューも並べてほしい" -- superseding the
-       8-31 version of this, which only moved the display-mode buttons and
-       duplicated them via CSS rather than relocating the real nodes; see
-       #topbar-menu-slot's own comment). .topbar drops space-between (a
-       3rd middle child, #topbar-menu-slot, doesn't space evenly the way
-       it wants) in favor of a plain gap, with .topbar-actions pushed to
-       the far right via margin-left:auto instead. */
+    /* .topbar drops space-between (7.69で#topbar-menu-slotを削除する前は
+       これが3rd middle childだったため) in favor of a plain gap, with
+       .topbar-actions pushed to the far right via margin-left:auto instead. */
     .topbar { justify-content: flex-start; gap: 18px; }
     .topbar-actions { margin-left: auto; }
-    .topbar-menu-slot { display: flex; flex-wrap: wrap; gap: 8px; }
     .topbar-badge-slot { display: flex; }
     /* デスクトップはマウス操作でタップ精度の心配がないため、モバイルの
        タップしやすさ優先の36px/18-14pxパディングをそのまま使う必要は
@@ -865,17 +827,11 @@
     .icon-btn { width: 28px; height: 28px; font-size: 0.85rem; }
     .person-badge { top: 8px; }
     .badge-scrub-btn { width: 24px; height: 24px; font-size: 1.1rem; }
-    /* 種別/表示/サビアンは1文字+title属性のツールチップに(上のHTML側
-       コメント参照)。図/起点/恒星の合は選択値を見せる役目があるので
-       フルラベルのまま。 */
-    .menu-btn-compact .full-label { display: none; }
-    .menu-btn-compact .short-label { display: inline; }
-    .menu-btn-compact { padding-left: 12px; padding-right: 12px; }
 
     /* 人物バッジ(名前・日時・トランジットのスクラブボタン)をトップ
        バーへ物理移動(2026-09-03、「バッジ行を...トップバーに統合」より)
-       -- #settings-menu -> #topbar-menu-slotと同じ「実ノードをappendChild
-       で動かす」パターン(layoutBadgeForWidth()、下のJS参照)。情報も
+       -- 実ノードをappendChildで動かすパターン(layoutBadgeForWidth()、
+       下のJS参照)。情報も
        スクラブボタンの機能も一切失わず、専用の行(バッジ避けのために
        chart-columnsへ付けていたmargin-top)がまるごと不要になる分を
        円の高さ予算に回せる。position:absoluteのままだとtopbarの
@@ -1011,9 +967,23 @@
        8px->6px、.chart-stage縦padding6/8px->4/6px、topbar上下padding
        10/8px->8/6pxをそれぞれさらに詰めた。実測(1365×728相当)で円の
        上のchrome合計が77px->69pxに縮小、5px弱の安全マージンを足して
-       74pxとした。 */
-    #pane-wheel { display: flex !important; flex-direction: column; align-items: center; width: min(68vw, calc(100vh - 74px), 820px); }
-    .wheel-wrap { max-width: min(68vw, calc(100vh - 74px), 820px); margin-top: 6px; }
+       74pxとした。
+       74px -> 93pxへ、9回目(逆に増やす方向、2026-09-03、同日中の続き、
+       7.69で#settings-menuを☰1個に統合した際の副作用の後始末) --
+       7.69で#current-state-line(図/起点/恒星の合の現在値、バッジの3行目)
+       を追加した結果、デスクトップではバッジ自体が#topbar-badge-slot
+       経由でトップバーに物理移動している(layoutBadgeForWidth())ため、
+       増えた1行分がトップバーの高さそのものを押し広げた。この定数は
+       #settings-menu削除で浮くはずの分を見込んで74のままにしていたが、
+       実測(1365×728相当)で円の上のchrome合計が69px->88pxに増えていた
+       のを見落としており、はみ出し(scrollHeight 742 > innerHeight 728)
+       を実際に引き起こしていた。5px弱の安全マージンを足して93pxに
+       修正(#settings-menu統合による広さの恩恵は、この計測時点では
+       #current-state-line追加分と概ね相殺していたということ -- 恩恵を
+       出すには、次はcurrent-state-lineをもっと軽くする方向で詰める
+       余地がある)。 */
+    #pane-wheel { display: flex !important; flex-direction: column; align-items: center; width: min(68vw, calc(100vh - 93px), 820px); }
+    .wheel-wrap { max-width: min(68vw, calc(100vh - 93px), 820px); margin-top: 6px; }
 
     /* min(22vw,360px)固定幅 -> flex:1で余った横幅を埋める方式に変更
        (2026-09-01、「やたらと開いている空間をもっと利用できないか」より)
@@ -1064,27 +1034,13 @@
     </div>
     <!-- Desktop-only home for #person-badge, physically moved here by
          layoutBadgeForWidth() (2026-09-03, "バッジ行を...トップバーに
-         統合" -- same real-DOM-relocation pattern as #topbar-menu-slot
-         below, for the same reason: #badge-line1/#badge-line2/the scrub
-         buttons are all looked up by id elsewhere, so moving the actual
-         node (not a copy) keeps every id unique and every handler wired
-         regardless of which container it's currently sitting in). -->
+         統合" -- #badge-line1/#badge-line2/the scrub buttons are all
+         looked up by id elsewhere, so moving the actual node (not a copy)
+         keeps every id unique and every handler wired regardless of which
+         container it's currently sitting in). -->
     <div class="topbar-badge-slot" id="topbar-badge-slot"></div>
-    <!-- Desktop-only home for #settings-menu's buttons, physically moved
-         here by layoutHeaderForWidth() (2026-08-31, "日輪の右側に起点
-         とかのメニューも並べてほしい" -- consolidating the whole settings
-         row into the topbar on desktop, not just the display-mode
-         buttons). An earlier version of this duplicated the display-mode
-         buttons into the topbar and hid the originals via CSS instead --
-         that doesn't scale to *all* of settings-menu's buttons, since
-         several of them (menu-ref-label etc.) are looked up by ID from
-         other functions, and duplicating IDs breaks getElementById. Real
-         DOM relocation (moving the actual nodes, not copies) sidesteps
-         that entirely -- there's only ever one of each element, wherever
-         it currently lives. -->
-    <div class="topbar-menu-slot" id="topbar-menu-slot"></div>
     <div class="topbar-actions">
-      <button class="icon-btn" title="人物一覧" onclick="showView('person-select')">☰</button>
+      <button class="icon-btn" title="メニュー" onclick="openMainMenu()">☰</button>
       <button class="icon-btn" id="theme-btn" title="テーマ切替" onclick="toggleTheme()">◐</button>
     </div>
   </div>
@@ -1133,42 +1089,28 @@
 
   <!-- ============ VIEW 2: メインチャート ============ -->
   <div class="view" id="view-chart">
-    <!-- Stargazer/AstroGoldを参考に、設定への入り口は円のすぐ下ではなく
-         ここ(トップバー直下の専用バー)に分離。円+データ側は結果を見る
-         専用領域として空ける。中身(横スライドパネル)は変更なし。 -->
-    <div class="settings-menu" id="settings-menu">
-      <!-- 出生図/経過図/二重円(2026-09-01、「チャートを読むときはそんな
-           に切り替えない」という相談を受けて7.33の常時表示から呼び出し
-           式に戻した -- 他の設定ボタンと同じ「現在の選択を表示するボタ
-           ン→押すとパネル」パターン(起点ボタンと同じ形)。 -->
-      <button class="menu-btn" id="menu-mode-btn" onclick="openPanel('mode-panel')">図: <span id="menu-mode-label">出生図</span></button>
-      <button class="menu-btn" id="menu-ref-btn" onclick="openPanel('ref-panel')">起点: <span id="menu-ref-label">トロピカル</span></button>
-      <!-- 種別/表示/サビアンは、今の選択値を表示する役目がない(押すと
-           パネルが開くだけの入口)ボタンなので、デスクトップでは1文字+
-           title属性のツールチップに縮めた(2026-09-03、「種別/表示/サビ
-           アん、これは、妥協案なんかないですかね」より) -- 図/起点/
-           恒星の合は選択値そのものを見せているので、アイコン化すると
-           クリックしないと今の状態が分からなくなり実害がある。それら
-           はフルラベルのまま残した。.menu-btn-compactの1文字表示は
-           デスクトップ専用のCSSで、モバイルの#settings-menuでは元の
-           フルラベルのまま(タップ精度優先、7.56のトップバー縮小と同じ
-           判断)。 -->
-      <button class="menu-btn menu-btn-compact" id="menu-type-btn" onclick="openPanel('type-panel')" title="種別(通常/日食図/月食図/四季図)"><span class="full-label">種別</span><span class="short-label">種</span></button>
-      <button class="menu-btn menu-btn-compact" id="menu-display-btn" onclick="openPanel('display-panel')" title="表示オプション"><span class="full-label">表示</span><span class="short-label">表</span></button>
-      <button class="menu-btn" id="menu-conj-btn" onclick="openPanel('conj-panel')"><span id="menu-conj-label">恒星の合</span></button>
-      <button class="menu-btn menu-btn-compact" id="menu-sabian-btn" onclick="setPane('sabian')" title="サビアン"><span class="full-label">サビアン</span><span class="short-label">サ</span></button>
-    </div>
+    <!-- 7.69: 図/起点/種別/表示/恒星の合/サビアンの6ボタン(旧#settings-menu)
+         を、トップバーの☰1つ(メニュー)にまとめた(2026-09-03、「メニュー
+         を一本化すると、円を大きく表示できますか？」より、円の上の帯を
+         1段丸ごと消せるので効果が大きいと判断)。実際のパネル(mode-panel
+         等)は変更なし、入り口だけ#main-menu-panel(下のside-panel群を
+         参照)に統一。「今何を見ているか」が分からなくならないよう、
+         図/起点/恒星の合(元々値を見せていた3つ)の現在値だけは、下の
+         バッジのすぐ下に#current-state-lineとして常時表示を残した
+         (案B、「現在値はメニューを開かないと見えない」案Aとの比較で
+         ユーザーと合意)。 -->
     <div class="chart-stage">
       <div class="person-badge" id="person-badge">
         <span class="dot"></span>
         <div class="person-badge-lines">
-          <div id="badge-line1">サンプル花子</div>
+          <div id="badge-line1" onclick="showView('person-select')" style="cursor:pointer;" title="タップして人物を切り替え">サンプル花子</div>
           <div class="badge-line2-row">
             <button class="badge-scrub-btn" id="badge-scrub-prev" style="visibility:hidden;" title="選択中の単位を戻す(長押し/ホイールでも)">‹</button>
             <span class="mono" id="badge-line2">出生図 1990-06-15 09:30:00</span>
             <button class="badge-scrub-btn" id="badge-scrub-next" style="visibility:hidden;" title="選択中の単位を進める(長押し/ホイールでも)">›</button>
             <button class="badge-scrub-btn badge-now-btn" id="badge-now-btn" style="visibility:hidden;" title="現在時刻に戻す" onclick="resetTransitToNow()">今</button>
           </div>
+          <div id="current-state-line">図: <span id="menu-mode-label">出生図</span>　起点: <span id="menu-ref-label">トロピカル</span>　<span id="menu-conj-label">恒星の合</span></div>
         </div>
       </div>
 
@@ -1279,6 +1221,23 @@
     <div class="panel-layer">
     <!-- ---- scrim ---- -->
     <div class="scrim" id="scrim" onclick="closeAllPanels()"></div>
+
+    <!-- ---- side panel: メインメニュー(7.69、旧#settings-menuの6ボタン
+         をここに集約) ---- -->
+    <div class="side-panel" id="main-menu-panel">
+      <div class="panel-head">
+        <h2>メニュー</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body" style="display:flex; flex-direction:column; gap:8px;">
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('mode-panel');"><span>図の種類(出生図/経過図/二重円)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('type-panel');"><span>種別(通常/日食図/月食図)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('ref-panel');"><span>起点(トロピカル/恒星)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('display-panel');"><span>表示オプション(度数・恒星名・アスペクト)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('sabian');"><span>サビアン</span><span class="chevron">›</span></button>
+      </div>
+    </div>
 
     <!-- ---- side panel: 出生図/経過図/二重円 ---- -->
     <div class="side-panel" id="mode-panel">
@@ -1924,6 +1883,16 @@
   function openPanel(id) {
     document.getElementById('scrim').classList.add('show');
     document.getElementById(id).classList.add('show');
+  }
+  // トップバーの☰(7.69で「人物一覧」から「メニュー」に役目変更)。
+  // #main-menu-panelは#view-chart内(.panel-layer)にしかDOM上存在せず、
+  // .viewはactiveでない限りdisplay:noneなので、チャート画面以外(人物
+  // 選択・人物管理)で押しても見た目には何も起きない -- ただしその2画面
+  // では元々メニューを開く必要がない(設定はチャートを見ながら触るもの
+  // なので)、実害はない想定。
+  function openMainMenu() {
+    if (!document.getElementById('view-chart').classList.contains('active')) return;
+    openPanel('main-menu-panel');
   }
   function closeAllPanels() {
     document.getElementById('scrim').classList.remove('show');
@@ -3328,30 +3297,12 @@
     legend.appendChild(natalCol);
     legend.appendChild(transitCol);
   }
-  // Moves #settings-menu's actual button *nodes* (not copies) into the
-  // topbar's #topbar-menu-slot at desktop width, and back at mobile width
-  // (2026-09-01, "日輪の右側に起点とかのメニューも並べてほしい" -- see
-  // #topbar-menu-slot's own comment for why relocation rather than
-  // duplication). Idempotent and safe to call from either state, since it
-  // just gathers whatever's currently in *either* container and puts it
-  // all in the correct one -- so it works both on initial load and every
-  // time the matchMedia listener below fires on a breakpoint crossing.
+  // 7.69で#settings-menu(図/起点/種別/表示/恒星の合/サビアンの6ボタン)を
+  // 廃止し☰1個の#main-menu-panelに統合したため、PC/モバイル間でこの
+  // 行を物理移動させていたlayoutHeaderForWidth()/#topbar-menu-slotは
+  // 不要になり削除した(#main-menu-panelはPC/モバイル共通の同じ側面
+  // パネルとして、位置を動かさず使い回す)。
   const desktopMQ = window.matchMedia('(min-width: 900px)');
-  function layoutHeaderForWidth() {
-    const slot = document.getElementById('topbar-menu-slot');
-    const menu = document.getElementById('settings-menu');
-    if (!slot || !menu) return;
-    const isDesktop = desktopMQ.matches;
-    const target = isDesktop ? slot : menu;
-    [...menu.children, ...slot.children].forEach(el => target.appendChild(el));
-    // #settings-menu still has its own padding/border even with all its
-    // buttons moved out, so it'd show as an empty bar at desktop -- hide
-    // it explicitly rather than relying on a CSS :empty selector (which
-    // whitespace text nodes between the original buttons could defeat).
-    menu.style.display = isDesktop ? 'none' : '';
-  }
-  desktopMQ.addEventListener('change', layoutHeaderForWidth);
-  layoutHeaderForWidth();
 
   // Moves #person-badge (name/date + transit scrub buttons, all still the
   // same node -- ids like #badge-line1/#badge-scrub-prev keep working
