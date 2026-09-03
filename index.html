@@ -1019,7 +1019,16 @@
   }
 </style>
 
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap">
+<!-- Noto Sans Symbols 2(2026-09-04追加、7.75) -- サイン・惑星・準惑星の
+     記号を手描きSVG(7.72)からこのフォントのテキスト表示に戻した。
+     手描きSVGは実機で「全然違う、読めない」と強く否定され(記憶だけで
+     描いたため精度が低かった)、代わりにGoogleが提供する専門の記号用
+     フォントを試したところ、本来の記号の形そのままで、かつWebフォント
+     なので端末のフォント事情に左右されない(元々の問題だったフォント
+     依存も解消)ことを確認できた。SIGNS/PLANET_META/MINOR_META側の
+     グリフ文字列には、7.56で追加済みのVariation Selector-15(U+FE0E)が
+     既に付いているため、絵文字カラー表示への化けも防げる。 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Space+Mono:wght@400;700&family=Noto+Sans+Symbols+2&display=swap">
 
 <div class="app" id="app">
 
@@ -1192,7 +1201,15 @@
                    沈んでいて、見にくい」より -- ink-dimは彩度・明度が
                    低く、度数文字が使っているink(一番明るいトーン)と
                    揃えて底上げした。 -->
-              <g id="sign-glyphs" font-size="15" fill="var(--ink)"></g>
+              <!-- font-size 15->13(2026-09-04、7.75でNoto Sans Symbols 2
+                   に切替えた際、実測でグリフの縦幅が旧フォントの約21.2
+                   から25.2に増え、サインリングの帯(150〜174、24単位幅)
+                   に収まらなくなっていた(内側150を割り込むもの、外側
+                   174を超えるものが両方発生)のを発見・修正。文字サイズ
+                   自体をもっと大きくする話は、次のレイアウト全体見直し
+                   (帯の間隔を詰めて空いた分を文字サイズに回す)で改めて
+                   対応する。 -->
+              <g id="sign-glyphs" font-size="11" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
               <!-- degree tick ring -->
               <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
                    -- 個々の線のstroke-width(0.4〜0.6と細い)に加えて、この
@@ -1203,6 +1220,12 @@
               <!-- aspect lines (drawn under the planet markers) -->
               <g id="aspect-lines"></g>
               <!-- planet markers -->
+              <!-- font-familyはグループ全体ではなく各グリフの<text>に
+                   個別設定(drawBodyRing()参照) -- グループに付けると、
+                   同じ#planet-markers内にある度数チップ(数字)まで
+                   Noto Sans Symbols 2を継承してしまい、数字側の文字
+                   メトリクスが変わって度数チップ同士の重なりチェックが
+                   崩れていた(2026-09-04、実測で発見)。 -->
               <g id="planet-markers" font-size="17"></g>
               <!-- checked fixed-star/deep-sky conjunction markers -->
               <g id="conj-markers"></g>
@@ -2046,92 +2069,13 @@
     { key: "pluto",   g: "♇︎", name: "冥王星" },
   ];
 
-  // ---------- 記号のSVG手描き化(2026-09-04、「サインとか、その他の記号
-  // も、チェックしてほしい」より) ----------
-  // これまでサイン・惑星の記号はUnicode文字(♈等)をテキストとして表示
-  // しており、実際の見た目はOS/ブラウザが「たまたま持っている」代替
-  // フォント任せだった(明示的なfont-family指定がなかったため)。射手座
-  // (♐、本来は矢印+斜めの横棒)が実機で崩れて見えたのも、エリスの記号
-  // (⯰)がiOSで消えたのも同じ根っこの問題。ここでは円チャート本体(サイン
-  // リング・惑星マーカー)だけを対象に、記号の形そのものを単純な線画
-  // (SVGのpath/line/circle)として直接描く方式に切り替え、フォントの
-  // 存在に一切依存しないようにした。度数リスト・アスペクト表・凡例等
-  // (HTML文字列で組み立てている箇所)は今回のスコープ外で、従来通り
-  // SIGNS/PLANET_META/MINOR_META の g(Unicodeテキスト)をそのまま使う
-  // -- そちらは文字列連結ベースの実装で、DOM要素を組み立て直す今回の
-  // 方式にすぐには乗せ替えられないため、次回以降の課題として残す。
-  // 各アイコンはローカル座標(-9〜9見当の正方形)で定義し、
-  // createGlyphIcon()がtranslate+scaleして実際の位置に配置する。
-  // 伝統的な占星術記号の書道的な正確さよりも、「どの端末でも同じ形に
-  // なる」ことと「見て判別できる」ことを優先した簡略化した線画。
-  const GLYPH_ICONS = {
-    // ---- サイン(12) ----
-    aries:       [{ tag: "path", d: "M -6,-7 C -8,-2 -5,2 -1,1 L -1,7" }, { tag: "path", d: "M 6,-7 C 8,-2 5,2 1,1 L 1,7" }],
-    taurus:      [{ tag: "circle", cx: 0, cy: 3, r: 4 }, { tag: "path", d: "M -5,-2 Q -7,-8 0,-6 Q 7,-8 5,-2" }],
-    gemini:      [{ tag: "line", x1: -5, y1: -6, x2: -5, y2: 6 }, { tag: "line", x1: 5, y1: -6, x2: 5, y2: 6 }, { tag: "line", x1: -7, y1: -6, x2: 7, y2: -6 }, { tag: "line", x1: -7, y1: 6, x2: 7, y2: 6 }],
-    cancer:      [{ tag: "path", d: "M -5,-3 C -2,-3 -2,1 -5,1 C -8,1 -8,-4 -5,-4" }, { tag: "path", d: "M 5,3 C 2,3 2,-1 5,-1 C 8,-1 8,4 5,4" }],
-    leo:         [{ tag: "circle", cx: -3, cy: -3, r: 3 }, { tag: "path", d: "M 0,-3 C 6,-3 8,1 5,4 C 3,6 0,4 1,2 C 2,0 4,1 3,3" }],
-    virgo:       [{ tag: "path", d: "M -7,7 L -7,-6 C -7,-6 -4,-2 -4,-6 L -4,7 C -4,-6 -1,-2 -1,-6 L -1,7 C -1,7 4,7 4,2 C 4,-2 0,-2 0,2" }],
-    libra:       [{ tag: "path", d: "M -7,-1 Q 0,-7 7,-1" }, { tag: "line", x1: -8, y1: 2, x2: 8, y2: 2 }, { tag: "line", x1: -6, y1: 6, x2: 6, y2: 6 }],
-    scorpio:     [{ tag: "path", d: "M -7,7 L -7,-6 C -7,-6 -4,-2 -4,-6 L -4,7 C -4,-6 -1,-2 -1,-6 L -1,7" }, { tag: "line", x1: -1, y1: 7, x2: 4, y2: 7 }, { tag: "line", x1: 4, y1: 7, x2: 2, y2: 4 }, { tag: "line", x1: 4, y1: 7, x2: 4, y2: 3 }],
-    // 射手座(2026-09-04、「射手座とか、なんか変。矢印と横棒だと思う」
-    // より) -- 矢の軸(左下から右上)+矢じり(先端のV字)+軸を斜めに
-    // 横切る短い横棒、の3要素で構成される本来の形をそのまま線で描く。
-    sagittarius: [{ tag: "line", x1: -6, y1: 6, x2: 6, y2: -6 }, { tag: "line", x1: 6, y1: -6, x2: 1, y2: -6 }, { tag: "line", x1: 6, y1: -6, x2: 6, y2: -1 }, { tag: "line", x1: -2, y1: 2, x2: 0, y2: 0 }],
-    capricorn:   [{ tag: "path", d: "M -6,-6 L -2,4 L 2,-6" }, { tag: "path", d: "M 2,-6 L 2,4 C 2,7 6,7 6,4 C 6,2 4,2 4,4" }],
-    aquarius:    [{ tag: "path", d: "M -7,-3 L -3,-6 L 1,-3 L 5,-6 L 8,-3" }, { tag: "path", d: "M -7,3 L -3,0 L 1,3 L 5,0 L 8,3" }],
-    pisces:      [{ tag: "path", d: "M -6,-7 C -9,-3 -9,3 -6,7" }, { tag: "path", d: "M 6,-7 C 9,-3 9,3 6,7" }, { tag: "line", x1: -6, y1: 0, x2: 6, y2: 0 }],
-    // ---- 惑星(9、地球⊕含む、ヘリオセントリックなので太陽は描かない) ----
-    mercury:     [{ tag: "path", d: "M -3,-4 C -3,-7 3,-7 3,-4" }, { tag: "circle", cx: 0, cy: 0, r: 3.5 }, { tag: "line", x1: 0, y1: 3.5, x2: 0, y2: 8 }, { tag: "line", x1: -2.5, y1: 6, x2: 2.5, y2: 6 }],
-    venus:       [{ tag: "circle", cx: 0, cy: -2, r: 3.5 }, { tag: "line", x1: 0, y1: 1.5, x2: 0, y2: 8 }, { tag: "line", x1: -2.5, y1: 5, x2: 2.5, y2: 5 }],
-    earth:       [{ tag: "circle", cx: 0, cy: 0, r: 6 }, { tag: "line", x1: 0, y1: -6, x2: 0, y2: 6 }, { tag: "line", x1: -6, y1: 0, x2: 6, y2: 0 }],
-    mars:        [{ tag: "circle", cx: -1, cy: 1, r: 4 }, { tag: "line", x1: 2, y1: -2, x2: 7, y2: -7 }, { tag: "line", x1: 3, y1: -7, x2: 7, y2: -7 }, { tag: "line", x1: 7, y1: -7, x2: 7, y2: -3 }],
-    jupiter:     [{ tag: "path", d: "M -7,-6 C -9,-2 -3,-2 -3,-6" }, { tag: "line", x1: -3, y1: -6, x2: -3, y2: 6 }, { tag: "line", x1: -7, y1: 2, x2: 1, y2: 2 }],
-    saturn:      [{ tag: "line", x1: -5, y1: -6, x2: 1, y2: -6 }, { tag: "line", x1: -2, y1: -7, x2: -2, y2: 3 }, { tag: "path", d: "M -2,3 C -2,6 1,6 1,3" }],
-    uranus:      [{ tag: "line", x1: -5, y1: -7, x2: -5, y2: 1 }, { tag: "line", x1: 5, y1: -7, x2: 5, y2: 1 }, { tag: "line", x1: -5, y1: -3, x2: 5, y2: -3 }, { tag: "circle", cx: 0, cy: 5, r: 2 }],
-    neptune:     [{ tag: "line", x1: -5, y1: -7, x2: -5, y2: 0 }, { tag: "line", x1: 5, y1: -7, x2: 5, y2: 0 }, { tag: "path", d: "M -5,-2 C -5,3 5,3 5,-2" }, { tag: "line", x1: 0, y1: 0, x2: 0, y2: 7 }, { tag: "line", x1: -3, y1: 7, x2: 3, y2: 7 }],
-    pluto:       [{ tag: "circle", cx: 0, cy: -5, r: 2.5 }, { tag: "path", d: "M -4,-1 C -4,3 4,3 4,-1" }, { tag: "line", x1: 0, y1: 1.5, x2: 0, y2: 7 }, { tag: "line", x1: -3, y1: 4, x2: 3, y2: 4 }],
-    // ---- 準惑星・小惑星(チェックすると惑星と同じ帯に混ざって出てくる
-    // ため、揃える必要がある。エリスだけは"Er"のテキスト表記のまま
-    // なので、ここには含めない=createGlyphIcon()が未定義キーとして
-    // 自動的にテキストへフォールバックする) ----
-    ceres:       [{ tag: "circle", cx: -2, cy: 0, r: 3.5 }, { tag: "path", d: "M 1.5,-3 C 5,-3 5,3 1.5,3" }],
-    pallas:      [{ tag: "circle", cx: 0, cy: 2, r: 3.5 }, { tag: "line", x1: 0, y1: -2, x2: 0, y2: -8 }, { tag: "path", d: "M -2,-6 L 0,-8 L 2,-6" }],
-    juno:        [{ tag: "circle", cx: 0, cy: -1, r: 3 }, { tag: "line", x1: -3, y1: -5, x2: 3, y2: -5 }, { tag: "line", x1: 0, y1: 2, x2: 0, y2: 7 }, { tag: "line", x1: -2, y1: 5, x2: 2, y2: 5 }],
-    vesta:       [{ tag: "circle", cx: 0, cy: -4, r: 2 }, { tag: "path", d: "M -4,0 L -4,6 L 4,6 L 4,0" }],
-    chiron:      [{ tag: "circle", cx: 0, cy: -4, r: 2.5 }, { tag: "line", x1: 0, y1: -1.5, x2: 0, y2: 6 }, { tag: "line", x1: 0, y1: 6, x2: 3, y2: 6 }, { tag: "line", x1: 0, y1: 4, x2: 2, y2: 4 }],
-  };
-  const SIGN_ICON_KEYS = ["aries", "taurus", "gemini", "cancer", "leo", "virgo", "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"];
-  // フォントに一切依存しない、シンプルな線画としてサイン/惑星記号を描く。
-  // iconKeyがGLYPH_ICONSに無い場合(エリスの"Er"等)は、従来通りfallbackText
-  // をそのままテキストとして描画する(安全なフォールバック)。
-  function createGlyphIcon(iconKey, x, y, size, color, fallbackText) {
-    const svgNS = "http://www.w3.org/2000/svg";
-    const spec = GLYPH_ICONS[iconKey];
-    if (!spec) {
-      const t = document.createElementNS(svgNS, "text");
-      t.setAttribute("x", x); t.setAttribute("y", y);
-      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-      t.setAttribute("fill", color);
-      t.setAttribute("font-size", String(size));
-      t.textContent = fallbackText || "?";
-      return t;
-    }
-    const g = document.createElementNS(svgNS, "g");
-    g.setAttribute("class", "glyph-icon");
-    g.setAttribute("transform", `translate(${x},${y}) scale(${size / 18})`);
-    g.setAttribute("stroke", color);
-    g.setAttribute("fill", "none");
-    g.setAttribute("stroke-width", "1.6");
-    g.setAttribute("stroke-linecap", "round");
-    g.setAttribute("stroke-linejoin", "round");
-    spec.forEach((shape) => {
-      const el = document.createElementNS(svgNS, shape.tag);
-      Object.entries(shape).forEach(([k, v]) => { if (k !== "tag") el.setAttribute(k, v); });
-      g.appendChild(el);
-    });
-    return g;
-  }
+  // 2026-09-04、7.72でサイン・惑星記号をSVG手描きアイコン化したが、
+  // 実機で「全然違う、読めない」と強く否定された(記憶だけで描いた
+  // ため精度が低かった)。7.75でNoto Sans Symbols 2フォント(Google
+  // Fonts、head内の<link>参照)によるテキスト表示に戻した -- 本来の
+  // 記号の形そのままで、かつWebフォントなので端末のフォント事情に
+  // 依存しない(元々の狙いは維持できている)。#sign-glyphs/#planet-markers
+  // のfont-family属性を参照。
 
   // Real computed longitudes (helio-app CLI, `--stars ... --transpose --csv`),
   // not placeholders -- サンプル人物(架空)1990-06-15 09:30 Asia/Tokyo、
@@ -2883,12 +2827,23 @@
       // グリフの表示半径160->164(2026-09-03、「メモリは、サインの帯の
       // 内周に着けてほしい」より、下の度数目盛りを帯の内周(150)寄りに
       // 移した分、目盛りの届く範囲(最大158)と被らないよう外側へ寄せた)。
-      const [gx, gy] = polar(200, 200, 164, deg + 15);
-      // 2026-09-04、SVG手描きアイコン化(フォント依存の解消、GLYPH_ICONS
-      // 参照)。#sign-glyphsグループの旧font-size/fill属性はテキスト時代
-      // の名残りでもう使われないが、createGlyphIcon()にそのまま同じ
-      // サイズ・色を渡している。
-      glyphs.appendChild(createGlyphIcon(SIGN_ICON_KEYS[i], gx, gy, 15, "var(--ink)", SIGNS[i]));
+      // 164->162へ(2026-09-04、7.75でNoto Sans Symbols 2フォントに切替え
+      // てグリフが縦に大きくなった影響で、サインリング帯(150〜174)の
+      // 内外どちらにもわずかにはみ出していたのを実測で発見 -- font-size
+      // 15->12との組み合わせで、はみ出しをほぼ解消(実測、内側最悪
+      // 149.4/外側最悪174.5、帯境界150/174に対して±0.6単位以内)。文字
+      // サイズ・帯幅の本格的な見直しは次のレイアウト全体見直しで行う。
+      const [gx, gy] = polar(200, 200, 162, deg + 15);
+      // 2026-09-04、7.72で手描きSVGアイコン化したが実機で「全然違う、
+      // 読めない」と強く否定されたため、7.75でNoto Sans Symbols 2
+      // フォント(#sign-glyphsのfont-family参照)によるテキスト表示に
+      // 戻した -- 本来の記号の形そのままで、かつWebフォントなので端末
+      // 依存もない。
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", gx); t.setAttribute("y", gy);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.textContent = SIGNS[i];
+      glyphs.appendChild(t);
     }
     // 10度/20度は大きい目盛り、5度/15度/25度は小さい目盛り(2026-09-01、
     // スターゲイザー/ケプラーの参考画像より) -- サインの境目(0度/30度)は
@@ -3228,7 +3183,14 @@
       const radii = staggerRadii(planets.map(p => ({ key: p.key, deg: p.deg })), baseRadius, step);
       planets.forEach(p => {
         const [x, y] = polar(200, 200, radii[p.key], p.deg);
-        markers.appendChild(createGlyphIcon(p.key, x, y, 15, color, p.g));
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", x); t.setAttribute("y", y);
+        t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+        t.setAttribute("fill", color);
+        t.setAttribute("font-size", "15");
+        t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
+        t.textContent = p.g;
+        markers.appendChild(t);
       });
       return radii;
     }
@@ -3242,9 +3204,12 @@
     // を左右する(2026-09-03、実測でジュピター・エリス・ケレス・キロンが
     // 詰まった配置で発覚 -- 幅15だけを見ていたら、実際にはグリフの高さ
     // (実測約21.2)の方が大きく、真西寄りの角度で重なりが残った)。幅と
-    // 高さの大きい方(22、高さ基準)を使えば、弧がどちらの成分に転んでも
-    // 安全になる。
-    sweepSameTierLabels(glyphItems, 22);
+    // 高さの大きい方を使えば、弧がどちらの成分に転んでも安全になる。
+    // 22 -> 26へ(2026-09-04、7.75でNoto Sans Symbols 2フォントに切替えた
+    // 際、実測でグリフの高さが約21.2->25.2に増えていたのを見落として
+    // いたため、6シナリオの自動チェックで重なりが83〜302px²まで悪化して
+    // いるのを発見・修正)。
+    sweepSameTierLabels(glyphItems, 26);
     const degItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: DEGREE_R }));
     sweepSameTierLabels(degItems, 33);  // チップ幅(28->33、度数文字のfont-size 9->10.5に合わせて比例で引き上げ、2026-09-03)
     const glyphByKey = new Map(glyphItems.map(it => [it.key, it]));
@@ -3254,7 +3219,14 @@
       const gi = glyphByKey.get(p.key);
       radii[p.key] = gi.r;  // アスペクト線のアンカーは実際に描かれたグリフの位置(スイープ後)
       const [x, y] = polar(200, 200, gi.r, gi.deg);
-      markers.appendChild(createGlyphIcon(p.key, x, y, 15, color, p.g));
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", x); t.setAttribute("y", y);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.setAttribute("fill", color);
+      t.setAttribute("font-size", "15");
+      t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
+      t.textContent = p.g;
+      markers.appendChild(t);
       // グリフが密な合でsweepにより実際にずれた場合だけガイド線を出す
       // (普段は動かないので、ほとんどのグリフにはガイド線が出ない)。
       if (guides && Math.abs(((gi.deg - gi.origDeg + 540) % 360) - 180) > 0.5) {
