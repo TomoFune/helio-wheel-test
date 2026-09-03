@@ -307,7 +307,17 @@
        ていることが伝わらず壊れて見えていた。"…"で切れていることを
        明示する。 */
     min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-    display: flex; align-items: center;
+    display: block;
+    /* display:flexだとtext-overflow:ellipsisが効かない(2026-09-03、
+       実機で「7.65で直したはずの右側の[みたいなやつ」が再発している
+       のを見て判明) -- ellipsisはブロックレベルの箱にしか適用されず、
+       flexコンテナ自身には効かない(子要素は個別にellipsisできるが、
+       ここは単純なtextContentの差し込みなので子要素化していなかった)。
+       align-items:centerは元々トランジット編集モード(renderEditableTime
+       が差し込むprefixのspan+.time-seg-row)の横並び調整用だったが、
+       .time-seg-row自体が既にinline-flexで自己完結しているため、外側の
+       #badge-line2をブロック化しても実機で見た目の崩れは無いことを確認
+       済み。 */
   }
   .time-seg-row { display: inline-flex; align-items: center; }
   .time-seg {
