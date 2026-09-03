@@ -1,0 +1,3366 @@
+<!doctype html><html><meta charset="utf-8">
+<title>Helio Wheel</title>
+<style>
+  /* --aspect-neutral(合・セミセクスタイル・クインタイル等5種のアス
+     ペクト線に使う色)を、ダーク#7a8099->#9ba3c2、ライト#8a8168->
+     #6f6650に(2026-09-03、「線とか文字が、見にくいのよね」「色？
+     線の太さ？コントラストかな？」より) -- 元の色は彩度・明度とも
+     低く、背景との対比が弱かった。 */
+  :root {
+    --bg: #fbf6ec;
+    --bg-elevated: #f2e9d6;
+    --bg-sunken: #ece0c8;
+    --ink: #1e1b14;
+    --ink-dim: #6b644f;
+    --ink-faint: #766c56;
+    --accent: #b5760c;
+    --accent-strong: #8f5a06;
+    --accent-soft: rgba(181, 118, 12, 0.14);
+    --line: rgba(30, 27, 20, 0.14);
+    --line-strong: rgba(30, 27, 20, 0.28);
+    --good: #4d7a4a;
+    --ring-a: #b5760c;
+    --ring-b: #6b644f;
+    --aspect-hard: #b5453a;
+    --aspect-soft: #3f6f8f;
+    --aspect-neutral: #6f6650;
+    --shadow: 0 12px 32px rgba(30, 27, 20, 0.16);
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 9px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0e1a;
+      --bg-elevated: #141829;
+      --bg-sunken: #090b14;
+      --ink: #f1ede4;
+      --ink-dim: #9199b5;
+      --ink-faint: #8993b8;
+      --accent: #e8a94c;
+      --accent-strong: #f4c274;
+      --accent-soft: rgba(232, 169, 76, 0.14);
+      --line: rgba(241, 237, 228, 0.1);
+      --line-strong: rgba(241, 237, 228, 0.2);
+      --good: #7fbf7a;
+      --ring-a: #e8a94c;
+      --ring-b: #6b7299;
+      --aspect-hard: #e08670;
+      --aspect-soft: #7fb3d9;
+      --aspect-neutral: #9ba3c2;
+      --shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e1a;
+    --bg-elevated: #141829;
+    --bg-sunken: #090b14;
+    --ink: #f1ede4;
+    --ink-dim: #9199b5;
+    --ink-faint: #8993b8;
+    --accent: #e8a94c;
+    --accent-strong: #f4c274;
+    --accent-soft: rgba(232, 169, 76, 0.14);
+    --line: rgba(241, 237, 228, 0.1);
+    --line-strong: rgba(241, 237, 228, 0.2);
+    --good: #7fbf7a;
+    --ring-a: #e8a94c;
+    --ring-b: #6b7299;
+    --aspect-hard: #e08670;
+    --aspect-soft: #7fb3d9;
+    --aspect-neutral: #7a8099;
+    --shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  h1, h2, h3, .display {
+    font-family: "Shippori Mincho", "Cormorant Garamond", "Hiragino Mincho ProN", serif;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+    color: var(--ink);
+    margin: 0;
+  }
+  .mono, .num {
+    font-family: "Space Mono", "JetBrains Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  button { font-family: inherit; }
+  button:focus-visible, [tabindex]:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- App shell ---------- */
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg);
+    position: relative;
+    /* NOT overflow:hidden here (2026-08-31) -- that clips the closed
+       .side-panels correctly (7.29), but as a side effect it also becomes
+       the nearest scroll-container ancestor for position:sticky, and
+       since .app itself never actually scrolls (the page does), a sticky
+       descendant just never sticks. The clipping moved to .panel-layer
+       (a dedicated absolute overlay, see its rule) which sits outside the
+       sticky .topbar/.settings-menu, so both fixes can coexist. */
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+    /* Sticky (2026-08-31, プレビュー欄の高さが限られていて、円を見よう
+       とスクロールすると呼び出しメニューに手が届かなくなるという相談を
+       受けて) -- background is needed explicitly since sticky elements
+       don't inherit an opaque backdrop from .app just by being its
+       descendant; without it, scrolled-under content would show through
+       the gaps between icons/buttons. z-index is below .scrim/.side-panel
+       (30/31) so an open panel still covers the header, same as before. */
+    position: sticky; top: 0; z-index: 15;
+    background: var(--bg);
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .brand-mark {
+    font-family: "Shippori Mincho", serif;
+    font-size: 1.25rem;
+    color: var(--accent);
+  }
+  .brand-sub {
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+  }
+  .topbar-menu-slot { display: none; }  /* populated + shown only at desktop -- see layoutHeaderForWidth() and the media query */
+  .topbar-badge-slot { display: none; }  /* populated + shown only at desktop -- see layoutBadgeForWidth() and the media query */
+  .topbar-actions { display: flex; gap: 10px; align-items: center; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-elevated);
+    color: var(--ink-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .view { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .view.active { display: flex; }
+
+  /* ---------- Screen: person select ---------- */
+  .screen-pad { padding: 22px 20px 32px; overflow-y: auto; flex: 1; }
+  .lead { color: var(--ink-dim); font-size: 0.88rem; line-height: 1.7; margin: 10px 0 22px; }
+
+  .person-list { display: flex; flex-direction: column; gap: 10px; }
+  .person-card {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    color: var(--ink);
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .person-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .person-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: conic-gradient(from 200deg, var(--ring-a), var(--accent-soft), var(--ring-a));
+    flex-shrink: 0;
+  }
+  .person-meta { flex: 1; min-width: 0; }
+  .person-name { font-weight: 700; font-size: 0.95rem; }
+  .person-detail { font-size: 0.84rem; color: var(--ink-faint); margin-top: 2px; }
+  .person-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .tag {
+    font-size: 0.78rem; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-strong);
+    letter-spacing: 0.02em;
+  }
+  .chevron { color: var(--ink-faint); font-size: 1.1rem; }
+
+  .quick-entry-btn {
+    margin-top: 18px;
+    width: 100%;
+    padding: 14px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--ink-dim);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .quick-entry-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .section-label {
+    font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 26px 0 10px;
+  }
+
+  /* ---------- Screen: chart main ---------- */
+  .chart-stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 18px 16px 8px;
+    min-height: 0;
+    position: relative;
+  }
+  .person-badge {
+    position: absolute; top: 14px; left: 16px; right: 16px; z-index: 5;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .person-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  /* 1行化(2026-09-01、「自分/年月日が二段になっている、一段にしたら
+     その分円を大きくできないか」より) -- 以前は#badge-line1(名前)と
+     .badge-line2-row(日時)を縦に2段積みしていたが、横並びの1行に変更。
+     浮いた高さぶんは.pane-tabs/.chart-columnsの上マージンを詰めて円の
+     高さ予算に還元している(下の該当コメント参照)。 */
+  .person-badge-lines {
+    min-width: 0; flex: 1;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  #badge-line1 {
+    font-size: 0.84rem; font-weight: 700; color: var(--ink);
+    flex-shrink: 0;
+    /* 折り返し(overflow-wrap)は残す -- 二重円モードで名前+種別ラベル+
+       日付が全部ここに入ることがあり、1行に収まりきらない場合の保険。
+       通常は横に並ぶが、狭い画面では自然に2行目へ折り返す。 */
+    overflow-wrap: break-word;
+  }
+  .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  #badge-line2 {
+    font-size: 0.8rem; color: var(--ink-dim);
+    min-width: 0; overflow: hidden; white-space: nowrap;
+    display: flex; align-items: center;
+  }
+  .time-seg-row { display: inline-flex; align-items: center; }
+  .time-seg {
+    font: inherit; font-family: "Space Mono", "JetBrains Mono", monospace;
+    color: var(--ink-dim); background: transparent; border: none; border-radius: 4px;
+    padding: 1px 1px; text-align: center; -webkit-appearance: none; appearance: none;
+  }
+  .time-seg:focus, .time-seg.active {
+    outline: none; background: var(--accent-soft); color: var(--ink);
+  }
+  .time-sep { color: var(--ink-faint); }
+  .badge-scrub-btn {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    color: var(--accent); font-size: 1.3rem; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .badge-scrub-btn:hover { border-color: var(--accent); }
+  .badge-now-btn { font-size: 0.7rem; font-weight: 700; color: var(--accent-strong); margin-left: 2px; }
+
+  /* ネイタル/トランジット/二重円 (2026-08-31, .display-tabsという専用の
+     帯をやめてsettings-menuの.menu-btnに合流させた -- 見た目は他の設定
+     ボタンと揃えつつ、選択中のものだけ色を付けて分かるようにする)。 */
+  .menu-btn.active {
+    background: var(--accent); border-color: var(--accent); color: var(--bg-sunken);
+  }
+  .menu-btn.active:hover { color: var(--bg-sunken); }
+
+  /* ---------- Pane switcher (2026-08-31, PCでは円+データを並べて一枚
+     で見たい/スマホでは円・度数・アスペクト・サビアンをタブで1つずつ、
+     という相談から) ----------
+     Mobile: .pane-tabs picks ONE of the 4 panes (wheel included) via
+     .mobile-active -- single-pane, matches the narrow-screen reality.
+     Desktop: .pane-tabs itself is hidden (円 doesn't need a tab, it's
+     always shown in its own column) and .data-panel-tabs -- a separate,
+     nearly-identical 3-button row living inside .data-panel -- instead
+     picks which of degrees/aspects/sabian shows via .data-active. Both
+     tab rows call the same setPane(), which keeps both states in sync;
+     see its comment for why two separate active-classes are needed. */
+  .pane-tabs {
+    display: flex; gap: 8px; width: 100%; max-width: 380px;
+    /* 58px -> 34px (2026-09-01、バッジが2段から1段になった分。「一段に
+       したら、その分円を大きくできませんか」より) -- 元の58pxは2段
+       (名前+日時、スクラブボタン込み)のバッジの実測高さに合わせた値。
+       1段になった今の実測クリアランスは実測32px分の余りがあったので、
+       58px-32px+8px(見た目の余白)=34pxに詰めた。 */
+    margin-top: 34px;
+  }
+  .pane-tab-btn {
+    flex: 1; padding: 8px 4px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    color: var(--ink-dim); font-size: 0.78rem; font-weight: 700; cursor: pointer;
+    text-align: center; transition: background 0.15s, color 0.15s;
+  }
+  .pane-tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg-sunken); }
+  .pane-tab-btn:hover:not(.active) { border-color: var(--accent); color: var(--ink); }
+  .data-panel-tabs { display: none; }  /* desktop-only, see media query */
+
+  .chart-columns { width: 100%; display: flex; flex-direction: column; align-items: center; }
+  .pane-content { display: none; width: 100%; }
+  .pane-content.mobile-active { display: block; }
+  #pane-wheel.mobile-active { display: flex; flex-direction: column; align-items: center; }
+  .data-panel { width: 100%; max-width: 380px; }
+
+  .wheel-wrap {
+    width: 100%;
+    max-width: 380px;
+    aspect-ratio: 1;
+    margin-top: 10px;
+    position: relative;
+  }
+  .wheel-wrap svg { width: 100%; height: 100%; overflow: visible; }
+  .wheel-wrap { border-radius: 50%; }
+  .wheel-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+
+  /* A menu bar directly under the topbar (Stargazer/AstroGoldの参考通り、
+     設定への入り口はチャート表示域の外に分離) -- not centered/capped like
+     the chart content below it, since it's meant to read as part of the
+     app chrome, the same way .topbar spans full width. */
+  .settings-menu {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+    /* Stacks directly under the sticky .topbar (69px: 18+36+14px padding/
+       icon-height + 1px border) -- see the comment on .topbar for why
+       both are sticky+opaque together. */
+    position: sticky; top: 69px; z-index: 14;
+    background: var(--bg);
+  }
+  .menu-btn {
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-elevated);
+    color: var(--ink-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, opacity 0.15s;
+  }
+  .menu-btn:hover { border-color: var(--accent); color: var(--ink); }
+  .menu-btn span { color: inherit; }
+  /* モバイルはフルラベルのまま(タップ精度優先) -- short-labelはデスク
+     トップの.menu-btn-compact専用、下のmin-width:900pxブロックで切替。 */
+  .menu-btn-compact .short-label { display: none; }
+
+  .legend-grid {
+    width: 100%;
+    max-width: 380px;
+    margin: 14px 0 4px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px 14px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 2px;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.86rem;
+  }
+  .legend-glyph {
+    width: 20px; text-align: center; color: var(--accent); flex-shrink: 0;
+  }
+  .legend-name { flex: 1; color: var(--ink); }
+  .legend-deg { color: var(--ink-dim); }
+  .legend-col-head {
+    font-size: 0.78rem; font-weight: 700; color: var(--ink);
+    letter-spacing: 0.04em; margin-bottom: 4px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .legend-grid.biwheel { column-gap: 18px; }
+  .legend-sabian {
+    font-size: 0.72rem; color: var(--ink-faint);
+    border: 1px dashed var(--line-strong); border-radius: 5px;
+    padding: 1px 5px; flex-shrink: 0;
+  }
+  /* サビアンタブの中身 -- 天体名+度数+サビアン文の4項目/行なので
+     legend-gridの2列グリッドには詰め込まず、1列の縦並びにしている。
+     文章は本来1行に収まらない長さ(実測30文字前後、2026-09-01)なので、
+     普段は短く省略した状態(.sabian-text、クリック/タップで全文表示に
+     切り替え、PCはtitle属性のホバーでも全文が見られる)にして、天体数
+     ぶん(9+)を一覧でパッと見渡せることを優先している。 */
+  .sabian-list { width: 100%; max-width: 380px; margin: 8px 0 4px; }
+  .sabian-row {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 4px 2px;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.86rem;
+  }
+  /* flex: 0 0 auto, not just flex-shrink:0 (2026-09-01, 「惑星とサインと
+     度数のスペースは開けすぎ」より) -- .legend-name の共通ルールは
+     flex:1(=grow:1 shrink:1 basis:0) なので、shrink だけ0にしても grow
+     はまだ効いたまま、天体名(2〜4文字)が .sabian-text と一緒に伸縮先を
+     取り合って不要な余白ができていた。3つとも中身の幅ぴったりに固定し、
+     余白は全部 .sabian-text(flex:1のまま)に回るようにした。 */
+  .sabian-row .legend-glyph, .sabian-row .legend-name, .sabian-row .legend-deg { flex: 0 0 auto; }
+  /* 1行固定でCSS省略(text-overflow:ellipsis)。以前は文字数(14文字)で
+     JS側で切り詰めていたが、実際のカラム幅(パネル幅や画面幅によって
+     変わる)に対して大きすぎる固定値だったため、切った後の文章がそれ
+     でも折り返して2行になり、行の高さが想定の倍近くになって「デフォル
+     トの12天体がスクロールなしで収まらない」原因になっていた
+     (2026-09-01)。white-space:nowrap+ellipsisなら、カラム幅がどうで
+     あっても常にちょうど1行に収まる。 */
+  .sabian-text {
+    flex: 1; min-width: 0; cursor: pointer;
+    color: var(--ink-dim); font-size: 0.82rem; line-height: 1.45;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sabian-text.expanded { white-space: normal; overflow: visible; text-overflow: clip; }
+  .sabian-text:hover { color: var(--ink); }
+  .block-label {
+    font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 14px 0 4px; width: 100%; max-width: 380px;
+  }
+
+  .aspect-table {
+    width: 100%; max-width: 380px;
+    margin-bottom: 4px;
+  }
+  /* Grid/matrix style (アストロゴールド等を参考、2026-08-31) -- triangular
+     half (single-wheel aspects are self-vs-self, so the lower-left half
+     would just duplicate the upper-right; skipped rather than shown
+     shaded, unlike a biwheel/synastry grid which legitimately needs the
+     full rectangle since the two axes are different bodies). Can run
+     wide with many bodies checked, so it scrolls horizontally in its own
+     box rather than squeezing the whole page. */
+  .aspect-grid-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .aspect-grid { border-collapse: collapse; }
+  .aspect-grid th, .aspect-grid td {
+    width: 30px; height: 30px; min-width: 30px;
+    text-align: center; vertical-align: middle;
+    border: 1px solid var(--line);
+    padding: 0; font-size: 0.72rem;
+  }
+  .aspect-grid th {
+    color: var(--accent); font-size: 0.9rem; font-weight: 400;
+    background: var(--bg-elevated); position: sticky; cursor: default;
+  }
+  .aspect-grid th:first-child { left: 0; z-index: 1; }
+  .aspect-grid tr:first-child th { top: 0; z-index: 1; }
+  .aspect-grid td.blank { background: var(--bg-sunken); opacity: 0.35; }
+  .aspect-grid td.hit { font-weight: 700; cursor: default; }
+  #planet-markers.hide-wheel-degrees .wheel-degree-label { display: none; }
+
+  .field-label {
+    font-size: 0.8rem; color: var(--ink-faint); letter-spacing: 0.06em;
+    margin-bottom: 8px; display: block;
+  }
+
+  .segmented {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  }
+  .segmented.two-row { grid-template-columns: repeat(3, 1fr); }
+  .seg-btn {
+    padding: 9px 4px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: var(--bg);
+    color: var(--ink-dim);
+    font-size: 0.84rem;
+    cursor: pointer;
+    text-align: center;
+  }
+  .seg-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-sunken);
+    font-weight: 700;
+  }
+
+  .row-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line-strong);
+    background: var(--bg);
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 0.84rem;
+  }
+  .row-btn .row-btn-value { color: var(--accent); font-weight: 700; }
+  .row-btn .chevron { font-size: 0.9rem; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .switch {
+    width: 42px; height: 24px; border-radius: 999px;
+    background: var(--line-strong);
+    position: relative; cursor: pointer; flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .switch.on { background: var(--accent); }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--bg); transition: left 0.15s;
+  }
+  .switch.on::after { left: 21px; }
+
+  .scrub-note { font-size: 0.78rem; color: var(--ink-faint); margin: 8px 0 0; line-height: 1.5; }
+
+  /* Shared row style for the two checkbox lists (minor bodies, aspect
+     types) -- same visual language as .mini-check already used in the
+     conjunction list, so all "pick which of these to include" controls
+     in this app look and behave the same way. */
+  .check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 2px;
+    font-size: 0.85rem; color: var(--ink);
+  }
+  .check-row-group-label {
+    font-size: 0.76rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 14px 0 2px;
+    grid-column: 1 / -1;  /* full-width heading when the list is a 2-col grid (no-op otherwise) */
+  }
+  .check-row-group-label:first-child { margin-top: 0; }
+  .aspect-swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  /* Two-column checkbox grids (2026-08-31, 表示オプションが縦に伸びすぎ
+     て見にくいという相談を受けて) -- only the two long pick-lists in the
+     表示オプション panel use this; everything else stays a normal
+     single-column .check-row. */
+  #minor-body-list, #aspect-type-list {
+    display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 10px;
+  }
+  /* Groups the panel's toggle-rows/checkbox-lists into clearly separated
+     blocks (度数表示・小惑星・アスペクト) instead of one long flat list --
+     same "before you'd have to guess where one setting group ends and the
+     next begins" problem the aspect-grid table solved for aspects earlier. */
+  .panel-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .panel-section:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  .panel-section-label {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin: 0 0 12px;
+  }
+
+  .orb-row { display: flex; align-items: center; gap: 10px; }
+  .orb-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .orb-value { font-size: 0.8rem; width: 44px; text-align: right; color: var(--accent); font-weight: 700; }
+
+  /* ---------- Slide-in panels ---------- */
+  /* Dedicated clipping layer for the scrim + side-panels (2026-08-31,
+     split out of .app -- see the comment on .app for why). inset:0
+     relative to .app (the nearest position:relative ancestor) gives it
+     exactly the box .app's own overflow:hidden used to provide, so
+     scrim/panel positioning and closed-panel clipping are unchanged.
+     pointer-events:none so this transparent layer doesn't block clicks to
+     .chart-stage underneath when no panel is open; .scrim/.side-panel
+     re-enable their own (scrim already did, via .show). */
+  .panel-layer {
+    position: absolute; inset: 0; overflow: hidden;
+    pointer-events: none; z-index: 20;
+  }
+  .scrim {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.36);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 30;
+  }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+
+  .side-panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 88%; max-width: 400px;
+    background: var(--bg);
+    border-left: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    transform: translateX(100%);
+    transition: transform 0.26s ease;
+    z-index: 31;
+    display: flex; flex-direction: column;
+    pointer-events: auto;
+  }
+  .side-panel.show { transform: translateX(0); }
+
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 18px 12px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+  }
+  .panel-head h2 { font-size: 1.05rem; }
+  .panel-body { padding: 14px 18px 24px; overflow-y: auto; flex: 1; }
+
+  .search-box {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-elevated); border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 14px;
+  }
+  .search-box input {
+    border: none; background: transparent; outline: none; flex: 1;
+    color: var(--ink); font-size: 0.85rem; font-family: inherit;
+  }
+  .search-box input::placeholder { color: var(--ink-faint); }
+
+  .tab-row { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-strong);
+    background: var(--bg); color: var(--ink-dim); font-size: 0.82rem; cursor: pointer;
+  }
+  .tab-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+
+  .ref-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 4px; border-bottom: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .ref-item:last-child { border-bottom: none; }
+  .ref-item-main { display: flex; flex-direction: column; }
+  .ref-item-name { font-size: 0.88rem; }
+  .ref-item-cat { font-size: 0.78rem; color: var(--ink-faint); margin-top: 1px; }
+  .ref-item-check {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 1.5px solid var(--line-strong);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--bg); font-size: 0.78rem; flex-shrink: 0;
+  }
+  .ref-item.selected .ref-item-check { background: var(--accent); border-color: var(--accent); }
+  .ref-item.selected .ref-item-name { color: var(--accent); font-weight: 700; }
+
+  /* conjunction list */
+  .conj-body-group { margin-bottom: 18px; }
+  .conj-body-name {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.8rem; font-weight: 700; margin-bottom: 8px; color: var(--ink);
+  }
+  .conj-body-glyph {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent-strong);
+    display: flex; align-items: center; justify-content: center; font-size: 0.86rem;
+  }
+  .conj-hit {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 4px 9px 30px;
+  }
+  .conj-hit-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .conj-hit-name { font-size: 0.82rem; }
+  .conj-hit-cat { font-size: 0.74rem; color: var(--ink-faint); margin-top: 1px; }
+  .conj-hit-sep { font-size: 0.8rem; color: var(--ink-faint); flex-shrink: 0; }
+  .mini-check {
+    width: 18px; height: 18px; border-radius: 5px;
+    border: 1.5px solid var(--line-strong);
+    cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--bg); font-size: 0.78rem;
+  }
+  .mini-check.on { background: var(--accent); border-color: var(--accent); }
+
+  .orb-slider-block {
+    padding: 12px 14px; border-radius: var(--radius-sm);
+    background: var(--bg-elevated); border: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+
+  /* ---------- Person management screen ---------- */
+  .pm-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .add-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 999px;
+    background: var(--accent); color: var(--bg-sunken);
+    border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+  }
+
+  /* ---------- Person add/edit form (storage.py Person fields) ---------- */
+  .pe-input {
+    width: 100%; padding: 11px 12px; margin-top: 6px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+    background: var(--bg-elevated); color: var(--ink);
+    font-size: 0.9rem; font-family: inherit;
+  }
+  .pe-input::placeholder { color: var(--ink-faint); }
+  .pe-input:disabled { opacity: 0.45; }
+  .pe-row { display: flex; gap: 8px; }
+  .pe-row .pe-input { margin-top: 6px; flex: 1; }
+  .pe-textarea { min-height: 72px; resize: vertical; }
+
+  /* bottom back-nav for sub-screens */
+  .subnav {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .back-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    color: var(--ink-dim); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .subnav h2 { font-size: 1rem; }
+
+  .flow-note {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg);
+    font-size: 0.78rem; padding: 7px 14px; border-radius: 999px;
+    z-index: 50; opacity: 0.88; pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- Desktop layout (wide viewport) ----------
+     Same markup/JS/interaction model as mobile -- settings still live in
+     call-up side-panels, not a permanent sidebar (an earlier version of
+     this mockup tried an always-open sidebar here; dropped it because it
+     eats the horizontal room that's the whole point of "見せたいのは
+     円+度数+サビアンだけ" on a big screen). Only the canvas (wheel +
+     legend) is allowed to grow well past its mobile cap. */
+  @media (min-width: 900px) {
+    /* 上下のpaddingを40px->16pxに詰めた(2026-09-01、「もう少し円は
+       大きくならないのかな」「バーンと見たい(NPT-Charts/ステラナビゲー
+       タのような、円が画面をほぼ占める見た目)」より) -- 「浮いたカード」
+       の見た目のための余白だったが、円の高さ予算(下の#pane-wheel参照)
+       を直接削っていたので、見た目の余白より円の大きさを優先して詰めた。
+       16px -> 8pxへ、2026-09-03、スターゲイザーとの比較で「だいぶいい！
+       もう一声」より、さらに詰めた。8px -> 6pxは同日中さらに後、
+       「円をもうちょっとだけ、大きくできないかなー」より。左右(24px)
+       は変更なし(横方向はまだ余裕があるため)。 */
+    body { display: flex; justify-content: center; padding: 6px 24px; }
+    .app {
+      /* Without an explicit width, .app (now a flex item since body just
+         became display:flex above) shrinks to fit its content instead of
+         growing to fill available space -- the classic flexbox "auto
+         width means content size, not fill" gotcha. That silently capped
+         everything below at its mobile content size even past this
+         breakpoint, so max-width:780px was never actually reached. */
+      width: 100%;
+      /* Fluid, not a fixed 780px cap (2026-08-31, 「13インチのノートPC
+         でも横が狭く感じる」という相談より) -- 780px固定だと、900px
+         ブレークポイントのすぐ上でしかちょうどよく見えず、それより広い
+         画面(13インチノートでも実際は1280px前後はある)では余白ばかり
+         増えて画面を活かせていなかった。min()で画面幅の95%まで追従し
+         つつ、無闇に大きくなりすぎないよう1300pxで頭打ちにしてある。 */
+      max-width: min(95vw, 1300px);
+      /* min-height を 100vh から引く分は、body の上下padding合計と常に
+         一致させる(2026-09-01発見) -- 基本ルールの min-height:100vh は
+         余白なしで画面いっぱいに広がるモバイル向けの値で、このデスク
+         トップ用ブロックが body に上下paddingを足しているのに.app側は
+         そのままだと、カードが常にビューポートよりpadding分高くなり、
+         中身の量に関係なく必ずページ全体が縦スクロールする状態になる
+         (「サビアンがデフォルトでもスクロールなしで見えない」の一因)。
+         body paddingを40px→16pxに詰めた(すぐ上のコメント参照)のに
+         合わせて80px→32pxに更新。 */
+      min-height: calc(100vh - 32px);
+      /* Stays overflow:hidden (inherited from the base .app rule) rather
+         than visible -- a closed .side-panel sits just outside .app's own
+         box (translateX(100%) shifts it a full panel-width to the right),
+         which overflow:hidden clips. Switching this to visible for
+         desktop (an earlier version of this rule did) let that closed
+         panel's left sliver show as a stray edge/box whenever the
+         viewport's margin around the centered .app was narrower than the
+         panel's width -- exactly the "段差" reported after the 7.28 fix
+         made .app reach its full centered width. */
+    }
+    /* 上下paddingを詰めた(18px 20px -> 10px 12px、2026-09-01、円の高さ
+       予算を増やすため。横(30px)は変更なし)。さらに6px 8pxまで追加で
+       詰めた(2026-09-03、「上のメニューバーとかをどうにかして、図自体を
+       大きくは見れないのかな」より -- トップバー/バッジ側の追加詰めと
+       セットで、下のコメント参照)。4px 6pxへさらに、同日中さらに後、
+       「円をもうちょっとだけ、大きくできないかなー」より。 */
+    .chart-stage { padding: 4px 30px 6px; }
+    /* Slightly more compact than mobile's (2026-08-31, "上のメニューが
+       3段分も高さがある" -- the fixed header chrome above the wheel eats
+       into the same short-viewport budget the wheel's own height cap
+       above is fighting for, so trimming it here buys the wheel a bit
+       more room too, not just a tidier header). */
+    .settings-menu { padding: 8px 30px; }
+    .menu-btn { padding: 5px 10px; font-size: 0.76rem; }
+
+    /* #settings-menu's buttons move up next to the brand (2026-09-01,
+       "日輪の右側に起点とかのメニューも並べてほしい" -- superseding the
+       8-31 version of this, which only moved the display-mode buttons and
+       duplicated them via CSS rather than relocating the real nodes; see
+       #topbar-menu-slot's own comment). .topbar drops space-between (a
+       3rd middle child, #topbar-menu-slot, doesn't space evenly the way
+       it wants) in favor of a plain gap, with .topbar-actions pushed to
+       the far right via margin-left:auto instead. */
+    .topbar { justify-content: flex-start; gap: 18px; }
+    .topbar-actions { margin-left: auto; }
+    .topbar-menu-slot { display: flex; flex-wrap: wrap; gap: 8px; }
+    .topbar-badge-slot { display: flex; }
+    /* デスクトップはマウス操作でタップ精度の心配がないため、モバイルの
+       タップしやすさ優先の36px/18-14pxパディングをそのまま使う必要は
+       ない、という判断で追加で詰めた(2026-09-03、「上のメニューバーと
+       かをどうにかして、図自体を大きくは見れないのかな」より -- 過去に
+       この予算を4回詰めた際は「ボタン類の押しやすさに関わるので現状
+       維持」としてトップバー自体には手を付けていなかったが、それは
+       モバイル/デスクトップ共通の値だったため。今回はデスクトップだけ
+       に絞った縮小なので、モバイルのタップしやすさには影響しない)。
+       icon-btn 36→28px、topbar上下パディング18/14→10/8px、バッジの
+       scrub-btn 30→24px・上位置14→8pxも同様に詰めた。10/8px→8/6pxへ
+       さらに、同日中さらに後、「円をもうちょっとだけ、大きくできない
+       かなー」より。 */
+    .topbar { padding: 8px 20px 6px; }
+    .icon-btn { width: 28px; height: 28px; font-size: 0.85rem; }
+    .person-badge { top: 8px; }
+    .badge-scrub-btn { width: 24px; height: 24px; font-size: 1.1rem; }
+    /* 種別/表示/サビアンは1文字+title属性のツールチップに(上のHTML側
+       コメント参照)。図/起点/恒星の合は選択値を見せる役目があるので
+       フルラベルのまま。 */
+    .menu-btn-compact .full-label { display: none; }
+    .menu-btn-compact .short-label { display: inline; }
+    .menu-btn-compact { padding-left: 12px; padding-right: 12px; }
+
+    /* 人物バッジ(名前・日時・トランジットのスクラブボタン)をトップ
+       バーへ物理移動(2026-09-03、「バッジ行を...トップバーに統合」より)
+       -- #settings-menu -> #topbar-menu-slotと同じ「実ノードをappendChild
+       で動かす」パターン(layoutBadgeForWidth()、下のJS参照)。情報も
+       スクラブボタンの機能も一切失わず、専用の行(バッジ避けのために
+       chart-columnsへ付けていたmargin-top)がまるごと不要になる分を
+       円の高さ予算に回せる。position:absoluteのままだとtopbarの
+       flexレイアウトに参加できないので、デスクトップではstaticに戻す
+       (left/right/z-indexはstaticでは無意味になるが実害はないので
+       そのまま)。 */
+    .person-badge { position: static; top: auto; }
+    #topbar-badge-slot { display: flex; align-items: center; }
+    #topbar-badge-slot .person-badge { gap: 6px; }
+    #topbar-badge-slot #badge-line1 { font-size: 0.78rem; }
+    #topbar-badge-slot #badge-line2 { font-size: 0.74rem; }
+
+    /* Side-by-side: 円(左)+ データパネル(右)を一枚で(2026-08-31の相談
+       "PCでは円表示とデータを一枚で表示したい"より)。円・データパネル
+       とも画面幅に応じて連続的に大きくなる(min()で上限あり)。以前は
+       .appのmax-width:780px前提でwheel-wrap 440px/data-panel 256pxに
+       固定していたが、.appが可変になったのに合わせてこちらも可変にした
+       (同じ「13インチでも狭い」相談より)。 */
+    .pane-tabs { display: none; }  /* 円タブは不要(常に表示されるので)、他の3つはdata-panel-tabsに役目を譲る */
+    /* .pane-tabsが消える分、.chart-columnsがバッジ避けの58pxマージンを
+       肩代わりする(.pane-tabsのコメント参照)。 */
+    /* justify-content:flex-start、center でも space-between でもなく
+       (2026-09-01の2回の相談を経ての最終形) -- centerは円+データパネル
+       をひとまとまりの塊として中央に置くため円がいくら大きくなっても
+       左右対称の余白が残っていた(1回目の相談)。次にspace-betweenへ
+       変えたが、.data-panelをflex:1化した(下のコメント参照)結果、
+       パネルが自分のmax-width上限(500px)で頭打ちになったときの余りが
+       全部「円とパネルの間の隙間」に回ってしまい、上限に達する広い画面
+       では274pxもの間延びした空白ができてしまった(2回目の相談で発覚)。
+       flex-startなら、余りは(空白ではなく)パネルの右側に自然に流れる
+       だけなので、円とパネルの間は常にgap+パネルの伸びた分だけになる。 */
+    /* gap: 固定24px -> 円の実際の幅の20% (2026-09-01, 「円と情報が
+       くっつきすぎて、円の外に表示される恒星の名前がデータに入り込む
+       のは嫌、長い名前の星もあるから余裕もって」より)。
+       固定px値ではダメだった理由: 恒星の合ラベル(edgeSafeRadius)は、
+       リングのすぐ外側に留めるための下限半径(minR=183, スロットが増え
+       ると191, 199…)が優先されるため、真東/真西付近ではアンカー位置
+       そのものがbox端(SVG座標で400)にかなり近い場所(183〜199)に固定
+       される -- ここにテキスト自体の幅(例: 「★アルフェラッツ」8文字)
+       が外向きに乗る分、box端を最大で恒星ラベル1個ぶん(SVG単位で全体
+       の幅の約18〜20%)はみ出す計算になる(実測: ★ディアデムで約52
+       SVG単位=画面上52px相当のはみ出しを確認)。このはみ出し量は円の
+       実際の描画サイズに比例して増減するので、固定pxのgapでは円が
+       大きい画面で足りなくなる。そこで円の幅の式(下の#pane-wheel参照:
+       min(68vw, calc(100vh-140px), 820px)、円の高さ予算を140pxに詰めた
+       のに合わせてこちらも更新)に0.2を掛けた式をそのまま
+       gapにも使い、円がどのサイズになっても常に安全マージンが円の
+       サイズに比例してついてくるようにした。 */
+    /* margin-top: 58px -> 34px -> 28px、経緯は上のコメント参照。28px ->
+       8pxは2026-09-03、バッジそのものをトップバーへ物理移動した
+       (#topbar-badge-slot、layoutBadgeForWidth()参照)ことで、デスク
+       トップでは.chart-stageの中にバッジがそもそも存在しなくなり、
+       避けるための余白が丸ごと不要になったため。8pxは.chart-stageの
+       上パディング(6px)からの純粋な見た目の呼吸代。gapの比例式の分母
+       (22)も、110px→90px→82px→74pxの詰めに合わせて15(0.2×74)に更新。 */
+    .chart-columns { flex-direction: row; align-items: flex-start; justify-content: flex-start; gap: min(13.6vw, calc(20vh - 15px), 164px); margin-top: 8px; }
+    /* display/flex-direction repeated here (not just relying on the base
+       #pane-wheel.mobile-active rule) because at desktop this needs to
+       show regardless of which pane is mobile-active; an explicit width
+       (not auto) because .wheel-wrap's own width:100% needs a concrete
+       parent width to resolve against -- auto here left it shrinking to
+       some unrelated min-content size instead of actually reaching its
+       intended size (same value repeated on both, matching .wheel-wrap's
+       own max-width below). */
+    /* Capped by viewport HEIGHT too (calc(100vh - 140px)): 4回目の見直し
+       (2026-09-01、「もう少し円は大きくならないのかな」「ちっちゃい、
+       バーンと見たい」より、NPT-Charts等の参考画像と比べての指摘)。
+       196pxだった内訳を実測(1366×729の実ブラウザウィンドウで、円の上に
+       あるものを1つずつ測った)して判明した削れる分をまとめて詰めた:
+       body縦padding 40px->16px(-24)、.chart-stage縦padding 18px->10px
+       (-8)、.wheel-wrap margin-top 18px->6px(-12)、下端の余白 17px->
+       約8px相当(-9)。合計53px縮めて196->143、切りよく140とした。
+       トップバー(69px、ボタン類の押しやすさに関わるので現状維持)と
+       バッジ避けの余白(34px、7.40で既に測って詰めた値)はこれ以上削ら
+       ずに残してある。
+       This is the 4th tightening of this budget: 320px(未測定の最初の
+       見積もり)->270px(トップバーのstickyバグ修正直後)->220px(設定
+       メニューがトップバーに合流した後)->196px(バッジ1段化)->140px
+       (今回、chrome全体を実測して再度詰めた)。Width (58vw -> 62vw ->
+       68vw) got a little more headroom too, for the same reason.
+       Not just width (2026-08-31, "円が下で切れて用をなさない" --
+       widening the wheel with vw alone made it taller too (it's a
+       square, aspect-ratio:1), and in a short viewport (this artifact's
+       own preview pane, or just a modest window) that pushed its bottom
+       below the fold. The whole point of making the wheel bigger was to
+       see it better, not to make part of it require scrolling to see at
+       all -- so the height cap wins over the width one whenever they
+       conflict, even if that leaves more gap next to .data-panel than
+       the width-only version had (explicitly OK'd: "右のデータとは、
+       ちょっと距離が離れてもいい"). */
+    /* 7.54で試した×1.25(85vw/1025px、高さ式は(100vh-140px)*1.25)は、
+       高さの項(100vh-140px)が「実際に使える縦の余白の実測上限」その
+       ものだったため、それを1.25倍すると箱がウィンドウの高さより背が
+       高くなり、縦にはみ出す(スクロールバーが出て、下端の恒星ラベルが
+       隠れる)不具合が発生した(2026-09-03、「んーーーーーー　はみでる」
+       より)。元の式に戻し、リングの実寸を大きくする方は7.55でサイン
+       リングの帯を狭めて内側の帯に空間を再配分する方式に切り替えた
+       (「サインの帯を狭くしてその他の内側の円を大きく」という提案
+       通り -- viewBoxのサイズ自体はそのままなので、.wheel-wrapの
+       ピクセルサイズを変えずに済み、この縦はみ出し問題も再発しない)。 */
+    /* 140px -> 110pxへ、5回目の詰め(2026-09-03、「上のメニューバーとか
+       をどうにかして、図自体を大きくは見れないのかな」より) -- 過去4回
+       は「トップバー(69px)はボタンの押しやすさに関わるので現状維持」
+       としていたが、これはモバイルと共通の値をそのまま使っていたため。
+       デスクトップはマウス操作でタップ精度を気にする必要がないため、
+       デスクトップ限定でトップバー・バッジ側を追加で詰めた(icon-btn
+       36->28px、topbar上下パディング18/14->10/8px、badge-scrub-btn
+       30->24px、person-badge位置14->8px -- 上のtopbar/icon-btnの宣言、
+       および.person-badge/.badge-scrub-btnの宣言を参照)。実測(1361×725
+       の実ブラウザウィンドウ相当)で、円の上のchrome合計が135px->105px
+       に縮んだ(トップバー69->49、バッジ避けmargin-top 34->28+chart-
+       stage縦padding分)。5px弱の安全マージンを足して110pxとした。
+       110px -> 90pxへ、6回目の詰め(2026-09-03、同日中の続き、「両方
+       やってみて」より) -- 人物バッジ自体を#topbar-badge-slotへ物理
+       移動し(layoutBadgeForWidth())、デスクトップの.chart-stageから
+       バッジがそもそも存在しなくなった。バッジを避けるための
+       margin-top(28px)がまるごと不要になり8pxまで詰められた分(実測
+       1361×725相当で、円の上のchrome合計が105px->85pxに縮小)、5px弱
+       の安全マージンを足して90pxとした。
+       90px -> 82pxへ、7回目の詰め(2026-09-03、同日中の続き、スターゲ
+       イザーとの実機比較screenshot2枚を見た上で「だいぶいい！もう
+       一声」より) -- body上下paddingを16px->8pxにさらに詰めた(上の
+       body宣言参照)。実測(1365×728相当)で円の上のchrome合計が
+       85px->77pxに縮小、5px弱の安全マージンを足して82pxとした。
+       82px -> 74pxへ、8回目の詰め(2026-09-03、同日中の続き、「円を
+       もうちょっとだけ、大きくできないかなー」より) -- body上下padding
+       8px->6px、.chart-stage縦padding6/8px->4/6px、topbar上下padding
+       10/8px->8/6pxをそれぞれさらに詰めた。実測(1365×728相当)で円の
+       上のchrome合計が77px->69pxに縮小、5px弱の安全マージンを足して
+       74pxとした。 */
+    #pane-wheel { display: flex !important; flex-direction: column; align-items: center; width: min(68vw, calc(100vh - 74px), 820px); }
+    .wheel-wrap { max-width: min(68vw, calc(100vh - 74px), 820px); margin-top: 6px; }
+
+    /* min(22vw,360px)固定幅 -> flex:1で余った横幅を埋める方式に変更
+       (2026-09-01、「やたらと開いている空間をもっと利用できないか」より)
+       -- 円は高さ(calc(100vh-220px))で頭打ちになっていることが多く、
+       vwベースの固定幅だと円とパネルの間に使われない余白が残っていた。
+       上限500pxはワイドモニタで間延びしすぎないための頭打ち、下限280px
+       は逆に円が横幅いっぱいまで伸びたときにパネルが潰れすぎないための
+       もの。 */
+    .data-panel { flex: 1 1 0; min-width: 280px; max-width: 500px; margin-top: 18px; }
+    .data-panel-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .data-panel .pane-content { display: none !important; width: 100%; }
+    .data-panel .pane-content.data-active { display: block !important; }
+    /* 天体数ぶんの行を並べるだけの1列固定をやめ、auto-fillで幅に応じて
+       自動的に2列(以上)になるようにした -- .data-panelがflex:1で広がる
+       ようになった分、余白を項目数で埋められる。max-widthは.data-panel
+       側に任せるので、ここでは指定しない(直接max-widthを付けると
+       .data-panelの実際の幅と食い違って頭打ちが二重になるため)。 */
+    .legend-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    /* 度数リスト/アスペクト表/サビアン欄それぞれの max-width:380px(元は
+       .app が780px固定だった頃の名残)を解除し、.data-panel の実際の幅
+       (flex:1、上のコメント参照)まで素直に広がるようにする。ここで
+       380pxのまま残すと、.data-panelを広げても中身がそこで頭打ちになり、
+       意味がなくなってしまう。 */
+    .legend-grid, .aspect-table, .block-label, .sabian-list { max-width: none; }
+    /* データパネル側にも高さの上限を設ける(2026-09-01、「サビアンも
+       デフォルトの表示設定くらいはスクロールせずに見たい」より) -- 円
+       側は7.36以降ビューポート高さに追従させているが、データパネル側は
+       中身の高さなりに伸びるままだったので、天体数が多いとページ全体が
+       縦スクロールする状態になっていた。260pxは.pane-content開始位置
+       (トップバー+chart-columnsのバッジ避けマージン+data-panel自身の
+       margin-top+タブ行)の見積もり。デフォルト表示(主要9天体+セレス/
+       エリス/キロンの計12行)がここに収まることを実機で確認済み。マイ
+       ナー天体を増やして12行を超えた場合は、ページ全体ではなく、この
+       パネルの中だけが内部スクロールする。 */
+    .legend-grid, .aspect-table, .sabian-list { max-height: calc(100vh - 260px); overflow-y: auto; }
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap">
+
+<div class="app" id="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">日輪</span>
+      <span class="brand-sub">HELIO&nbsp;WHEEL</span>
+    </div>
+    <!-- Desktop-only home for #person-badge, physically moved here by
+         layoutBadgeForWidth() (2026-09-03, "バッジ行を...トップバーに
+         統合" -- same real-DOM-relocation pattern as #topbar-menu-slot
+         below, for the same reason: #badge-line1/#badge-line2/the scrub
+         buttons are all looked up by id elsewhere, so moving the actual
+         node (not a copy) keeps every id unique and every handler wired
+         regardless of which container it's currently sitting in). -->
+    <div class="topbar-badge-slot" id="topbar-badge-slot"></div>
+    <!-- Desktop-only home for #settings-menu's buttons, physically moved
+         here by layoutHeaderForWidth() (2026-08-31, "日輪の右側に起点
+         とかのメニューも並べてほしい" -- consolidating the whole settings
+         row into the topbar on desktop, not just the display-mode
+         buttons). An earlier version of this duplicated the display-mode
+         buttons into the topbar and hid the originals via CSS instead --
+         that doesn't scale to *all* of settings-menu's buttons, since
+         several of them (menu-ref-label etc.) are looked up by ID from
+         other functions, and duplicating IDs breaks getElementById. Real
+         DOM relocation (moving the actual nodes, not copies) sidesteps
+         that entirely -- there's only ever one of each element, wherever
+         it currently lives. -->
+    <div class="topbar-menu-slot" id="topbar-menu-slot"></div>
+    <div class="topbar-actions">
+      <button class="icon-btn" title="人物一覧" onclick="showView('person-select')">☰</button>
+      <button class="icon-btn" id="theme-btn" title="テーマ切替" onclick="toggleTheme()">◐</button>
+    </div>
+  </div>
+
+  <!-- ============ VIEW 1: 人物選択 ============ -->
+  <div class="view active" id="view-person-select">
+    <div class="screen-pad">
+      <div class="eyebrow">Step 1</div>
+      <h1 style="font-size:1.5rem; margin-top:6px;">だれの図を見ますか</h1>
+      <p class="lead">保存済みの人物を選ぶか、その場で日時を入力してすぐに図を出せます。</p>
+
+      <div class="person-list">
+        <button class="person-card" onclick="selectPerson('サンプル花子', '1990-06-15 09:30 ・ 東京都')">
+          <div class="person-avatar"></div>
+          <div class="person-meta">
+            <div class="person-name">サンプル花子</div>
+            <div class="person-detail">1990-06-15 09:30 ・ 東京都</div>
+            <div class="person-tags"><span class="tag">サンプル</span></div>
+          </div>
+          <span class="chevron">›</span>
+        </button>
+        <button class="person-card" onclick="selectPerson('アインシュタイン', '1879-03-14 ・ 出生時刻不明')">
+          <div class="person-avatar" style="background: conic-gradient(from 40deg, var(--ring-b), var(--accent-soft), var(--ring-b));"></div>
+          <div class="person-meta">
+            <div class="person-name">アインシュタイン</div>
+            <div class="person-detail">1879-03-14 ・ 出生時刻不明(正午で近似)</div>
+            <div class="person-tags"><span class="tag">偉人</span></div>
+          </div>
+          <span class="chevron">›</span>
+        </button>
+      </div>
+
+      <button class="quick-entry-btn" onclick="selectPerson('新規入力', 'その場で入力した日時')">+ 保存せず、その場で日時を入力する</button>
+
+      <div class="section-label">その他</div>
+      <button class="person-card" onclick="showView('person-manage')">
+        <div class="person-avatar" style="background: var(--bg-sunken); display:flex; align-items:center; justify-content:center; font-size:1rem;">⚙︎</div>
+        <div class="person-meta">
+          <div class="person-name" style="font-size:0.85rem;">人物データを管理</div>
+          <div class="person-detail">追加・編集・削除、分類の整理</div>
+        </div>
+        <span class="chevron">›</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ VIEW 2: メインチャート ============ -->
+  <div class="view" id="view-chart">
+    <!-- Stargazer/AstroGoldを参考に、設定への入り口は円のすぐ下ではなく
+         ここ(トップバー直下の専用バー)に分離。円+データ側は結果を見る
+         専用領域として空ける。中身(横スライドパネル)は変更なし。 -->
+    <div class="settings-menu" id="settings-menu">
+      <!-- 出生図/経過図/二重円(2026-09-01、「チャートを読むときはそんな
+           に切り替えない」という相談を受けて7.33の常時表示から呼び出し
+           式に戻した -- 他の設定ボタンと同じ「現在の選択を表示するボタ
+           ン→押すとパネル」パターン(起点ボタンと同じ形)。 -->
+      <button class="menu-btn" id="menu-mode-btn" onclick="openPanel('mode-panel')">図: <span id="menu-mode-label">出生図</span></button>
+      <button class="menu-btn" id="menu-ref-btn" onclick="openPanel('ref-panel')">起点: <span id="menu-ref-label">トロピカル</span></button>
+      <!-- 種別/表示/サビアンは、今の選択値を表示する役目がない(押すと
+           パネルが開くだけの入口)ボタンなので、デスクトップでは1文字+
+           title属性のツールチップに縮めた(2026-09-03、「種別/表示/サビ
+           アん、これは、妥協案なんかないですかね」より) -- 図/起点/
+           恒星の合は選択値そのものを見せているので、アイコン化すると
+           クリックしないと今の状態が分からなくなり実害がある。それら
+           はフルラベルのまま残した。.menu-btn-compactの1文字表示は
+           デスクトップ専用のCSSで、モバイルの#settings-menuでは元の
+           フルラベルのまま(タップ精度優先、7.56のトップバー縮小と同じ
+           判断)。 -->
+      <button class="menu-btn menu-btn-compact" id="menu-type-btn" onclick="openPanel('type-panel')" title="種別(通常/日食図/月食図/四季図)"><span class="full-label">種別</span><span class="short-label">種</span></button>
+      <button class="menu-btn menu-btn-compact" id="menu-display-btn" onclick="openPanel('display-panel')" title="表示オプション"><span class="full-label">表示</span><span class="short-label">表</span></button>
+      <button class="menu-btn" id="menu-conj-btn" onclick="openPanel('conj-panel')"><span id="menu-conj-label">恒星の合</span></button>
+      <button class="menu-btn menu-btn-compact" id="menu-sabian-btn" onclick="setPane('sabian')" title="サビアン"><span class="full-label">サビアン</span><span class="short-label">サ</span></button>
+    </div>
+    <div class="chart-stage">
+      <div class="person-badge" id="person-badge">
+        <span class="dot"></span>
+        <div class="person-badge-lines">
+          <div id="badge-line1">サンプル花子</div>
+          <div class="badge-line2-row">
+            <button class="badge-scrub-btn" id="badge-scrub-prev" style="visibility:hidden;" title="選択中の単位を戻す(長押し/ホイールでも)">‹</button>
+            <span class="mono" id="badge-line2">出生図 1990-06-15 09:30:00</span>
+            <button class="badge-scrub-btn" id="badge-scrub-next" style="visibility:hidden;" title="選択中の単位を進める(長押し/ホイールでも)">›</button>
+            <button class="badge-scrub-btn badge-now-btn" id="badge-now-btn" style="visibility:hidden;" title="現在時刻に戻す" onclick="resetTransitToNow()">今</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile: switches which single pane is visible (円/度数/アスペ
+           クト/サビアン). Desktop: the 円 button is hidden (the wheel is
+           always shown in its own column there) and the other 3 instead
+           control which pane shows in .data-panel alongside it -- see
+           setPane() and the desktop media query. -->
+      <div class="pane-tabs" id="pane-tabs">
+        <button class="pane-tab-btn active" data-pane="wheel" onclick="setPane('wheel')">円</button>
+        <button class="pane-tab-btn" data-pane="degrees" onclick="setPane('degrees')">度数</button>
+        <button class="pane-tab-btn" data-pane="aspects" onclick="setPane('aspects')">アスペクト</button>
+        <button class="pane-tab-btn" data-pane="sabian" onclick="setPane('sabian')">サビアン</button>
+      </div>
+
+      <div class="chart-columns">
+        <div class="pane-content mobile-active" id="pane-wheel">
+          <div class="wheel-wrap" tabindex="0" title="トランジット表示中は↑↓キーやホイールで日時を送れます">
+            <!-- viewBox 0 0 400 400 -> -50 -50 500 500(2026-09-03、「円の
+                 外側に恒星、つぎにサイン、その次、度数表示エリア、惑星
+                 サインエリア...」の帯レイアウト作り直しより) -- 中心
+                 (200,200)自体は変えず、外周にSVG単位で50ぶんの余白を
+                 追加しただけ(内側の座標計算はすべて既存のまま使える)。
+                 リング(当時132〜178)より外の"使える余白"が22単位
+                 (178→200)しかなく、恒星ラベル用の専用の帯を作るには
+                 狭すぎたため。見た目のリングの大きさは.wheel-wrapの
+                 CSSサイズはそのまま(500/400=1.25倍に薄まる、リング
+                 自体は以前よりやや小さく見える)にして、恒星ラベルの
+                 逃げ場を優先した。(サインリング自体はその後7.55で
+                 150〜170に狭め、浮いた分を惑星グリフ・度数帯に回した。) -->
+            <svg viewBox="-50 -50 500 500">
+              <defs>
+                <radialGradient id="skyfade" cx="50%" cy="50%" r="65%">
+                  <stop offset="0%" stop-color="var(--accent-soft)"/>
+                  <stop offset="100%" stop-color="transparent"/>
+                </radialGradient>
+              </defs>
+              <circle cx="200" cy="200" r="180" fill="url(#skyfade)"/>
+              <!-- 太さ・不透明度を底上げ(2026-09-03、「線とか文字が、
+                   見にくいのよね」「色？線の太さ？コントラストかな？」
+                   より、1.2/0.55, 1/0.35, 0.75/0.5 -> それぞれ下記に)。
+                   外周170->174は同日中さらに後、「サインのマークが円
+                   からはみ出ちゃった」より -- サイングリフの表示半径
+                   164(font-size 15)がリング外周ぎりぎりで、文字の上半分
+                   がはみ出していた。帯を少し広げて収めた。 -->
+              <circle cx="200" cy="200" r="174" fill="none" stroke="var(--ring-a)" stroke-width="1.5" opacity="0.7"/>
+              <circle cx="200" cy="200" r="140" fill="none" stroke="var(--ring-b)" stroke-width="1.3" opacity="0.5"/>
+              <circle cx="200" cy="200" r="150" fill="none" stroke="var(--ring-a)" stroke-width="1" opacity="0.65"/>
+              <!-- 12 sign divisions -->
+              <g id="sign-ticks"></g>
+              <!-- class="mono"を外した(2026-09-03、「サインの背景の四角い
+                   枠は地味に邪魔」より) -- Space Mono/JetBrains Monoは
+                   ♈〜♓のような占星術記号をカバーしておらず、Windowsが
+                   絵文字用の代替フォントで補って色付きの四角枠として
+                   表示していた。#planet-markers(こちらはmonoクラスなし
+                   で問題なく表示できている)と同じく、bodyのCJK対応
+                   フォント(Zen Kaku Gothic New等、記号もカバーしている)
+                   を継承させるだけで直る。fill(--ink-dim -> --ink)は
+                   2026-09-03、「サインとか、度数の文字の色が、まだ
+                   沈んでいて、見にくい」より -- ink-dimは彩度・明度が
+                   低く、度数文字が使っているink(一番明るいトーン)と
+                   揃えて底上げした。 -->
+              <g id="sign-glyphs" font-size="15" fill="var(--ink)"></g>
+              <!-- degree tick ring -->
+              <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
+                   -- 個々の線のstroke-width(0.4〜0.6と細い)に加えて、この
+                   グループ全体にもopacity 0.4が掛かっており、実質ほぼ
+                   見えていなかった。目盛り自体はDOM上には存在していた
+                   (コード上のバグではなく視認性の問題)。 -->
+              <g id="degree-ticks" opacity="0.9"></g>
+              <!-- aspect lines (drawn under the planet markers) -->
+              <g id="aspect-lines"></g>
+              <!-- planet markers -->
+              <g id="planet-markers" font-size="17"></g>
+              <!-- checked fixed-star/deep-sky conjunction markers -->
+              <g id="conj-markers"></g>
+              <!-- selected origin star/galaxy: single label outside the ring -->
+              <g id="ref-star-marker"></g>
+              <circle cx="200" cy="200" r="3" fill="var(--accent)"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="data-panel">
+          <!-- Desktop-only tab row (mirrors pane-tabs minus 円) -- see
+               .data-panel-tabs in the desktop media query. -->
+          <div class="data-panel-tabs">
+            <button class="pane-tab-btn active" data-pane="degrees" onclick="setPane('degrees')">度数</button>
+            <button class="pane-tab-btn" data-pane="aspects" onclick="setPane('aspects')">アスペクト</button>
+            <button class="pane-tab-btn" data-pane="sabian" onclick="setPane('sabian')">サビアン</button>
+          </div>
+          <div class="pane-content data-active" id="pane-degrees">
+            <div class="legend-grid" id="legend-grid"></div>
+          </div>
+          <div class="pane-content" id="pane-aspects">
+            <div class="aspect-table" id="aspect-table"></div>
+          </div>
+          <div class="pane-content" id="pane-sabian">
+            <div class="sabian-list" id="sabian-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wraps scrim+panels only (not settings-menu, and topbar is outside
+         #view-chart entirely) -- see .panel-layer's CSS comment for why
+         this needs to be a separate layer from .app itself. -->
+    <div class="panel-layer">
+    <!-- ---- scrim ---- -->
+    <div class="scrim" id="scrim" onclick="closeAllPanels()"></div>
+
+    <!-- ---- side panel: 出生図/経過図/二重円 ---- -->
+    <div class="side-panel" id="mode-panel">
+      <div class="panel-head">
+        <h2>図の種類</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="segmented" id="mode-segmented" style="grid-template-columns:repeat(3,1fr);">
+          <button class="seg-btn display-mode-btn active" data-display="N" onclick="setDisplayMode(this,'N'); closeAllPanels();">出生図</button>
+          <button class="seg-btn display-mode-btn" data-display="T" onclick="setDisplayMode(this,'T'); closeAllPanels();">経過図</button>
+          <button class="seg-btn display-mode-btn" data-display="both" onclick="setDisplayMode(this,'both'); closeAllPanels();">二重円</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- side panel: 起点選択 ---- -->
+    <div class="side-panel" id="ref-panel">
+      <div class="panel-head">
+        <h2>起点を選ぶ</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="search-box">
+          <span style="color:var(--ink-faint);">⌕</span>
+          <input type="text" placeholder="恒星名・星座名で検索">
+        </div>
+        <div class="ref-item selected" onclick="pickRef(this,'tropical','トロピカル')" style="margin-bottom:10px; padding-left:6px; padding-right:6px; border-radius: var(--radius-sm); background: var(--accent-soft);">
+          <div class="ref-item-main"><span class="ref-item-name">トロピカル(恒星起点なし)</span><span class="ref-item-cat">初期設定 ・ 通常のヘリオセントリック黄経</span></div>
+          <div class="ref-item-check">✓</div>
+        </div>
+        <div class="section-label" style="margin:0 0 10px;">恒星・銀河を起点にする</div>
+
+        <div class="tab-row">
+          <button class="tab-btn active">GCS(主要)</button>
+          <button class="tab-btn">88星座</button>
+          <button class="tab-btn">グループ中心</button>
+          <button class="tab-btn">星団・銀河</button>
+        </div>
+
+        <div class="ref-item" onclick="pickRef(this,'sirius','シリウス')">
+          <div class="ref-item-main"><span class="ref-item-name">シリウス</span><span class="ref-item-cat">おおいぬ座 α星</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'arcturus','アルクトゥルス')">
+          <div class="ref-item-main"><span class="ref-item-name">アルクトゥルス</span><span class="ref-item-cat">うしかい座 α星</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'antares','アンタレス')">
+          <div class="ref-item-main"><span class="ref-item-name">アンタレス</span><span class="ref-item-cat">さそり座 α星</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'alcyone','アルシオン')">
+          <div class="ref-item-main"><span class="ref-item-name">アルシオン</span><span class="ref-item-cat">おうし座 η星 ・ プレアデス星団</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'thuban','トゥバン')">
+          <div class="ref-item-main"><span class="ref-item-name">トゥバン</span><span class="ref-item-cat">りゅう座 α星</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'orion_belt','オリオン三ツ星(中央)')">
+          <div class="ref-item-main"><span class="ref-item-name">オリオン三ツ星(中央)</span><span class="ref-item-cat">ミンタカ・アルニラム・アルニタクの平均</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'big_dipper','北斗七星(中央)')">
+          <div class="ref-item-main"><span class="ref-item-name">北斗七星(中央)</span><span class="ref-item-cat">7星の平均</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+        <div class="ref-item" onclick="pickRef(this,'andromeda_galaxy','アンドロメダ銀河')">
+          <div class="ref-item-main"><span class="ref-item-name">アンドロメダ銀河</span><span class="ref-item-cat">M31</span></div>
+          <div class="ref-item-check"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- side panel: 恒星・銀河との合 ---- -->
+    <div class="side-panel" id="conj-panel">
+      <div class="panel-head">
+        <h2>恒星・銀河との合</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body">
+        <div id="star-conj-note" style="display:none; font-size:0.8rem; color:var(--ink-faint); line-height:1.7; margin-bottom:14px;">
+          恒星・銀河との合は、二重円では表示しません(情報量が多すぎるため)。
+        </div>
+        <div class="star-conj-control">
+          <div class="toggle-row">
+            <span class="field-label" style="margin-bottom:0;">恒星・銀河との合(コンジャンクション)を表示</span>
+            <div class="switch on" id="conj-switch" onclick="toggleSwitch(this); buildChart();"></div>
+          </div>
+          <div class="orb-slider-block" style="margin-top:12px;">
+            <div class="orb-row">
+              <span style="font-size: 0.86rem; color:var(--ink-dim);">オーブ</span>
+              <input type="range" min="0.2" max="5" step="0.1" value="1.5" id="orb-slider-panel" oninput="updateOrb(this.value)">
+              <span class="orb-value mono" id="orb-value-2">1.5°</span>
+            </div>
+          </div>
+
+          <div id="conj-groups"></div>
+
+          <p style="font-size: 0.8rem; color:var(--ink-faint); line-height:1.6; margin-top:16px;">
+            チェックした星だけが図の外周にマーク表示されます。選択はすぐに反映されます。N・Tどちらでも計算できますが、恒星側の位置は出生時(1990年)のもので近似しています(歳差はごくわずかなので、数十年のずれなら実用上問題ありません)。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- side panel: N/Tの種別 ---- -->
+    <div class="side-panel" id="type-panel">
+      <div class="panel-head">
+        <h2>種別</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body">
+        <span class="field-label">N(ネイタル)の種類 — 常に保持されます</span>
+        <div class="segmented" id="n-type-segmented" style="grid-template-columns:repeat(3,1fr); margin-bottom:22px;">
+          <button class="seg-btn active" data-type="normal" onclick="setNType(this,'normal')">通常</button>
+          <button class="seg-btn" data-type="eclipseSolar" onclick="setNType(this,'eclipseSolar')">日食図</button>
+          <button class="seg-btn" data-type="eclipseLunar" onclick="setNType(this,'eclipseLunar')">月食図</button>
+        </div>
+
+        <span class="field-label">T(トランジット)を特別な瞬間へジャンプ</span>
+        <div class="segmented" id="t-jump-segmented" style="grid-template-columns:repeat(3,1fr);">
+          <button class="seg-btn" onclick="jumpTTo('eclipseSolar', this)">日食</button>
+          <button class="seg-btn" onclick="jumpTTo('eclipseLunar', this)">月食</button>
+          <button class="seg-btn" onclick="jumpTTo('seasonal', this)">四季(夏至)</button>
+        </div>
+        <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので日食/月食の表示は消えます</p>
+      </div>
+    </div>
+
+    <!-- ---- side panel: 表示オプション ---- -->
+    <div class="side-panel" id="display-panel">
+      <div class="panel-head">
+        <h2>表示オプション</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-section">
+          <div class="panel-section-label">度数表示</div>
+          <div class="toggle-row">
+            <span class="field-label" style="margin-bottom:0;">円の中に度数を表示</span>
+            <div class="switch on" id="wheel-degree-switch" onclick="toggleSwitch(this); updateWheelDegreeVisibility();"></div>
+          </div>
+          <p class="scrub-note" style="margin-top:8px;">円の下の度数リストは、「度数」タブでいつでも見られます。</p>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-label">小惑星・準惑星</div>
+          <div id="minor-body-list"></div>
+          <p class="scrub-note" style="margin-top:8px;">チェックした天体は、円・度数リスト・アスペクトの両方(線と表)に反映されます。</p>
+        </div>
+
+        <div class="panel-section conj-only-control">
+          <div class="panel-section-label">アスペクト</div>
+          <div class="toggle-row">
+            <span class="field-label" style="margin-bottom:0;">円の中にアスペクト線を表示</span>
+            <div class="switch on" id="aspect-switch" onclick="toggleSwitch(this); redrawAspects();"></div>
+          </div>
+          <p class="scrub-note" style="margin-top:8px;">円の下のアスペクト表は、「アスペクト」タブでいつでも見られます。対象は、上で表示を選んだ天体(主要9天体+チェックした小惑星)です。</p>
+          <div id="aspect-type-list" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ============ VIEW 3: 人物管理 ============ -->
+  <div class="view" id="view-person-manage">
+    <div class="subnav">
+      <button class="back-btn" onclick="showView('person-select')">←</button>
+      <h2>人物データを管理</h2>
+    </div>
+    <div class="screen-pad">
+      <div class="pm-toolbar">
+        <span style="font-size: 0.86rem; color:var(--ink-faint);">2人 登録済み</span>
+        <button class="add-btn" onclick="openPersonEdit(null)">+ 新規追加</button>
+      </div>
+      <div class="person-list">
+        <div class="person-card" style="cursor:default;">
+          <div class="person-avatar"></div>
+          <div class="person-meta">
+            <div class="person-name">サンプル花子</div>
+            <div class="person-detail">1990-06-15 09:30 ・ 東京都</div>
+            <div class="person-tags"><span class="tag">サンプル</span></div>
+          </div>
+          <span class="chevron" style="font-size:0.9rem; cursor:pointer;" onclick="openPersonEdit(0)">✎</span>
+        </div>
+        <div class="person-card" style="cursor:default;">
+          <div class="person-avatar" style="background: conic-gradient(from 40deg, var(--ring-b), var(--accent-soft), var(--ring-b));"></div>
+          <div class="person-meta">
+            <div class="person-name">アインシュタイン</div>
+            <div class="person-detail">1879-03-14 ・ 出生時刻不明</div>
+            <div class="person-tags"><span class="tag">偉人</span></div>
+          </div>
+          <span class="chevron" style="font-size:0.9rem; cursor:pointer;" onclick="openPersonEdit(1)">✎</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VIEW 4: 人物 追加/編集 ============
+       storage.pyのPersonとほぼ1対1のフィールド(name/birth_date/birth_time/
+       time_unknown/timezone/latitude/longitude/place_name/category/notes)。
+       アストロゴールドのEdit Chart画面を参考にした項目立て(2026-08-30)。
+       このモックアップは架空データのみなので「保存」は実際には永続化せず、
+       トーストを出して一覧に戻るだけ -- 本物のUIとエンジンを繋ぐ作業で
+       実際にstorage.pyへ保存する処理に差し替える想定。 -->
+  <div class="view" id="view-person-edit">
+    <div class="subnav">
+      <button class="back-btn" onclick="showView('person-manage')">←</button>
+      <h2 id="person-edit-title">人物を追加</h2>
+    </div>
+    <div class="screen-pad">
+      <span class="field-label">名前</span>
+      <input type="text" id="pe-name" class="pe-input" placeholder="例: 山田太郎">
+
+      <span class="field-label" style="margin-top:18px;">生年月日</span>
+      <div class="pe-row">
+        <input type="number" id="pe-year" class="pe-input" placeholder="年" style="flex:1.4;">
+        <input type="number" id="pe-month" class="pe-input" placeholder="月" min="1" max="12">
+        <input type="number" id="pe-day" class="pe-input" placeholder="日" min="1" max="31">
+      </div>
+
+      <div class="toggle-row" style="margin-top:14px;">
+        <span class="field-label" style="margin-bottom:0;">出生時刻が不明</span>
+        <div class="switch" id="pe-time-unknown-switch" onclick="toggleSwitch(this); updatePersonEditTimeState();"></div>
+      </div>
+      <p class="scrub-note" style="margin-top:6px;">不明な場合、正午(12:00)で近似計算します(偉人など向け)。</p>
+
+      <div id="pe-time-block">
+        <span class="field-label" style="margin-top:14px;">出生時刻</span>
+        <div class="pe-row">
+          <input type="number" id="pe-hour" class="pe-input" placeholder="時" min="0" max="23">
+          <input type="number" id="pe-minute" class="pe-input" placeholder="分" min="0" max="59">
+        </div>
+      </div>
+
+      <span class="field-label" style="margin-top:18px;">出生地</span>
+      <input type="text" id="pe-place" class="pe-input" placeholder="例: 東京都渋谷区">
+
+      <div class="pe-row" style="margin-top:8px;">
+        <input type="text" id="pe-lat" class="pe-input" placeholder="緯度 (例: 35.66)">
+        <input type="text" id="pe-lon" class="pe-input" placeholder="経度 (例: 139.70)">
+      </div>
+
+      <span class="field-label" style="margin-top:8px;">タイムゾーン</span>
+      <input type="text" id="pe-tz" class="pe-input" placeholder="例: Asia/Tokyo">
+
+      <span class="field-label" style="margin-top:18px;">分類</span>
+      <input type="text" id="pe-category" class="pe-input" placeholder="自由入力(例: 家族, 偉人, 芸能人)">
+
+      <span class="field-label" style="margin-top:18px;">メモ</span>
+      <textarea id="pe-notes" class="pe-input pe-textarea" placeholder="自由に記入"></textarea>
+
+      <button class="add-btn" style="width:100%; justify-content:center; margin-top:26px; padding:14px; font-size:0.88rem;" onclick="savePersonEdit()">保存</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="flow-note" id="flow-note">クリックして画面遷移を試せます</div>
+<div class="flow-note" id="pe-toast" style="opacity:0; transition:opacity 0.3s;"></div>
+
+<script>
+  // ---------- theme ----------
+  function toggleTheme() {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme');
+    if (cur === 'dark') root.setAttribute('data-theme', 'light');
+    else if (cur === 'light') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', 'dark');
+  }
+
+  // ---------- view switching ----------
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    closeAllPanels();
+  }
+
+  // ---------- person add/edit (storage.py Person fields) ----------
+  // Matches the real Person dataclass 1:1 (name/birth_date/birth_time/
+  // time_unknown/timezone/latitude/longitude/place_name/category/notes).
+  // Field layout follows AstroGoldのEdit Chart画面(2026-08-30の相談で確認)。
+  // "保存" doesn't actually persist anything -- this mockup has no real
+  // backing store (see the person-list's own hardcoded HTML) -- it just
+  // proves out the form, matching this file's existing scope everywhere
+  // else (real persistence happens once this UI is wired to the real
+  // engine/storage.py).
+  const EXAMPLE_PEOPLE = [
+    { name: "サンプル花子", year: 1990, month: 6, day: 15, timeUnknown: false, hour: 9, minute: 30,
+      place: "東京都", lat: "35.68", lon: "139.65", tz: "Asia/Tokyo", category: "サンプル", notes: "" },
+    { name: "アインシュタイン", year: 1879, month: 3, day: 14, timeUnknown: true, hour: 12, minute: 0,
+      place: "ドイツ ウルム", lat: "48.40", lon: "9.99", tz: "Europe/Berlin", category: "偉人", notes: "" },
+  ];
+  function updatePersonEditTimeState() {
+    const unknown = document.getElementById('pe-time-unknown-switch').classList.contains('on');
+    document.getElementById('pe-hour').disabled = unknown;
+    document.getElementById('pe-minute').disabled = unknown;
+  }
+  function openPersonEdit(index) {
+    const isNew = index === null;
+    document.getElementById('person-edit-title').textContent = isNew ? '人物を追加' : '人物を編集';
+    const p = isNew ? null : EXAMPLE_PEOPLE[index];
+    document.getElementById('pe-name').value = p ? p.name : '';
+    document.getElementById('pe-year').value = p ? p.year : '';
+    document.getElementById('pe-month').value = p ? p.month : '';
+    document.getElementById('pe-day').value = p ? p.day : '';
+    document.getElementById('pe-hour').value = p ? p.hour : '';
+    document.getElementById('pe-minute').value = p ? p.minute : '';
+    document.getElementById('pe-place').value = p ? p.place : '';
+    document.getElementById('pe-lat').value = p ? p.lat : '';
+    document.getElementById('pe-lon').value = p ? p.lon : '';
+    document.getElementById('pe-tz').value = p ? p.tz : 'Asia/Tokyo';
+    document.getElementById('pe-category').value = p ? p.category : '';
+    document.getElementById('pe-notes').value = p ? p.notes : '';
+    const timeUnknownSwitch = document.getElementById('pe-time-unknown-switch');
+    timeUnknownSwitch.classList.toggle('on', !!(p && p.timeUnknown));
+    updatePersonEditTimeState();
+    showView('person-edit');
+  }
+  function savePersonEdit() {
+    const name = document.getElementById('pe-name').value.trim() || '(名前未入力)';
+    const n = document.getElementById('pe-toast');
+    n.textContent = `「${name}」を保存しました(モックアップのため実際には保存されません)`;
+    n.style.opacity = '0.88';
+    clearTimeout(window.__peToastTimer);
+    window.__peToastTimer = setTimeout(() => { n.style.opacity = '0'; }, 2600);
+    showView('person-manage');
+  }
+
+  let currentPersonName = 'サンプル花子';
+  function selectPerson(name, detail) {
+    currentPersonName = name;
+    nType = 'normal';
+    tSpecialMoment = null;
+    transitTime = TRANSIT_BASE_TIME;
+    displayMode = 'N';
+    document.querySelectorAll('.display-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.display === 'N'));
+    document.getElementById('menu-mode-label').textContent = DISPLAY_MODE_LABELS.N;
+    document.querySelectorAll('#n-type-segmented .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'normal'));
+    document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    showView('chart');
+    updateControlAvailability();
+    buildChart();
+    updateBadge();
+  }
+
+  // ---------- display mode (N / T / biwheel) + N-type + T-type ----------
+  function updateControlAvailability() {
+    const isBiwheel = displayMode === 'both';
+    const refBtn = document.getElementById('menu-ref-btn');
+    refBtn.style.opacity = nType === 'normal' ? '1' : '0.4';
+    refBtn.style.pointerEvents = nType === 'normal' ? 'auto' : 'none';
+    document.querySelectorAll('.conj-only-control').forEach(el => {
+      el.style.opacity = isBiwheel ? '0.4' : '1';
+      el.style.pointerEvents = isBiwheel ? 'none' : 'auto';
+    });
+    // Star/deep-sky conjunctions now work for N or T (each object's own
+    // absolute longitude is known, so the angle check works against
+    // whichever body set is on screen) -- only the biwheel excludes them.
+    document.querySelectorAll('.star-conj-control').forEach(el => {
+      el.style.opacity = isBiwheel ? '0.4' : '1';
+      el.style.pointerEvents = isBiwheel ? 'none' : 'auto';
+    });
+    const conjMenuBtn = document.getElementById('menu-conj-btn');
+    conjMenuBtn.style.opacity = isBiwheel ? '0.4' : '1';
+    conjMenuBtn.style.pointerEvents = isBiwheel ? 'none' : 'auto';
+    updateConjunctionUI();
+
+    // T is always scrubbable now -- eclipse/seasonal are just a jump-to
+    // shortcut on the same timeline, not a separate frozen mode.
+    const showScrubHandles = displayMode !== 'N';
+    document.getElementById('badge-scrub-prev').style.visibility = showScrubHandles ? 'visible' : 'hidden';
+    document.getElementById('badge-scrub-next').style.visibility = showScrubHandles ? 'visible' : 'hidden';
+    document.getElementById('badge-now-btn').style.visibility = showScrubHandles ? 'visible' : 'hidden';
+  }
+  const DISPLAY_MODE_LABELS = { N: '出生図', T: '経過図', both: '二重円' };
+  function setDisplayMode(btn, mode) {
+    // By data-display, not by the clicked `btn` reference -- setNType()-
+    // style panel buttons and the "図: ..." menu button's own state both
+    // need to end up in sync regardless of which one triggered the change.
+    document.querySelectorAll('.display-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.display === mode));
+    document.getElementById('menu-mode-label').textContent = DISPLAY_MODE_LABELS[mode];
+    displayMode = mode;
+    updateControlAvailability();
+    buildChart();
+    updateBadge();
+  }
+  function setNType(btn, type) {
+    document.querySelectorAll('#n-type-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    nType = type;
+    updateControlAvailability();
+    if (displayMode !== 'T') { buildChart(); updateBadge(); }
+  }
+  function jumpTTo(special, btn) {
+    document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tSpecialMoment = special;
+    transitTime = T_SPECIAL_TIMES[special];
+    if (displayMode !== 'N') buildChart();
+    updateBadge();
+    updateConjunctionUI();
+  }
+  function formatTransitTime() {
+    const d = new Date(transitTime);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  }
+  function typeLabelJa(type, entry) {
+    if (type === 'eclipseSolar') return '日食';
+    if (type === 'eclipseLunar') return '月食';
+    if (type === 'seasonal') return `四季図(${entry.seasonLabel})`;
+    return null;
+  }
+  function updateBadge() {
+    const line1 = document.getElementById('badge-line1');
+    const line2 = document.getElementById('badge-line2');
+
+    if (displayMode === 'both') {
+      // Biwheel shows the person's name on top and T's own (live) data
+      // below. Plain natal needs nothing extra on the name line -- but
+      // if N itself is an eclipse chart, that has to say so, or there's
+      // no way to tell "this person's natal" from "this person's eclipse"
+      // apart at a glance.
+      const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
+      const nLabel = typeLabelJa(nType, nEntry);
+      line1.textContent = nLabel ? `${currentPersonName}　${nLabel}　${nEntry.date}` : currentPersonName;
+      const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
+      renderEditableTime(line2, tLabel ? `トランジット　${tLabel}　` : 'トランジット　');
+      return;
+    }
+    if (displayMode === 'T') {
+      line1.textContent = 'トランジット';
+      const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
+      renderEditableTime(line2, tLabel ? `${tLabel}　` : '');
+      return;
+    }
+    // displayMode === 'N' -- birth data is a fixed fact about the person
+    // (edited via person management, not here), so this stays plain text.
+    line1.textContent = currentPersonName;
+    const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
+    const nLabel = typeLabelJa(nType, nEntry);
+    const nDate = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : nEntry.date;
+    line2.textContent = nLabel ? `${nLabel}　${nDate}` : `出生図　${nDate}`;
+  }
+
+  // ---------- badge time editor (T/biwheel only) ----------
+  // Click a segment to make it the active scrub unit (shared with the
+  // ‹/› buttons, the mouse-wheel-over-chart gesture, and the panel's own
+  // ±buttons -- one unit selection drives all of them, which is what
+  // let the separate 年/月/日/... picker in the 時間送り panel go away).
+  // Type into a segment to overwrite it directly.
+  const TIME_SEG_UNITS = ['year', 'month', 'day', 'hour', 'minute', 'second'];
+  const TIME_SEG_SEP = { year: '-', month: '-', day: ' ', hour: ':', minute: ':', second: '' };
+  function timeSegValue(unit, d) {
+    if (unit === 'year') return d.getUTCFullYear();
+    if (unit === 'month') return d.getUTCMonth() + 1;
+    if (unit === 'day') return d.getUTCDate();
+    if (unit === 'hour') return d.getUTCHours();
+    if (unit === 'minute') return d.getUTCMinutes();
+    return d.getUTCSeconds();
+  }
+  function timeSegText(unit, v) {
+    return unit === 'year' ? String(v).padStart(4, '0') : String(v).padStart(2, '0');
+  }
+  function renderEditableTime(container, prefixText) {
+    container.innerHTML = '';
+    if (prefixText) {
+      const prefix = document.createElement('span');
+      prefix.textContent = prefixText;
+      container.appendChild(prefix);
+    }
+    const row = document.createElement('span');
+    row.className = 'time-seg-row';
+    const d = new Date(transitTime);
+    TIME_SEG_UNITS.forEach((unit) => {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.autocomplete = 'off';
+      input.className = 'time-seg' + (unit === scrubUnit ? ' active' : '');
+      input.dataset.unit = unit;
+      input.size = unit === 'year' ? 4 : 2;
+      input.value = timeSegText(unit, timeSegValue(unit, d));
+      input.addEventListener('focus', () => {
+        scrubUnit = unit;
+        row.querySelectorAll('.time-seg').forEach((el) => el.classList.toggle('active', el === input));
+        input.select();
+      });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+      input.addEventListener('change', () => {
+        const n = parseInt(input.value, 10);
+        if (!Number.isNaN(n)) applyTransitFieldEdit(unit, n);
+        else input.value = timeSegText(unit, timeSegValue(unit, new Date(transitTime)));
+      });
+      row.appendChild(input);
+      if (TIME_SEG_SEP[unit]) {
+        const sep = document.createElement('span');
+        sep.className = 'time-sep';
+        sep.textContent = TIME_SEG_SEP[unit];
+        row.appendChild(sep);
+      }
+    });
+    container.appendChild(row);
+  }
+  function applyTransitFieldEdit(unit, value) {
+    const d = new Date(transitTime);
+    if (unit === 'year') d.setUTCFullYear(value);
+    else if (unit === 'month') d.setUTCMonth(value - 1);
+    else if (unit === 'day') d.setUTCDate(value);
+    else if (unit === 'hour') d.setUTCHours(value);
+    else if (unit === 'minute') d.setUTCMinutes(value);
+    else if (unit === 'second') d.setUTCSeconds(value);
+    transitTime = d.getTime();
+    if (tSpecialMoment) {
+      tSpecialMoment = null;
+      document.querySelectorAll('#t-jump-segmented .seg-btn').forEach((b) => b.classList.remove('active'));
+    }
+    if (displayMode !== 'N') buildChart();
+    updateBadge();
+    updateConjunctionUI();
+  }
+
+  // ---------- transit time-scrub ----------
+  function scrubTransit(direction) {
+    const d = new Date(transitTime);
+    if (scrubUnit === 'year') d.setUTCFullYear(d.getUTCFullYear() + direction);
+    else if (scrubUnit === 'month') d.setUTCMonth(d.getUTCMonth() + direction);
+    else if (scrubUnit === 'day') d.setUTCDate(d.getUTCDate() + direction);
+    else if (scrubUnit === 'hour') d.setUTCHours(d.getUTCHours() + direction);
+    else if (scrubUnit === 'minute') d.setUTCMinutes(d.getUTCMinutes() + direction);
+    else if (scrubUnit === 'second') d.setUTCSeconds(d.getUTCSeconds() + direction);
+    transitTime = d.getTime();
+    // Moved off whatever special moment we were on (if any) -- it's no
+    // longer "the eclipse", just some other point in time now.
+    if (tSpecialMoment) {
+      tSpecialMoment = null;
+      document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    }
+    if (displayMode !== 'N') buildChart();
+    updateBadge();
+    updateConjunctionUI();
+  }
+  function resetTransitToNow() {
+    transitTime = TRANSIT_BASE_TIME;
+    tSpecialMoment = null;
+    document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    if (displayMode !== 'N') buildChart();
+    updateBadge();
+    updateConjunctionUI();
+  }
+
+  function toggleSwitch(el) { el.classList.toggle('on'); }
+
+  // ---------- pane switcher (円/度数/アスペクト/サビアン) ----------
+  // Two separate "active" classes because mobile and desktop mean
+  // different things by "which pane is showing":
+  //  - .mobile-active: exactly one of the 4 panes (wheel included) is
+  //    visible -- this is what mobile actually uses.
+  //  - .data-active: exactly one of the 3 *data* panes (degrees/aspects/
+  //    sabian) is visible inside .data-panel -- this is what desktop
+  //    uses (the wheel pane is forced visible there regardless of which
+  //    tab is "selected", via the media query's #pane-wheel rule).
+  // Picking 円 on mobile only touches .mobile-active, leaving whichever
+  // data pane was last chosen untouched -- so switching back to a data
+  // tab, or resizing to desktop, still shows the right thing.
+  const PANES = ['wheel', 'degrees', 'aspects', 'sabian'];
+  const DATA_PANES = ['degrees', 'aspects', 'sabian'];
+  function currentDataPane() {
+    return DATA_PANES.find(p => document.getElementById('pane-' + p).classList.contains('data-active')) || 'degrees';
+  }
+  function setPane(name) {
+    PANES.forEach(p => document.getElementById('pane-' + p).classList.toggle('mobile-active', p === name));
+    document.querySelectorAll('.pane-tabs .pane-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === name));
+    if (name !== 'wheel') {
+      DATA_PANES.forEach(p => document.getElementById('pane-' + p).classList.toggle('data-active', p === name));
+    }
+    const dataName = name === 'wheel' ? currentDataPane() : name;
+    document.querySelectorAll('.data-panel-tabs .pane-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === dataName));
+  }
+
+  // Wheel-inline degree labels are toggled via a class on their shared
+  // parent (`#planet-markers`) rather than being skipped at creation time
+  // -- drawBodyRing() doesn't need to know about this switch at all, and
+  // the class survives buildChart()/buildBiwheelChart() clearing and
+  // rebuilding the group's *contents* (innerHTML) since it's set on the
+  // group element itself, not its children.
+  function updateWheelDegreeVisibility() {
+    const on = document.getElementById('wheel-degree-switch').classList.contains('on');
+    document.getElementById('planet-markers').classList.toggle('hide-wheel-degrees', !on);
+  }
+
+  // ---------- minor bodies: individually selectable (checkbox list) ----------
+  // Which of these are checked drives *everything* about that body at
+  // once -- shown on the wheel/legend, counted in the "恒星の合" body
+  // list, AND included as an aspect participant. No separate "is this
+  // one an aspect target" toggle -- deliberately, to avoid a 3rd
+  // independent checkbox list for what would be a rare use case.
+  // セレス・エリス・キロンはデフォルトでオン(2026-09-01の相談より)。
+  // 他(パラス・ジュノー・ベスタ・リリス)はデフォルトのまま(オフ)。
+  const minorBodiesOn = new Set(['ceres', 'eris', 'chiron']);
+  function toggleMinorBody(el) {
+    const key = el.dataset.key;
+    el.classList.toggle('on');
+    el.textContent = el.classList.contains('on') ? '✓' : '';
+    if (el.classList.contains('on')) minorBodiesOn.add(key); else minorBodiesOn.delete(key);
+    buildChart();
+    updateConjunctionUI();
+  }
+  function fillMinorBodyList() {
+    const container = document.getElementById('minor-body-list');
+    container.innerHTML = '';
+    MINOR_META.forEach((m) => {
+      const isOn = minorBodiesOn.has(m.key);
+      const row = document.createElement('div');
+      row.className = 'check-row';
+      row.innerHTML = `<span class="mini-check${isOn ? ' on' : ''}" data-key="${m.key}" onclick="toggleMinorBody(this)">${isOn ? '✓' : ''}</span>` +
+        `<span>${m.g ? m.g + ' ' : ''}${m.name}</span>`;
+      container.appendChild(row);
+    });
+  }
+  function updateOrb(v) {
+    conjOrb = +v;
+    document.getElementById('orb-value-2').textContent = conjOrb.toFixed(1) + '°';
+    document.getElementById('orb-slider-panel').value = conjOrb;
+    updateConjunctionUI();
+  }
+
+
+  // ---------- panels ----------
+  function openPanel(id) {
+    document.getElementById('scrim').classList.add('show');
+    document.getElementById(id).classList.add('show');
+  }
+  function closeAllPanels() {
+    document.getElementById('scrim').classList.remove('show');
+    document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('show'));
+  }
+  let currentRef = 'tropical';
+  let currentRefLabel = 'トロピカル';
+  function pickRef(el, key, label) {
+    document.querySelectorAll('.ref-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('menu-ref-label').textContent = label;
+    currentRef = key;
+    currentRefLabel = label;
+    buildChart();  // selection propagates immediately, no separate "apply" step
+    closeAllPanels();
+  }
+  function toggleMini(el) {
+    el.classList.toggle('on');
+    el.textContent = el.classList.contains('on') ? '✓' : '';
+    const hitId = el.dataset.hit;
+    if (el.classList.contains('on')) checkedHits.add(hitId); else checkedHits.delete(hitId);
+    drawConjunctionMarkers();
+    drawReferenceStarLabel();  // which conjunction stars are checked can change what it needs to nudge away from
+  }
+
+  // ---------- chart drawing ----------
+  // 各グリフの末尾に付けている"︎"(テキスト表示選択子、Unicode
+  // Variation Selector-15)は、絵文字対応フォントがこれらの記号を
+  // 「絵文字(カラー・四角枠)」表示に倒すのを明示的に禁止し、常に
+  // 「テキスト(モノクロ)」表示を強制するもの(2026-09-03、「サインの
+  // フォントの四角い色、じゃまなんですけれど」より) -- 7.53では
+  // #sign-glyphsのfont-family(class="mono"を外す)だけで対処したが、
+  // それはあくまで特定のフォント環境でたまたま直っていただけで、
+  // Windows側のフォント優先順位・キャッシュ状態次第では絵文字用の
+  // 代替フォントに倒れる余地が残っていた。VS15はfont-familyに関係なく
+  // 効くため、根本的に再発を防げる。
+  const SIGNS = ["♈︎","♉︎","♊︎","♋︎","♌︎","♍︎","♎︎","♏︎","♐︎","♑︎","♒︎","♓︎"];
+  const PLANET_META = [
+    { key: "mercury", g: "☿︎", name: "水星" },
+    { key: "venus",   g: "♀︎", name: "金星" },
+    { key: "earth",   g: "⊕︎", name: "地球" },
+    { key: "mars",    g: "♂︎", name: "火星" },
+    { key: "jupiter", g: "♃︎", name: "木星" },
+    { key: "saturn",  g: "♄︎", name: "土星" },
+    { key: "uranus",  g: "♅︎", name: "天王星" },
+    { key: "neptune", g: "♆︎", name: "海王星" },
+    { key: "pluto",   g: "♇︎", name: "冥王星" },
+  ];
+  // Real computed longitudes (helio-app CLI, `--stars ... --transpose --csv`),
+  // not placeholders -- サンプル人物(架空)1990-06-15 09:30 Asia/Tokyo、
+  // 東京都(35.6762N 139.6503E)、for every reference point offered in the
+  // picker. Aspect angular separations are the same regardless of which of
+  // these is chosen (rotating every body by the same shift doesn't change
+  // the angle *between* two of them), so ASPECTS below is computed once
+  // against the tropical (unrotated) values.
+  // (2026-09-03、「私のデータはいったん削除しておいて」より -- 以前は
+  // ユーザー自身の実際の出生データを使っていたが、友人への配布テストに
+  // 備えて架空のサンプル人物のデータに全面差し替えた。数値だけ変えて
+  // 名前や日付表示を差し替える、という上辺だけの対処ではなく、実際に
+  // CLIで架空の日時・場所から再計算した値に総入れ替えしている
+  // -- 表示ラベルだけ変えても、天体の位置自体から元の実出生時刻が
+  // 逆算できてしまっては意味がないため。)
+  const REF_LONGITUDES = {
+    tropical:          { mercury: 357.99930398539857, venus: 353.9345847700036, earth: 263.6739254210988, mars: 326.0634725239268, jupiter: 109.99846386904794, saturn: 291.1127489423308, uranus: 277.4252629169288, neptune: 283.06073511831505, pluto: 226.6651071354895 },
+    sirius:            { mercury: 254.04922610145866, venus: 249.98450688606368, earth: 159.72384753715886, mars: 222.1133946399869, jupiter: 6.048385985108041, saturn: 187.1626710583909, uranus: 173.47518503298886, neptune: 179.11065723437514, pluto: 122.71502925154961 },
+    arcturus:          { mercury: 153.89895646691684, venus: 149.83423725152187, earth: 59.573577902617046, mars: 121.96312500544508, jupiter: 265.8981163505662, saturn: 87.0124014238491, uranus: 73.32491539844705, neptune: 78.96038759983333, pluto: 22.56475961700778 },
+    antares:           { mercury: 108.37033595991221, venus: 104.30561674451724, earth: 14.044957395612414, mars: 76.43450449844045, jupiter: 220.3694958435616, saturn: 41.483780916844466, uranus: 27.796294891442415, neptune: 33.43176709282869, pluto: 337.03613911000315 },
+    alcyone:           { mercury: 298.14027100451165, venus: 294.0755517891166, earth: 203.81489244021182, mars: 266.2044395430398, jupiter: 50.13943088816099, saturn: 231.25371596144387, uranus: 217.56622993604182, neptune: 223.2017021374281, pluto: 166.80607415460256 },
+    thuban:            { mercury: 200.67889178326809, venus: 196.6141725678731, earth: 106.35351321896829, mars: 168.74306032179632, jupiter: 312.67805166691744, saturn: 133.79233674020034, uranus: 120.10485071479829, neptune: 125.74032291618457, pluto: 69.34469493335902 },
+    orion_belt:        { mercury: 274.63033076383385, venus: 270.5656115484389, earth: 180.30495219953406, mars: 242.6944993023621, jupiter: 26.629490647483237, saturn: 207.7437757207661, uranus: 194.05628969536406, neptune: 199.69176189675034, pluto: 143.2961339139248 },
+    big_dipper:        { mercury: 204.20161027341632, venus: 200.13689105802135, earth: 109.87623170911652, mars: 172.26577881194456, jupiter: 316.2007701570657, saturn: 137.31505523034858, uranus: 123.62756920494652, neptune: 129.2630414063328, pluto: 72.86741342350726 },
+    andromeda_galaxy:  { mercury: 330.2828507847901, venus: 326.21813156939515, earth: 235.95747222049033, mars: 298.34701932331836, jupiter: 82.28201066843948, saturn: 263.3962957417224, uranus: 249.70880971632033, neptune: 255.3442819177066, pluto: 198.94865393488107 },
+  };
+  // Minor bodies (real natal longitudes, same CLI/date as above --
+  // `--no-minor` omitted).
+  // 小惑星リリスは表示リストから一旦除外(2026-09-01、「まぎらわしいから
+  // 外しておこうかな」より) -- 上のコメントにあった通り、これは黒い月
+  // (Black Moon Lilith, U+26B8)とは別の小惑星本体で、名前が同じで紛らわ
+  // しかった。NATAL_MINORの値自体は害がないので残してあるが、MINOR_META
+  // から外れているので選択リストにもチャートにも出てこない。
+  const MINOR_META = [
+    { key: "ceres",           g: "⚳︎", name: "セレス" },
+    { key: "pallas",          g: "⚴︎", name: "パラス" },
+    { key: "juno",            g: "⚵︎", name: "ジュノー" },
+    { key: "vesta",           g: "⚶︎", name: "ベスタ" },
+    { key: "chiron",          g: "⚷︎", name: "キロン" },
+    { key: "eris",            g: "⯰︎", name: "エリス" },
+  ];
+  const NATAL_MINOR = {
+    ceres: 130.602188, pallas: 71.406816, juno: 232.6101, vesta: 16.30325,
+    chiron: 108.041235, eris: 16.952841, lilith_asteroid: 295.24316,
+  };
+  // Real longitudes for every (基準点=anchor) x (種類=chart type) combination
+  // this mockup offers, all from the real helio-app CLI/eclipses.py/a quick
+  // Earth-heliocentric-longitude-crosses-a-multiple-of-90 root-finder for
+  // 四季図 (equinox/solstice: Earth's heliocentric longitude is always
+  // exactly 180 deg from the geocentric tropical Sun by construction, so
+  // Earth_helio=180/270/0/90 <-> geocentric Sun at 0/90/180/270 <-> spring
+  // equinox/summer solstice/autumn equinox/winter solstice). The star-
+  // reference picker only applies to natal+normal (REF_LONGITUDES above);
+  // every other cell here is tropical-only, a scope simplification for
+  // this discussion prototype, not a real-app limitation.
+  const ANCHOR_DATA = {
+    natal: {
+      normal:       { lons: null /* uses REF_LONGITUDES[currentRef] instead */, date: "1990-06-15 09:30:00 (Asia/Tokyo)" },
+      eclipseSolar: { lons: { mercury: 193.25475, venus: 131.357304, earth: 126.586146, mars: 244.081642, jupiter: 98.363314, saturn: 286.900869, uranus: 275.825649, neptune: 282.232047, pluto: 225.683064 }, date: "1990-01-26 19:20:01 UTC" },
+      eclipseLunar: { lons: { mercury: 237.118579, venus: 154.107025, earth: 140.785237, mars: 251.559483, jupiter: 99.543447, saturn: 287.323901, uranus: 275.986655, neptune: 282.315355, pluto: 225.781845 }, date: "1990-02-09 19:15:44 UTC" },
+      seasonal:     { lons: { mercury: 32.455244, venus: 4.470343, earth: 270.0, mars: 330.264878, jupiter: 110.546519, saturn: 291.313441, uranus: 277.501285, neptune: 283.100175, pluto: 226.711813 }, date: "1990-06-21 15:29:47 UTC", seasonLabel: "夏至" },
+    },
+    transit: {
+      normal:       { lons: { mercury: 158.25002, venus: 300.796195, earth: 335.214326, mars: 68.513164, jupiter: 128.82408, saturn: 10.031322, uranus: 62.642971, neptune: 2.817987, pluto: 304.426329 }, date: "2026-08-28 12:00:00 UTC" },
+      eclipseSolar: { lons: { mercury: 67.286092, venus: 275.864237, earth: 320.035801, mars: 60.085688, jupiter: 127.559573, saturn: 9.493279, uranus: 62.462263, neptune: 2.721922, pluto: 304.354085 }, date: "2026-08-12 17:36:45 UTC" },
+      eclipseLunar: { lons: { mercury: 156.734852, venus: 300.289567, earth: 334.904944, mars: 68.344143, jupiter: 128.798402, saturn: 10.020381, uranus: 62.639298, neptune: 2.816035, pluto: 304.424861 }, date: "2026-08-28 04:18:32 UTC" },
+      seasonal:     { lons: { mercury: 229.593262, venus: 192.215699, earth: 270.0, mars: 30.402249, jupiter: 123.339672, saturn: 7.709393, uranus: 61.862153, neptune: 2.402716, pluto: 304.113748 }, date: "2026-06-21 08:19:19 UTC", seasonLabel: "夏至" },
+    },
+  };
+  // Mean daily motion (deg/day = 360/orbital period), a circular-orbit
+  // approximation used ONLY to make the transit time-scrub control feel
+  // live in this JS-only mockup -- not real astronomy (real angular speed
+  // varies with orbital position). The actual app will recompute this
+  // exactly via Astropy once the Pyodide/PWA engine is wired in.
+  const MEAN_MOTION_DEG_PER_DAY = {
+    mercury: 360 / 87.969, venus: 360 / 224.701, earth: 360 / 365.256,
+    mars: 360 / 686.980, jupiter: 360 / 4332.59, saturn: 360 / 10759.22,
+    uranus: 360 / 30688.5, neptune: 360 / 60182, pluto: 360 / 90560,
+  };
+  const TRANSIT_BASE_TIME = Date.UTC(2026, 7, 28, 12, 0, 0);  // month is 0-indexed: 7 = August
+  let transitTime = TRANSIT_BASE_TIME;
+  let scrubUnit = 'day';
+
+  // N and T are always both "loaded" independently -- each has its own
+  // chart-type setting that's kept regardless of which one is currently
+  // being displayed. `displayMode` only picks what to render: N alone,
+  // T alone, or both as a biwheel. This is what lets a T-anchored
+  // eclipse/seasonal chart combine with N in a biwheel, or N's eclipse
+  // combine with T's -- any N-type x any T-type is a valid biwheel.
+  let nType = 'normal';
+  let displayMode = 'N';
+  let conjOrb = 1.5;
+
+  // Real fixed-star/deep-sky conjunction hits (helio-app CLI
+  // `--list-conjunctions --orb 3`), for N's normal (birth) longitudes
+  // only -- the full 90-star + 12-deep-sky catalog isn't embedded in
+  // this mockup, so this is the one moment conjunctions can be shown
+  // accurately for. Keys match PLANET_META/MINOR_META body keys.
+  // Real absolute heliocentric longitudes (helio-app CLI, at the natal
+  // epoch -- サンプル人物(架空)1990-06-15) for every catalog star/deep-sky
+  // object that showed up within a 3 deg orb of the natal chart. Storing
+  // each object's own longitude (not just "how far it was from body X")
+  // is what lets conjunctions be checked against *any* currently
+  // displayed body set -- N's, or T's (scrubbed or jumped) -- with the
+  // same simple angular-separation math, not just the fixed natal
+  // moment. A star's ecliptic longitude drifts only ~0.014 deg/year
+  // from precession, so reusing the 1990 value for T's "now"/scrubbed
+  // moments decades away is a deliberate, disclosed approximation, not
+  // an oversight -- the real app will recompute this properly once the
+  // Pyodide engine is wired in.
+  // `cat` (constellation + Bayer letter, e.g. "おおいぬ座 α星") matches
+  // the same secondary-caption format the origin-star picker (ref-panel)
+  // already uses -- constellation_ja/name_en(Bayer) pulled directly from
+  // stars.py for this list (2026-09-03、実データを架空データに総入れ替え
+  // した際、CLIの--list-conjunctions --orb 3で新しい合の星を再検索し、
+  // このテーブル自体も丸ごと差し替えた -- 星は全部αであることを
+  // name_en(alf X)で確認済み)。
+  const CATALOG_STARS = {
+    scl_principal: { name: "ちょうこくしつ座の主星", short: "ちょうこくしつ座", cat: "ちょうこくしつ座 α星", lon: 0.358497, kind: "star" },
+    markab: { name: "マルカブ", cat: "ペガスス座 α星", lon: 353.352561, kind: "star" },
+    ara_principal: { name: "さいだん座の主星", short: "さいだん座", cat: "さいだん座 α星", lon: 264.800961, kind: "star" },
+    rasalhague: { name: "ラスアルハゲ", cat: "へびつかい座 α星", lon: 262.314821, kind: "star" },
+    men_principal: { name: "テーブルさん座の主星", short: "テーブルさん座", cat: "テーブルさん座 α星", lon: 265.163326, kind: "star" },
+    atria: { name: "アトリア", cat: "みなみのさんかく座 α星", lon: 260.762492, kind: "star" },
+    castor: { name: "カストル", cat: "ふたご座 α星", lon: 110.107183, kind: "star" },
+    peacock: { name: "ピーコック", cat: "くじゃく座 α星", lon: 293.683714, kind: "star" },
+    sct_principal: { name: "たて座の主星", short: "たて座", cat: "たて座 α星", lon: 278.883318, kind: "star" },
+    tel_principal: { name: "ぼうえんきょう座の主星", short: "ぼうえんきょう座", cat: "ぼうえんきょう座 α星", lon: 274.94015, kind: "star" },
+    cra_principal: { name: "みなみのかんむり座の主星", short: "みなみのかんむり座", cat: "みなみのかんむり座 α星", lon: 284.001178, kind: "star" },
+    vega: { name: "ベガ", cat: "こと座 α星", lon: 285.182498, kind: "star" },
+    zubenelgenubi: { name: "ズベンエルゲヌビ", cat: "てんびん座 α星", lon: 224.949501, kind: "star" },
+    lyn_principal: { name: "やまねこ座の主星", short: "やまねこ座", cat: "やまねこ座 α星", lon: 131.70941, kind: "star" },
+    acubens: { name: "アクベンス", cat: "かに座 α星", lon: 133.508223, kind: "star" },
+    aldebaran: { name: "アルデバラン", cat: "おうし座 α星", lon: 69.65569, kind: "star" },
+    unukalhai: { name: "ウヌクアルハイ", cat: "へび座 α星", lon: 231.94111, kind: "star" },
+    lup_principal: { name: "おおかみ座の主星", short: "おおかみ座", cat: "おおかみ座 α星", lon: 233.370807, kind: "star" },
+    mus_principal: { name: "はえ座の主星", short: "はえ座", cat: "はえ座 α星", lon: 230.24193, kind: "star" },
+    alpheratz: { name: "アルフェラッツ", cat: "アンドロメダ座 α星", lon: 14.17551, kind: "star" },
+  };
+  function isNNormal() { return displayMode === 'N' && nType === 'normal'; }
+  function angularSep(a, b) {
+    const d = Math.abs(a - b) % 360;
+    return Math.min(d, 360 - d);
+  }
+
+  // ---------- fixed-star conjunctions: keeping the star catalog in the
+  // same frame/epoch as whatever's currently being compared against it
+  // (2026-08-31, 2件の相談から) ----------
+  // Bug 1: 起点(トロピカル/恒星)を変えると合になる星が変わってしまう。
+  // 原因は、REF_LONGITUDES[currentRef]で惑星側は選んだ基準点の枠に回転
+  // させているのに、CATALOG_STARSの恒星は常にトロピカル(無回転)のまま
+  // 比較していたこと -- 角度差は本来、座標系を回転させても変わらない
+  // はずなので、これは実装バグ。惑星と同じだけ恒星側も回転させて直す。
+  // REF_TROPICAL_LON[key] = その基準点自身のトロピカル黄経。
+  // REF_LONGITUDES.tropical[p] - REF_LONGITUDES[key][p] は本来どの惑星pで
+  // 計算しても同じ値になるはず(回転は全天体に一律にかかるため) -- 実際
+  // の値がわずかに(0.001度未満)ばれるのは元データの丸め誤差。mercuryを
+  // 代表として使う。
+  const REF_TROPICAL_LON = { tropical: 0 };
+  for (const refKey of Object.keys(REF_LONGITUDES)) {
+    if (refKey === 'tropical') continue;
+    REF_TROPICAL_LON[refKey] = ((REF_LONGITUDES.tropical.mercury - REF_LONGITUDES[refKey].mercury) % 360 + 360) % 360;
+  }
+  // Bug 2: 「ネイタルはネイタルの年月日、トランジットはトランジットの
+  // 年月日で、恒星の位置も揃えてほしい」。CATALOG_STARSの黄経は出生時
+  // (1990-06-15)一点で固定していたため、トランジット(2026年、約36年後)
+  // を見ているときも1990年の恒星位置のまま比較していた。歳差により黄経
+  // は年に約0.014度(50.29秒/年)動くので、36年で約0.5度 -- オーブ設定
+  // (デフォルト1.5度)次第では合否が変わりうる差。見ている年月日に応じて
+  // 恒星側の黄経も動かす。
+  const NATAL_EPOCH_MS = Date.UTC(1990, 5, 15, 0, 30, 0);  // 1990-06-15 09:30 JST = 00:30 UTC、出生時=カタログの基準時刻そのもの(サンプル人物・架空)
+  const PRECESSION_DEG_PER_YEAR = 50.29 / 3600;
+  const MS_PER_YEAR = 365.25 * 86400000;
+  const N_TYPE_EPOCH_MS = {
+    normal: NATAL_EPOCH_MS,
+    eclipseSolar: Date.UTC(1990, 0, 26, 19, 20, 1),
+    eclipseLunar: Date.UTC(1990, 1, 9, 19, 15, 44),
+    seasonal: Date.UTC(1990, 5, 21, 15, 29, 47),
+  };
+  function currentConjunctionEpochMs() {
+    // T: 現在表示中の(スクラブ/ジャンプ後の)瞬間そのもの。N: 選択中の
+    // 種別(通常/日食図/月食図/四季図)それぞれの実日時。
+    return displayMode === 'T' ? transitTime : N_TYPE_EPOCH_MS[nType];
+  }
+  function effectiveStarLon(star) {
+    const drift = (currentConjunctionEpochMs() - NATAL_EPOCH_MS) / MS_PER_YEAR * PRECESSION_DEG_PER_YEAR;
+    const refOffset = isNNormal() ? REF_TROPICAL_LON[currentRef] : 0;  // Tおよびnormal以外のNは起点セレクター非対応(常にトロピカル)なので回転なし
+    return ((star.lon + drift - refOffset) % 360 + 360) % 360;
+  }
+  // Every hit starts checked ("visible on the wheel") by default; toggling
+  // a checkbox in the panel removes/adds it here rather than re-deriving
+  // from the checkbox DOM, since the panel's list gets rebuilt from
+  // scratch on every orb/mode change (a plain HTML checked attribute
+  // wouldn't survive that rebuild). Keyed "bodyKey|starKey", same as
+  // before, so a check/uncheck made in N stays remembered if you switch
+  // to look at T too.
+  const checkedHits = new Set();
+  const seenHitIds = new Set();  // tracks which hitIds have already been given their default-checked state, so re-running conjunctionSummary() (e.g. on an orb change) never silently re-checks something the user deliberately unchecked
+  // Conjunctions are unavailable only for the biwheel (too cluttered
+  // with two rings already -- the same rule aspects/conjunctions
+  // already followed) -- N and T both work now, including N/T's own
+  // eclipse or seasonal chart types, since this is plain angle math
+  // once each object's longitude is known.
+  function conjunctionsAvailable() { return displayMode !== 'both'; }
+  function currentConjunctionLongitudes() {
+    if (displayMode === 'T') return resolveTLongitudes();
+    return resolveNLongitudes();
+  }
+  function conjunctionSummary(orbDeg) {
+    const lons = currentConjunctionLongitudes();
+    const allMeta = [...PLANET_META, ...MINOR_META];
+    const minorKeys = new Set(MINOR_META.map(m => m.key));
+    const out = [];
+    for (const bodyMeta of allMeta) {
+      if (minorKeys.has(bodyMeta.key) && !minorBodiesOn.has(bodyMeta.key)) continue;
+      const bodyLon = lons[bodyMeta.key];
+      if (bodyLon === undefined) continue;
+      const hits = [];
+      for (const [starKey, star] of Object.entries(CATALOG_STARS)) {
+        const sep = angularSep(bodyLon, effectiveStarLon(star));
+        if (sep > orbDeg) continue;
+        hits.push({ key: starKey, name: star.name, short: star.short, cat: star.cat, kind: star.kind, sep });
+        const hitId = bodyMeta.key + '|' + starKey;
+        if (!seenHitIds.has(hitId)) {
+          seenHitIds.add(hitId);
+          checkedHits.add(hitId);  // default: newly-seen hits start checked
+        }
+      }
+      hits.sort((a, b) => a.sep - b.sep);
+      if (hits.length) out.push({ key: bodyMeta.key, name: bodyMeta.name, glyph: bodyMeta.g, hits });
+    }
+    return out;
+  }
+  function updateConjunctionUI() {
+    const menuLabel = document.getElementById('menu-conj-label');
+    const note = document.getElementById('star-conj-note');
+    if (!conjunctionsAvailable()) {
+      note.style.display = '';
+      menuLabel.textContent = '恒星の合';
+      return;
+    }
+    note.style.display = 'none';
+    const summary = conjunctionSummary(conjOrb);
+    menuLabel.textContent = summary.length ? `恒星の合 (${summary.length})` : '恒星の合';
+
+    const container = document.getElementById('conj-groups');
+    container.innerHTML = '';
+    if (summary.length === 0) {
+      container.innerHTML = `<p style="color:var(--ink-faint); font-size:0.85rem;">このオーブ内には見つかりません。オーブを広げてみてください。</p>`;
+      return;
+    }
+    summary.forEach(body => {
+      const group = document.createElement('div');
+      group.className = 'conj-body-group';
+      const hitsHtml = body.hits.map(h => {
+        const hitId = body.key + '|' + h.key;
+        const isOn = checkedHits.has(hitId);
+        const catHtml = h.cat ? `<span class="conj-hit-cat">${h.cat}</span>` : '';
+        return `<div class="conj-hit"><span class="mini-check${isOn ? ' on' : ''}" data-hit="${hitId}" onclick="toggleMini(this)">${isOn ? '✓' : ''}</span><span class="conj-hit-main"><span class="conj-hit-name">${h.name}</span>${catHtml}</span><span class="conj-hit-sep mono">${h.sep.toFixed(2)}°</span></div>`;
+      }).join('');
+      group.innerHTML = `<div class="conj-body-name"><span class="conj-body-glyph">${body.glyph}</span> ${body.name}</div>${hitsHtml}`;
+      container.appendChild(group);
+    });
+    drawConjunctionMarkers();
+    drawReferenceStarLabel();  // see the note on toggleMini() -- orb changes can change which bodies are in the fan-out cluster too
+  }
+  function drawConjunctionMarkers() {
+    const group = document.getElementById('conj-markers');
+    if (!group) return;
+    group.innerHTML = '';
+    const showOn = document.getElementById('conj-switch')?.classList.contains('on');
+    if (!conjunctionsAvailable() || !showOn) return;
+    const lons = currentConjunctionLongitudes();
+    const svgNS = "http://www.w3.org/2000/svg";
+    // Outside the sign ring (r > 178), not the inner degree band planets
+    // use -- that's what keeps this from reopening the old "円の外に
+    // 戻す" rejection (HANDOFF 7.9), which was about planet degree
+    // labels colliding with these same markers when both lived near the
+    // outside. Planet labels stayed inside; only the star/deep-sky
+    // markers move out here, at the user's explicit request, so there's
+    // no collision to reintroduce.
+    const summary = conjunctionSummary(conjOrb);
+    // Two bodies that are themselves in conjunction with each other (so
+    // nearly the same longitude) can both fall within orb of the same
+    // star -- without this, that star's label would get drawn twice,
+    // stacked right on top of itself (2026-08-31, reported as "アンタレス
+    // が2つ重なって見える" from exactly this situation: 水星 and 海王星
+    // both near アンタレス). Keep only the tightest-orb (body, star)
+    // pairing per star key, so each star marker appears once, attached to
+    // whichever body is actually closest to it.
+    const bestBodyForStar = {};
+    summary.forEach(body => {
+      body.hits.filter(h => checkedHits.has(body.key + '|' + h.key)).forEach(h => {
+        const cur = bestBodyForStar[h.key];
+        if (!cur || h.sep < cur.sep) bestBodyForStar[h.key] = { bodyKey: body.key, sep: h.sep };
+      });
+    });
+    // 恒星ラベル専用の帯(STAR_R起点)に、スロット(1天体に複数の恒星が
+    // 合になっている場合の1件目・2件目・3件目)ごとまとめてsweep
+    // SameTierLabels()で確定的に並べる(2026-09-03、円の外側から恒星/
+    // サイン/度数/惑星/アスペクトの帯レイアウトに作り直した際に統一) --
+    // 以前はlabelAngleOffsets(6度以内なら固定量ずらす決め打ち)+
+    // edgeSafeRadius(画面端に出ないよう半径を引く)の組み合わせだったが、
+    // 実際に重なるかどうかを直接見ていなかった。度数ラベル・惑星グリフ
+    // と同じsweepSameTierLabels(実際のチップ幅から必要な最小角度を計算
+    // し、確定的に1回で押し広げる)に統一し、キャンバス拡張(viewBox
+    // -50 -50 500 500)で得た余白ぶんSTAR_Rも外側へ移した。
+    const slots = [];  // { body, h, labelText, color, i }
+    summary.forEach(body => {
+      const hits = body.hits.filter(h => checkedHits.has(body.key + '|' + h.key) && bestBodyForStar[h.key].bodyKey === body.key);
+      if (!hits.length) return;
+      const maxSlots = 3;  // beyond this, fold the rest into a "他N件" tag on the last slot rather than stacking indefinitely
+      hits.slice(0, maxSlots).forEach((h, i) => {
+        const overflow = (i === maxSlots - 1) ? hits.length - maxSlots : 0;
+        const shortName = h.short || h.name;
+        const labelText = (h.kind === "star" ? "★" : "◆") + shortName + (overflow > 0 ? ` 他${overflow}` : "");
+        slots.push({ body, h, i, labelText, color: h.kind === "star" ? "var(--accent)" : "var(--aspect-soft)" });
+      });
+    });
+    const labelFontSize = 10.5;
+    // スロット番号(0,1,2)ごとに束ねてsweepする -- 同じ天体の2件目・3件目
+    // 同士はradiusが違うので元々ぶつからないが、違う天体の1件目同士が
+    // ぶつかることは普通にあるため。
+    const bySlot = new Map();
+    slots.forEach(s => { if (!bySlot.has(s.i)) bySlot.set(s.i, []); bySlot.get(s.i).push(s); });
+    bySlot.forEach((group2, i) => {
+      const maxW = Math.max(...group2.map(s => estimateLabelWidth(s.labelText, labelFontSize)));
+      const r = STAR_R + i * STAR_ROW_STEP;
+      const items = group2.map(s => ({ key: s.body.key + '|' + s.h.key, deg: lons[s.body.key], r }));
+      sweepSameTierLabels(items, maxW);
+      items.forEach((it, idx) => { group2[idx]._pos = it; });
+    });
+    slots.forEach(s => {
+      const { body, h, labelText, color } = s;
+      const lon = lons[body.key];
+      const pos = s._pos;
+      // short spoke from the ring edge (at the body's *true* longitude)
+      // out to the label (at its possibly swept one) -- makes which
+      // planet a stacked label belongs to readable even when two
+      // planets' labels end up close together around the ring, and
+      // reads as a visible little kink when a label's been swept.
+      const [gx1, gy1] = polar(200, 200, 175, lon);
+      const [gx2, gy2] = polar(200, 200, pos.r - 7, pos.deg);
+      const guide = document.createElementNS(svgNS, "line");
+      guide.setAttribute("x1", gx1); guide.setAttribute("y1", gy1);
+      guide.setAttribute("x2", gx2); guide.setAttribute("y2", gy2);
+      guide.setAttribute("stroke", color); guide.setAttribute("stroke-width", "0.6"); guide.setAttribute("opacity", "0.45");
+      group.appendChild(guide);
+
+      const [x, y] = polar(200, 200, pos.r, pos.deg);
+      const label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", x); label.setAttribute("y", y);
+      label.setAttribute("text-anchor", safeTextAnchor(x));
+      label.setAttribute("dominant-baseline", "middle");
+      label.setAttribute("font-size", String(labelFontSize));
+      label.setAttribute("fill", color);
+      label.style.cursor = "default";
+      label.textContent = labelText;
+      // Hover (desktop) shows the exact name + separation; on touch,
+      // the short label alone already answers "which star is conjunct
+      // which planet" at a glance, so tap doesn't need to do anything extra.
+      const title = document.createElementNS(svgNS, "title");
+      title.textContent = `${h.name}${h.cat ? '(' + h.cat + ')' : ''} -- ${body.name}との合、離角${h.sep.toFixed(2)}°`;
+      label.appendChild(title);
+      group.appendChild(label);
+    });
+  }
+  // T has no separate "type" -- it's always one continuous scrubbable
+  // timeline. Eclipse/seasonal are shortcuts that jump transitTime to a
+  // specific found instant; `tSpecialMoment` just tracks whether we're
+  // still sitting exactly on one (so the badge can label it), and any
+  // scrub away from it clears the label -- you can't be "at the eclipse"
+  // and also somewhere else at the same time.
+  let tSpecialMoment = null;
+  const T_SPECIAL_TIMES = {
+    eclipseSolar: Date.UTC(2026, 7, 12, 17, 36, 45),
+    eclipseLunar: Date.UTC(2026, 7, 28, 4, 18, 32),
+    seasonal: Date.UTC(2026, 5, 21, 8, 19, 19),
+  };
+
+  function formatAstro(deg) {
+    const norm = ((deg % 360) + 360) % 360;
+    const signIdx = Math.floor(norm / 30);
+    const inSign = norm - signIdx * 30;
+    const d = Math.floor(inSign);
+    const m = Math.floor((inSign - d) * 60);
+    return SIGNS[signIdx] + d + "°" + String(m).padStart(2, "0") + "'";
+  }
+  // サビアン用の数え度数表記(2026-09-01、「サビアンは数え度数表記でい
+  // いのでは。その方が字数も少ない?」より) -- サビアンシンボルは伝統的
+  // に実際の度数(0-29度、分刻み)ではなく、「その度に入っている」という
+  // 数え方(1-30度、切り上げ)で呼ぶ。分を持たないぶんformatAstroより短く
+  // なり(例: "♍0°33'"(6文字)->"♍1°"(3文字))、.sabian-row で天体名や
+  // サビアン文に回せる横幅が増える。
+  function formatSabianDegree(deg) {
+    const norm = ((deg % 360) + 360) % 360;
+    const signIdx = Math.floor(norm / 30);
+    const inSign = norm - signIdx * 30;
+    const counting = Math.min(30, Math.floor(inSign) + 1);
+    return SIGNS[signIdx] + counting + "°";
+  }
+  // Same as formatAstro but without the sign glyph -- used right on the
+  // wheel next to each body's marker, where the ring position already
+  // shows the sign.
+  // Split into two short strings for a stacked two-line label on the
+  // wheel (see drawBodyRing) instead of one wide "12°09'" line.
+  function formatDegMinParts(deg) {
+    const norm = ((deg % 360) + 360) % 360;
+    const inSign = norm % 30;
+    const d = Math.floor(inSign);
+    const m = Math.floor((inSign - d) * 60);
+    return [d + "°", String(m).padStart(2, "0") + "'"];
+  }
+  function transitLongitudesNow() {
+    // Scrubbed transit time = base real data + approximate mean-motion
+    // propagation over the elapsed days (see MEAN_MOTION_DEG_PER_DAY note).
+    const elapsedDays = (transitTime - TRANSIT_BASE_TIME) / 86400000;
+    const base = ANCHOR_DATA.transit.normal.lons;
+    const out = {};
+    for (const key in base) {
+      out[key] = ((base[key] + MEAN_MOTION_DEG_PER_DAY[key] * elapsedDays) % 360 + 360) % 360;
+    }
+    return out;
+  }
+  function resolveNLongitudes() {
+    return nType === 'normal' ? REF_LONGITUDES[currentRef] : ANCHOR_DATA.natal[nType].lons;
+  }
+  function resolveTLongitudes() {
+    // While sitting exactly on a jumped-to special moment, use its real
+    // precomputed longitudes (not the mean-motion approximation) -- once
+    // scrubbed away, tSpecialMoment is null and we fall back to the
+    // approximation for wherever the scrub landed.
+    return tSpecialMoment ? ANCHOR_DATA.transit[tSpecialMoment].lons : transitLongitudesNow();
+  }
+  function currentPlanets() {
+    const lons = displayMode === 'T' ? resolveTLongitudes() : resolveNLongitudes();
+    let list = PLANET_META.map(p => ({ ...p, deg: lons[p.key], astro: formatAstro(lons[p.key]) }));
+    const activeMinors = MINOR_META.filter(p => minorBodiesOn.has(p.key));
+    list = list.concat(activeMinors.map(p => ({ ...p, deg: NATAL_MINOR[p.key], astro: formatAstro(NATAL_MINOR[p.key]) })));
+    return list;
+  }
+  // Same longitude map the wheel/legend are built from (main 9 + whichever
+  // minor bodies are checked), reused for aspects so "displayed" and
+  // "counted for aspects" are always the same set -- see the note by
+  // minorBodiesOn above for why there's no separate 3rd selection.
+  function currentDisplayLongitudes() {
+    const base = displayMode === 'T' ? resolveTLongitudes() : resolveNLongitudes();
+    const lons = { ...base };
+    MINOR_META.forEach(p => { if (minorBodiesOn.has(p.key)) lons[p.key] = NATAL_MINOR[p.key]; });
+    return lons;
+  }
+
+  // ---------- aspects ----------
+  // Angular separation between two bodies is unchanged by rotating both
+  // by the same reference-point shift, so aspects are computed fresh
+  // from whichever longitude map the current mode is actually showing
+  // (not hardcoded to natal) -- correct for transit/eclipse modes too.
+  // Includes both major aspects (wide orbs, on by default) and minor
+  // aspects (tight orbs, off by default so existing charts don't
+  // suddenly get busy) -- user explicitly asked for the minor set too.
+  const ASPECT_DEFS = [
+    { type: "conjunction",    angle: 0,   orb: 6, color: "var(--aspect-neutral)", dash: "1,0", labelJa: "0度",    major: true },
+    { type: "semisextile",    angle: 30,  orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "30度",   major: false },
+    { type: "semisquare",     angle: 45,  orb: 2, color: "var(--aspect-hard)",    dash: "2,2", labelJa: "45度",   major: false },
+    { type: "sextile",        angle: 60,  orb: 4, color: "var(--aspect-soft)",    dash: "1,0", labelJa: "60度",   major: true },
+    { type: "quintile",       angle: 72,  orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "72度",   major: false },
+    { type: "square",         angle: 90,  orb: 6, color: "var(--aspect-hard)",    dash: "5,3", labelJa: "90度",   major: true },
+    { type: "trine",          angle: 120, orb: 6, color: "var(--aspect-soft)",    dash: "1,0", labelJa: "120度",  major: true },
+    { type: "sesquiquadrate", angle: 135, orb: 2, color: "var(--aspect-hard)",    dash: "2,2", labelJa: "135度",  major: false },
+    { type: "biquintile",     angle: 144, orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "144度",  major: false },
+    { type: "quincunx",       angle: 150, orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "150度",  major: false },
+    { type: "opposition",     angle: 180, orb: 6, color: "var(--aspect-hard)",    dash: "1,0", labelJa: "180度",  major: true },
+  ];
+  function computeAspects(lonMap) {
+    const keys = Object.keys(lonMap);
+    const hits = [];
+    for (let i = 0; i < keys.length; i++) {
+      for (let j = i + 1; j < keys.length; j++) {
+        const a = keys[i], b = keys[j];
+        let diff = Math.abs(lonMap[a] - lonMap[b]) % 360;
+        diff = Math.min(diff, 360 - diff);
+        for (const def of ASPECT_DEFS) {
+          if (Math.abs(diff - def.angle) <= def.orb) hits.push({ a, b, ...def, exactDiff: diff });
+        }
+      }
+    }
+    return hits;
+  }
+  const aspectTypesOn = new Set(ASPECT_DEFS.filter(d => d.major).map(d => d.type));
+  function toggleAspectType(el) {
+    el.classList.toggle('on');
+    el.textContent = el.classList.contains('on') ? '✓' : '';
+    const t = el.dataset.type;
+    if (el.classList.contains('on')) aspectTypesOn.add(t); else aspectTypesOn.delete(t);
+    redrawAspects();
+  }
+  function fillAspectTypeList() {
+    const container = document.getElementById('aspect-type-list');
+    container.innerHTML = '';
+    [['メジャーアスペクト', true], ['マイナーアスペクト', false]].forEach(([groupLabel, isMajor]) => {
+      const heading = document.createElement('div');
+      heading.className = 'check-row-group-label';
+      heading.textContent = groupLabel;
+      container.appendChild(heading);
+      ASPECT_DEFS.filter(d => d.major === isMajor).forEach((def) => {
+        const isOn = aspectTypesOn.has(def.type);
+        const row = document.createElement('div');
+        row.className = 'check-row';
+        row.innerHTML = `<span class="mini-check${isOn ? ' on' : ''}" data-type="${def.type}" onclick="toggleAspectType(this)">${isOn ? '✓' : ''}</span>` +
+          `<span class="aspect-swatch" style="background:${def.color};"></span><span>${def.labelJa}</span>`;
+        container.appendChild(row);
+      });
+    });
+  }
+  function redrawAspects() {
+    const group = document.getElementById('aspect-lines');
+    group.innerHTML = "";
+    if (displayMode === 'both') return;  // too cluttered with two rings, matches the real app's rule for conjunctions -- buildBiwheelChart() calls fillAspectTable() itself for that case
+    fillAspectTable();
+    const showAll = document.getElementById('aspect-switch').classList.contains('on');
+    if (!showAll) return;
+    const lons = currentDisplayLongitudes();  // main 9 + whichever minor bodies are checked -- see the note by minorBodiesOn
+    const aspects = computeAspects(lons);
+    aspects.filter(a => aspectTypesOn.has(a.type)).forEach(a => {
+      const ra = window.__markerRadii?.[a.a] ?? 108;
+      const rb = window.__markerRadii?.[a.b] ?? 108;
+      const [rawX1, rawY1] = polar(200, 200, ra, lons[a.a]);
+      const [rawX2, rawY2] = polar(200, 200, rb, lons[a.b]);
+      const [x1, y1, x2, y2] = insetLineEndpoints(rawX1, rawY1, rawX2, rawY2, 9);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+      line.setAttribute("stroke", a.color);
+      // 太さ1/1.5->1.4/2、不透明度0.75->0.9(2026-09-03、「線とか文字が、
+      // 見にくいのよね」「色？線の太さ？コントラストかな？」より)。
+      line.setAttribute("stroke-width", a.type === "conjunction" ? "2" : "1.4");
+      line.setAttribute("stroke-dasharray", a.dash);
+      line.setAttribute("opacity", "0.9");
+      group.appendChild(line);
+    });
+  }
+  // A readable list alongside the wheel+lines -- lines alone get hard to
+  // read once a few overlap, and the user explicitly asked to see
+  // 円・データ・アスペクト表 together without opening anything. Mirrors
+  // exactly what redrawAspects() draws (same lonMap, same aspectTypesOn
+  // filter), single-wheel only -- biwheel already excludes aspects.
+  // Grid/matrix format (アストロゴールドの参考画面通り、2026-08-31の相談
+  // で「1行ずつのリスト」から差し替え). Rows/cols = whichever bodies are
+  // currently displayed (main 9 + checked minors, same set drawAspects
+  // already uses). Only the upper-right triangle is filled -- see the
+  // CSS comment on .aspect-grid for why the mirrored lower-left half is
+  // skipped rather than shown blank-but-present.
+  function fillAspectTable() {
+    const container = document.getElementById('aspect-table');
+    if (!container) return;
+    container.innerHTML = '';
+    if (displayMode === 'both') {
+      container.innerHTML = `<p style="color:var(--ink-faint); font-size:0.82rem;">二重円ではアスペクトは表示しません(情報量が多すぎるため)。</p>`;
+      return;
+    }
+    const lons = currentDisplayLongitudes();
+    const allMeta = [...PLANET_META, ...MINOR_META];
+    const bodies = allMeta.filter((m) => lons[m.key] !== undefined);
+    if (bodies.length < 2) {
+      container.innerHTML = `<p style="color:var(--ink-faint); font-size:0.82rem;">対象の天体が足りません。</p>`;
+      return;
+    }
+    const hits = computeAspects(lons)
+      .filter((a) => aspectTypesOn.has(a.type))
+      .map((a) => ({ ...a, orb: Math.abs(a.exactDiff - a.angle) }));
+    // Tightest-orb hit wins if (with unusually wide orbs) more than one
+    // aspect type matched the same pair.
+    const hitByPair = {};
+    hits.forEach((h) => {
+      const key = h.a + '|' + h.b;
+      if (!hitByPair[key] || h.orb < hitByPair[key].orb) hitByPair[key] = h;
+    });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'aspect-grid-wrap';
+    const table = document.createElement('table');
+    table.className = 'aspect-grid';
+
+    const headRow = document.createElement('tr');
+    headRow.appendChild(document.createElement('th'));
+    for (let j = 1; j < bodies.length; j++) {
+      const th = document.createElement('th');
+      th.textContent = bodies[j].g;
+      th.title = bodies[j].name;
+      headRow.appendChild(th);
+    }
+    table.appendChild(headRow);
+
+    for (let i = 0; i < bodies.length - 1; i++) {
+      const tr = document.createElement('tr');
+      const rowTh = document.createElement('th');
+      rowTh.textContent = bodies[i].g;
+      rowTh.title = bodies[i].name;
+      tr.appendChild(rowTh);
+      for (let j = 1; j < bodies.length; j++) {
+        const td = document.createElement('td');
+        if (j <= i) {
+          td.className = 'blank';
+        } else {
+          const hit = hitByPair[bodies[i].key + '|' + bodies[j].key] || hitByPair[bodies[j].key + '|' + bodies[i].key];
+          if (hit) {
+            td.className = 'hit';
+            td.style.color = hit.color;
+            td.textContent = hit.angle;
+            td.title = `${bodies[i].name} ${hit.labelJa} ${bodies[j].name}(オーブ${hit.orb.toFixed(2)}°)`;
+          }
+        }
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    wrap.appendChild(table);
+    container.appendChild(wrap);
+  }
+  // Sort by longitude, find the single biggest gap (so a cluster straddling
+  // 0/360 isn't split in two), walk from just after it, and group bodies
+  // within `gapDeg` of their immediate neighbor into consecutive clusters.
+  // Same clustering logic as the real app's chart.py `_stagger_radii`,
+  // pulled out into its own function (2026-09-02) so both the glyph
+  // stagger (staggerRadii below) and the degree-label placement
+  // (drawBodyRing) agree on exactly the same cluster boundaries -- also
+  // returns each cluster's flanking gap sizes (gapBefore/gapAfter, in the
+  // sorted-order sense, wrapping around for the first/last cluster), which
+  // drawBodyRing uses to decide which side has more open room for a
+  // cluster's label block.
+  function clusterByGap(items, gapDeg) {
+    const n = items.length;
+    if (n === 0) return [];
+    const sorted = [...items].sort((a, b) => a.deg - b.deg);
+    const gaps = sorted.map((cur, i) => {
+      const next = sorted[(i + 1) % n];
+      return ((next.deg - cur.deg) % 360 + 360) % 360;
+    });
+    let cutIdx = 0;
+    for (let i = 1; i < n; i++) if (gaps[i] > gaps[cutIdx]) cutIdx = i;
+    const order = Array.from({ length: n }, (_, i) => sorted[(cutIdx + 1 + i) % n]);
+    const orderGaps = Array.from({ length: n }, (_, i) => gaps[(cutIdx + 1 + i) % n]);  // gap AFTER order[i]
+    const clusters = [];
+    order.forEach((item, i) => {
+      const gapBefore = i === 0 ? gaps[cutIdx] : orderGaps[i - 1];
+      if (gapBefore >= gapDeg) {
+        clusters.push({ members: [item], gapBefore });
+      } else {
+        clusters[clusters.length - 1].members.push(item);
+      }
+    });
+    clusters.forEach((c, i) => {
+      c.gapAfter = i === clusters.length - 1 ? gaps[cutIdx] : clusters[i + 1].gapBefore;
+    });
+    return clusters;
+  }
+  function staggerRadii(items, baseRadius, step, clusterGapDeg = 8.0) {
+    const radii = {};
+    clusterByGap(items, clusterGapDeg).forEach(({ members }) => {
+      members.forEach((item, depth) => {
+        radii[item.key] = Math.max(baseRadius - depth * step, step * 1.5);
+      });
+    });
+    return radii;
+  }
+
+  // アスペクト線の両端を、天体グリフの中心手前でmarginぶん止める
+  // (2026-09-01、「アスペクト線と惑星がぶつかって惑星がつぶれている、
+  // 惑星そのものを中心にしないでほしい」より) -- 元は文字通りグリフの
+  // 中心座標同士を結んでいたため、天体が集まっている場所では何本もの線
+  // がグリフの真上で交差し、グリフ自体が線の重なりに埋もれて読みにくく
+  // なっていた。線の向きに沿って両端をmarginぶん内側へ引っ込めることで、
+  // グリフの周りに線の入らない余白ができる。2点が近すぎてmargin*2以上
+  // 離れていない場合(隣接スタッガー同士の合など)は縮めず元のまま返す
+  // -- 変に潰れて見えなくなるより、多少グリフに触れる方がまし。
+  function insetLineEndpoints(x1, y1, x2, y2, margin) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < margin * 2 + 1) return [x1, y1, x2, y2];
+    const ux = dx / dist, uy = dy / dist;
+    return [x1 + ux * margin, y1 + uy * margin, x2 - ux * margin, y2 - uy * margin];
+  }
+  function polar(cx, cy, r, deg) {
+    // Same rotation as the real app's chart.py `_xy()`: theta=(270-lon)%360,
+    // x=r*sin(theta), y=r*cos(theta) in a y-up frame -- negate the cos term
+    // here because SVG's y-axis points down. This is what makes Aries land
+    // in Sagittarius's naive-clockwise-from-12 slot and Cancer land in
+    // Virgo's slot (a fixed, user-specified layout, not a stylistic choice).
+    const theta = ((270 - deg) % 360) * Math.PI / 180;
+    return [cx + r * Math.sin(theta), cy - r * Math.cos(theta)];
+  }
+  function drawSignRing() {
+    const ticks = document.getElementById('sign-ticks');
+    const glyphs = document.getElementById('sign-glyphs');
+    const dticks = document.getElementById('degree-ticks');
+    ticks.innerHTML = ""; glyphs.innerHTML = ""; dticks.innerHTML = "";
+
+    for (let i = 0; i < 12; i++) {
+      const deg = i * 30;
+      const [x1, y1] = polar(200, 200, 150, deg);
+      const [x2, y2] = polar(200, 200, 174, deg);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+      // 太さ・不透明度を底上げ(2026-09-03、「線とか文字が、見にくいのよね」
+      // 「色？線の太さ？コントラストかな？」より、0.75/0.4 -> 1.1/0.6)。
+      line.setAttribute("stroke", "var(--ring-a)"); line.setAttribute("stroke-width", "1.1");
+      line.setAttribute("opacity", "0.6");
+      ticks.appendChild(line);
+
+      // グリフの表示半径160->164(2026-09-03、「メモリは、サインの帯の
+      // 内周に着けてほしい」より、下の度数目盛りを帯の内周(150)寄りに
+      // 移した分、目盛りの届く範囲(最大158)と被らないよう外側へ寄せた)。
+      const [gx, gy] = polar(200, 200, 164, deg + 15);
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", gx); t.setAttribute("y", gy);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.textContent = SIGNS[i];
+      glyphs.appendChild(t);
+    }
+    // 10度/20度は大きい目盛り、5度/15度/25度は小さい目盛り(2026-09-01、
+    // スターゲイザー/ケプラーの参考画像より) -- サインの境目(0度/30度)は
+    // 上のループで既に太い線を引いているので、ここでは残り5つの区切り
+    // (5,10,15,20,25度)だけを5度刻みで扱い、10の倍数かどうかで長さ・
+    // 太さを変える。
+    for (let d = 0; d < 360; d += 5) {
+      if (d % 30 === 0) continue;  // サインの境目は上のループの太い線が既にある
+      const isMajor = d % 10 === 0;
+      // 帯の外周(170)寄り→内周(150)寄りに変更(2026-09-03、「メモリは、
+      // サインの帯の内周に着けてほしいかな」より) -- 惑星グリフ・度数
+      // 表示は帯の内側(半径150未満)にあるので、目盛りを内周に付けた
+      // 方が「どの目盛りの上に惑星があるか」を目で追いやすくなる。
+      // 長さ自体は変えていない(大6単位/小3単位、外周版と同じ)。
+      const [x1, y1] = polar(200, 200, 150, d);
+      const [x2, y2] = polar(200, 200, isMajor ? 156 : 153, d);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+      // stroke-widthも少し太く(0.6/0.4 -> 0.9/0.6、2026-09-01、「メモリ
+      // がない」より) -- グループのopacity引き上げ(#degree-ticksタグの
+      // コメント参照)と合わせて、実際に見える太さにした。0.9/0.6 ->
+      // 1.2/0.9へさらに太く(2026-09-03、「線とか文字が、見にくいのよね」
+      // 「色？線の太さ？コントラストかな？」より)。
+      line.setAttribute("stroke", "var(--ink-faint)"); line.setAttribute("stroke-width", isMajor ? "1.2" : "0.9");
+      dticks.appendChild(line);
+    }
+  }
+
+  // Labels always grow away from the wheel's own center (whichever side
+  // of it they're on) -- this used to flip to grow inward instead once
+  // close to the left/right edge (near due-east/west, where growing
+  // outward runs out of room inside the SVG's own box and spills into
+  // whatever sits next to it -- 2026-08-31, "ディアデムがデータエリアに
+  // はみ出る"), but that let the flipped text reach back across the
+  // wheel's own ring (2026-09-01, "ディアデムが円の内側に入るのは
+  // いただけない"). Direction is simple and fixed again; edgeSafeRadius()
+  // below is what actually keeps labels near that edge out of trouble now
+  // -- it pulls their *radius* in so there's room to grow outward without
+  // needing to reach the edge at all, without the label ever moving
+  // closer to center than the ring.
+  function safeTextAnchor(x) {
+    return x < 199 ? 'end' : (x > 201 ? 'start' : 'middle');
+  }
+  // Reduces r for bodies near due-east/west (where a given r produces the
+  // largest possible x-displacement from center, sin(theta)~=1) so their
+  // anchor point doesn't sit too close to the SVG's own left/right edge --
+  // giving the (always outward-growing, per safeTextAnchor above) label
+  // text room to extend without spilling as far past the wheel's own box.
+  // Never reduces below minR, which stays safely outside the sign ring
+  // (r=178-180) so a label can never end up drawn over/inside the ring
+  // itself, however extreme the angle -- unlike the text-anchor-flip
+  // approach this replaces, some overflow past the wheel's own edge is
+  // still possible at the true worst case (a long name at exactly
+  // due-east/west), but that now lands in the wheel<->data-panel gap
+  // (explicitly OK'd to be more generous, "円と右のデータはもっと離して
+  // もいい") rather than inside the ring, which was the actual complaint.
+  //
+  // textWidth(SVG単位)を追加(2026-09-01、「円の外に表示される恒星の
+  // 名前がデータに入り込むのは嫌」より) -- 固定maxXOffset=165は短い名前
+  // 前提の値で、実際の6文字ラベル(★ディアデム)でも文字がbox(x=400)を
+  // 44単位ほどはみ出ることが実測で判明した(アンカーを内側に寄せても、
+  // そこから文字自体が外向きに伸びる分は考慮されていなかったため)。
+  // ラベルごとの推定文字幅を引いた分だけmaxXOffsetを狭め、アンカー+
+  // 文字幅がboxの端(中心から200単位)に収まるようにする。40は下限(「他
+  // N件」タグ付きの極端に長いラベルでもリングの外までは出るように)。
+  function edgeSafeRadius(baseR, deg, minR, textWidth = 0, extraMargin = 0) {
+    const theta = ((270 - deg) % 360 + 360) % 360 * Math.PI / 180;
+    const sinAbs = Math.abs(Math.sin(theta));
+    // extraMargin(SVG単位、既定0=今までと同じ挙動) -- 実際のウィンドウに
+    // SVGの箱より広い余白がある分だけ、境界をさらに広げてよい(下の
+    // availableEdgeMarginSvgUnits()のコメント参照)。250は中心(200,200)
+    // から見た箱の半幅(2026-09-03、viewBoxを0 0 400 400から-50 -50 500
+    // 500に拡張した際、200から250に更新 -- 帯レイアウトのコメント参照)。
+    const maxXOffset = Math.max(40, 250 + extraMargin - textWidth - 8);  // how far from center=200 the anchor is allowed to sit, minus room for the label text itself to grow outward
+    if (sinAbs < 0.02) return baseR;  // near due-north/south, x barely moves regardless of r -- no reduction needed
+    const safeR = maxXOffset / sinAbs;  // the largest r that keeps this label's text inside the SVG's own box (plus any real extra window margin) at this angle
+    // minR is normally a floor -- it keeps stacked labels visibly spread
+    // out (see call sites: 183, 191, 199...) -- but for a long enough
+    // label near due east/west, minR itself can already be past safeR,
+    // so clamping up to minR guarantees the text spills past the box
+    // (and, since nothing clips beyond that, past the actual browser
+    // window -- 2026-09-03, 「ひだりがきれてしまっている」、アルクトゥルス
+    // 起点ラベルがウィンドウ左端で見切れる実例。実測: 幅1038pxの
+    // ウィンドウでlabelのleftが-24px、つまり24px分ウィンドウの外に出て
+    // いた)。安全なsafeRがminRより小さいときだけ、床をminRからsafeRへ
+    // 下げる(積み上げの見た目より、見切れないことを優先する)。
+    //
+    // この「半径を内側に引く」対処だけだと、今度は引いた先(惑星の度数
+    // 表示ゾーンなど)と重なることがある(2026-09-03、「これはみにくい
+    // ねぇ」-- アルクトゥルスがウィンドウには収まったが、地球・天王星・
+    // エリスの度数チップの真ん中に着地してしまっていた)。そのため
+    // 呼び出し側(drawReferenceStarLabel)では、まずfitStarLabel()で
+    // テキスト自体を省略してminRのまま収まるようにする方を先に試し、
+    // それでも収まらない極端なケースだけこの関数の「半径を引く」に
+    // フォールバックする、という2段構えにしている。
+    const effectiveMinR = Math.min(minR, safeR);
+    return Math.max(effectiveMinR, Math.min(baseR, safeR));
+  }
+  // ラベル文字幅のおおまかな推定(SVG単位) -- ここで使う文字(全角の
+  // 天体名・星座名・★/◆/✦記号)はだいたい1文字=1em幅で描画されるため、
+  // 実際のDOM計測(getBBoxはこの環境では信頼できない場面があった)を
+  // せずに文字数×フォントサイズで近似している。+数単位は安全マージン。
+  function estimateLabelWidth(text, fontSize) {
+    return text.length * fontSize + 6;
+  }
+  // 実際のウィンドウに、SVGの箱(0〜400単位)より広い余白があるぶんを
+  // SVG単位で返す(2026-09-03、「シリウスも短縮されてしまう」より) --
+  // edgeSafeRadius/fitStarLabelは元々「SVGの箱からはみ出さない」ことしか
+  // 見ておらず、ウィンドウが広くて実際には全く見切れる心配がない場合でも
+  // 一律に安全側(短縮・半径を内側に引く)へ倒してしまっていた。実際の
+  // .wheel-wrapの左右の余白(ウィンドウ端までの実ピクセル距離)を測り、
+  // SVG単位に換算して"追加の許容幅"として使う。左右のうち狭い方を採用
+  // (中央寄せなので通常ほぼ同じだが、念のため)。8px分は見た目の余白
+  // として差し引く。
+  function availableEdgeMarginSvgUnits() {
+    const wrap = document.querySelector('.wheel-wrap');
+    if (!wrap) return 0;
+    const rect = wrap.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    const scale = rect.width / 500;  // viewBoxの全幅(2026-09-03、400→500に拡張)
+    const marginPx = Math.min(rect.left, window.innerWidth - rect.right);
+    return Math.max(0, (marginPx - 8) / scale);
+  }
+  // 恒星ラベルの表示テキストと半径を一緒に決める(2026-09-03、「これは
+  // みにくいねぇ」より) -- edgeSafeRadius()単体だと、ウィンドウ内に
+  // 収めるために半径をminRより内側まで引くことがあり、そうすると今度は
+  // 惑星の度数表示ゾーンなど別の場所と重なってしまう。ここではまず
+  // 「元々の安全な半径(minR)のまま、テキストを省略すれば収まるか」を
+  // 優先的に試す(1文字ずつ削って「…」を付け、再チェック)。名前を
+  // 2文字+「…」まで削っても収まらない極端なケースだけ、最後の手段として
+  // edgeSafeRadius本来の「半径を内側に引く」に委ねる -- 惑星ゾーンに
+  // 近づくより、まず表示を短くする方を優先するため。
+  function fitStarLabel(fullText, fontSize, deg, minR, baseR, extraMargin = 0) {
+    const theta = ((270 - deg) % 360 + 360) % 360 * Math.PI / 180;
+    const sinAbs = Math.abs(Math.sin(theta));
+    function safeRFor(text) {
+      if (sinAbs < 0.02) return baseR;
+      const maxXOffset = Math.max(40, 250 + extraMargin - estimateLabelWidth(text, fontSize) - 8);
+      return maxXOffset / sinAbs;
+    }
+    let displayText = fullText;
+    if (safeRFor(fullText) < minR) {
+      let cut = fullText;
+      while (cut.length > 2 && safeRFor(cut + "…") < minR) cut = cut.slice(0, -1);
+      displayText = cut + "…";
+    }
+    const r = edgeSafeRadius(baseR, deg, minR, estimateLabelWidth(displayText, fontSize), extraMargin);
+    return { r, text: displayText, truncated: displayText !== fullText };
+  }
+  // 同じ半径(同じ段)を共有するラベル同士を、円周上のスイープで確定的に
+  // (反復の収束待ちなしで)重ならないよう並べ直す(2026-09-01、「惑星と
+  // 度数がかぶってて見えない」を追う中で判明) -- 8度クラスタリング
+  // (staggerRadii)の"リセット"判定は「直前の1つとの角度差」しか見ない
+  // ため、木星→エリス(9.75度)→セレス(9.2度)のように、隣とは8度を
+  // 超えていても3体とも同じ段に乗ってしまうケースが普通にあり、その場合
+  // チップ幅(28)が必要とする角度に対して実際の間隔が足りず重なることが
+  // ある。以前はこの後に「グリフごと押し合う」反復処理を重ねていたが、
+  // 込み入ったケースで局所的な均衡(それ以上動かないが実際には重なった
+  // まま)に陥ることがあり、反復回数をいくら増やしても解決しなかった
+  // (実機で150回・400回とも同じ結果になることを確認)。2026-09-02、
+  // drawBodyRing自体を作り直し(下のコメント参照)、この関数の役目は
+  // 「合になっていない孤立した天体同士が、たまたま8度弱の間隔で並んで
+  // ラベルが触れてしまう」ケースだけに絞った -- 同じ段の全員をまとめて
+  // 角度順に並べ、隙間が足りないところだけ必要なぶんだけ押す(1回で
+  // 終わる)ので、詰まって動けなくなることがない。
+  function sweepSameTierLabels(state, chipW) {
+    const byR = new Map();
+    state.forEach(it => {
+      const key = Math.round(it.r * 10);  // 浮動小数の誤差で段が分かれないよう丸める
+      if (!byR.has(key)) byR.set(key, []);
+      byR.get(key).push(it);
+    });
+    byR.forEach((group) => {
+      const n = group.length;
+      if (n < 2) return;
+      const r = group[0].r;
+      const minGapDeg = (chipW / r) * (180 / Math.PI) * 1.05;  // 安全マージン5%
+      group.sort((a, b) => a.deg - b.deg);
+      // 一番大きな隙間で輪を切り、そこを起点にする(staggerRadii自身の
+      // クラスタ検出と同じ考え方 -- 詰まっているクラスタの真ん中で輪が
+      // 切れて分断されるのを避ける)。
+      const gaps = group.map((it, i) => {
+        const next = group[(i + 1) % n];
+        return ((next.deg - it.deg) % 360 + 360) % 360;
+      });
+      let cut = 0;
+      for (let i = 1; i < n; i++) if (gaps[i] > gaps[cut]) cut = i;
+      const order = Array.from({ length: n }, (_, i) => group[(cut + 1 + i) % n]);
+      // 起点からの相対角度(輪をほどいた直線上の値)に直してスイープする。
+      const base = order[0].deg;
+      const pos = [0];
+      for (let i = 1; i < n; i++) {
+        const d = ((order[i].deg - order[i - 1].deg) % 360 + 360) % 360;
+        pos.push(pos[i - 1] + d);
+      }
+      for (let i = 1; i < n; i++) {
+        if (pos[i] - pos[i - 1] < minGapDeg) pos[i] = pos[i - 1] + minGapDeg;
+      }
+      for (let i = 0; i < n; i++) order[i].deg = ((base + pos[i]) % 360 + 360) % 360;
+    });
+  }
+  // 実際に他の表示(rect/text)と重なっていたら、縦方向に1段ずつずらして
+  // 避ける(2026-09-03、起点ラベルの重なり対策(7.50)を汎用化したもの)
+  // -- 「これはみにくいねぇ」の修正時は起点ラベル専用のインライン処理
+  // だったが、実機で「合クラスタのタグ(⊕・⯰など)と恒星合ラベル(★
+  // ディアデム)が重なる」「起点マーカー(✦)がエリスのタグと重なる」
+  // という、恒星合ラベル・起点ラベルどちらの側からも見えていなかった
+  // 組み合わせが見つかった(drawConjunctionMarkersは惑星のタグの存在を
+  // 知らず、起点ラベルの重なりチェックも#planet-markersしか見ておらず
+  // #conj-markersを見ていなかったため)。どちらの呼び出し元でも同じロジ
+  // ックで済むよう共通化し、両方から使う。ずらした量(delta)を返すので、
+  // 呼び出し側は自分の背景チップ・ガイド線の端点を同じ分だけ動かせる。
+  function nudgeClearOfOverlap(el, othersSelector, step = 22, maxSteps = 6) {
+    const baseY = parseFloat(el.getAttribute('y'));
+    function overlapsAny() {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0) return false;  // not laid out (hidden view) -- nothing to avoid
+      const others = document.querySelectorAll(othersSelector);
+      for (const o of others) {
+        if (o === el) continue;
+        const or = o.getBoundingClientRect();
+        if (!(r.right <= or.left || r.left >= or.right || r.bottom <= or.top || r.top >= or.bottom)) return true;
+      }
+      return false;
+    }
+    for (let i = 1; i <= maxSteps && overlapsAny(); i++) {
+      const dir = i % 2 === 1 ? 1 : -1;
+      const mag = Math.ceil(i / 2);
+      el.setAttribute('y', baseY + dir * mag * step);
+    }
+    return parseFloat(el.getAttribute('y')) - baseY;
+  }
+  // リング上の実際の位置(p.degの角度、半径ringInner)から、ラベル側の
+  // 手前(8単位手前で止め、チップの中まで刺さらないように)まで一本の
+  // 線を引く -- 恒星の合ラベル(drawConjunctionMarkers)と同じパターン。
+  // 孤立した天体・合になったタグ、どちらの終点(dx,dy)でも同じように
+  // 使える汎用版(2026-09-03、合クラスタをタグ+ガイド線方式に作り直した
+  // ときに、孤立天体用のガイド線コードと統合)。
+  function drawGuideLine(markers, deg, ringInner, dx, dy) {
+    const [xRing, yRing] = polar(200, 200, ringInner, deg);
+    const ddx = dx - xRing, ddy = dy - yRing;
+    const dist = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
+    const xOut = dx - (ddx / dist) * 8, yOut = dy - (ddy / dist) * 8;
+    const guide = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    guide.setAttribute("x1", xRing); guide.setAttribute("y1", yRing);
+    guide.setAttribute("x2", xOut); guide.setAttribute("y2", yOut);
+    guide.setAttribute("stroke", "var(--ink-faint)"); guide.setAttribute("stroke-width", "0.6");
+    guide.setAttribute("opacity", "0.5");
+    markers.insertBefore(guide, markers.firstChild);
+  }
+  // 度数の文字を(dx,dy)中心に描く(孤立した天体用) -- 度数/分を2段に
+  // 分けたスタック表記(AstroGold/NPT-Charts参考)。背景の四角いチップは
+  // 廃止した(2026-09-03、「数字の裏のパネル...じゃまなんですけれど」
+  // より) -- 帯レイアウト化(7.53)で度数専用の帯(DEGREE_R)が他の帯と
+  // 構造的に重ならなくなったため、下地を隠す目的の背景板はもう実質的に
+  // 不要だった(アスペクト線も、両端がPLANET_R上にある弦である以上、
+  // 弦が円の外側であるDEGREE_Rまで届くことはない)。
+  function drawDegreeChip(markers, dx, dy, deg, color) {
+    const [degStr, minStr] = formatDegMinParts(deg);
+    const dtext = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    dtext.setAttribute("class", "wheel-degree-label");
+    dtext.setAttribute("x", dx);
+    dtext.setAttribute("text-anchor", "middle");
+    dtext.setAttribute("fill", color); dtext.setAttribute("opacity", "1");
+    // font-size 9->10.5、font-weight追加(2026-09-03、「まだ、ちょっと
+    // 見にくいのよね」より、パネルを復活させない前提での文字自体の
+    // 底上げ)。背景チップ(28x20)基準で見積もった安全マージン(34単位、
+    // PLANET_R/DEGREE_Rのコメント参照)より、文字だけの実サイズは元々
+    // 小さいので、この程度の拡大では再度の重なりは生じない想定
+    // (sweepSameTierLabelsのchipWも28->33へ比例して引き上げ済み)。
+    dtext.setAttribute("font-size", "10.5");
+    dtext.setAttribute("font-weight", "700");
+    const line1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+    line1.setAttribute("x", dx); line1.setAttribute("y", dy - 4);
+    line1.textContent = degStr;
+    const line2 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+    line2.setAttribute("x", dx); line2.setAttribute("y", dy + 6);
+    line2.textContent = minStr;
+    dtext.appendChild(line1); dtext.appendChild(line2);
+    markers.appendChild(dtext);
+  }
+  // 惑星の記号(グリフ)専用の帯(PLANET_R)と、度数表示専用の帯
+  // (DEGREE_R)を、それぞれ固定の半径として分離する(2026-09-03、
+  // 「円の外側に恒星、つぎに、サイン、その次、度数表示エリア、惑星
+  // サインエリアと、本当はこの星はどこにあるよ、の目印の線を円のメモリ
+  // にぶっさす」の帯レイアウト提案より) -- 7.42〜7.52は、度数ラベル・
+  // 合になった天体の見せ方を何度も作り直したが、度数ラベル・恒星ラベル・
+  // 起点ラベルがそれぞれ独立に"良さそうな場所"を探すせいで、お互いの
+  // 存在を知らずに同じ場所に描き込む、という事故が繰り返し起きていた
+  // (7.47の金星の例、7.51のエリス/水星の例、7.52のディアデムの例)。
+  // 今回は発想を変え、種類ごとに専用の帯(半径)を固定で割り当てる --
+  // 違う帯同士は最初から場所が別なので原理的にぶつかりようがなく、
+  // 同じ帯の中の重なりだけをsweepSameTierLabels()(確定的・反復なし)
+  // で解決すればよい。内側から: アスペクト線 → 惑星グリフ(PLANET_R)
+  // → 度数表示(DEGREE_R) → サインリング(132〜178、既存) → 恒星ラベル
+  // (外側、drawConjunctionMarkers/drawReferenceStarLabel側で定義)。
+  // 度数は常にサインリングの内側の目盛りへ細いガイド線を刺して"本当の
+  // 位置"を示す。グリフ自体も、合が密集してsweepで動かされた場合だけ
+  // (ほとんどの場合は動かない)同じガイド線を出す。
+  // PLANET_R/DEGREE_Rは106/140(以前は88/122) -- サインリングを狭めて
+  // (132〜178の46単位 → 150〜170の20単位)浮いた分の半径を、内側の
+  // 惑星グリフ・度数帯に回した(2026-09-03、「サインの帯を狭くしても
+  // いいのではないですか？そうすると、その他の内側の円が大きく
+  // できますね」より)。
+  const PLANET_R = 106;
+  // DEGREE_Rは、PLANET_Rから34単位離す(2026-09-03、実測で判明) --
+  // 半径だけ十分離れていれば安全、と思っていたが(24単位で試した)、
+  // グリフとチップの中心を結ぶ「半径方向の変位」は、実際にはその角度
+  // によってx成分・y成分に分解される(斜めの角度では両方に分散する)。
+  // グリフ半幅7.5+チップ半幅14=21.5(x方向に必要)、グリフ半高10.6+
+  // チップ半高10=20.6(y方向に必要)の釣り合う角度(約44度)で最大に
+  // なる必要半径を逆算すると約29.8。そこに安全マージンを足した値。
+  const DEGREE_R = 140;
+  // 恒星ラベル(恒星の合・起点)専用の帯。サインリング外側(170)から
+  // 十分離す -- キャンバス拡張(viewBox -50 -50 500 500)で得た余白を
+  // 使い、以前の「リングのすぐ外22単位」に無理やり収める窮屈さを解消
+  // した(2026-09-03、「恒星ラベルをリングから離す」より)。サイン
+  // リングを狭めた(7.55)ことで、この余白はむしろ25単位に広がった。
+  const STAR_R = 195;
+  const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
+  function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, guides = true, showDegrees = true }) {
+    if (!showDegrees) {
+      // 二重円: 度数は出さないので、以前通りグリフだけを段違いスタッガー
+      // で描く(帯レイアウトは単一円のときだけ)。
+      const radii = staggerRadii(planets.map(p => ({ key: p.key, deg: p.deg })), baseRadius, step);
+      planets.forEach(p => {
+        const [x, y] = polar(200, 200, radii[p.key], p.deg);
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", x); t.setAttribute("y", y);
+        t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+        t.setAttribute("fill", color);
+        t.setAttribute("font-size", "15");
+        t.textContent = p.g;
+        markers.appendChild(t);
+      });
+      return radii;
+    }
+    // 単一円: 全天体の記号をPLANET_R、度数をDEGREE_Rに固定し、それぞれ
+    // の帯の中だけでsweepSameTierLabels()により重なりを解消する。孤立
+    // しているか合になっているかで扱いを変える必要がなくなった。
+    const glyphItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: PLANET_R }));
+    // sweepSameTierLabelsは「弧の長さ」を隙間として使うが、弧の接線方向は
+    // 円周上の場所によって画面のx成分にもy成分にも傾く。真西/真東付近では
+    // 接線がほぼ縦方向になり、そこでは"幅"ではなく"高さ"がぶつかるかどうか
+    // を左右する(2026-09-03、実測でジュピター・エリス・ケレス・キロンが
+    // 詰まった配置で発覚 -- 幅15だけを見ていたら、実際にはグリフの高さ
+    // (実測約21.2)の方が大きく、真西寄りの角度で重なりが残った)。幅と
+    // 高さの大きい方(22、高さ基準)を使えば、弧がどちらの成分に転んでも
+    // 安全になる。
+    sweepSameTierLabels(glyphItems, 22);
+    const degItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: DEGREE_R }));
+    sweepSameTierLabels(degItems, 33);  // チップ幅(28->33、度数文字のfont-size 9->10.5に合わせて比例で引き上げ、2026-09-03)
+    const glyphByKey = new Map(glyphItems.map(it => [it.key, it]));
+    const degByKey = new Map(degItems.map(it => [it.key, it]));
+    const radii = {};
+    planets.forEach(p => {
+      const gi = glyphByKey.get(p.key);
+      radii[p.key] = gi.r;  // アスペクト線のアンカーは実際に描かれたグリフの位置(スイープ後)
+      const [x, y] = polar(200, 200, gi.r, gi.deg);
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", x); t.setAttribute("y", y);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.setAttribute("fill", color);
+      t.setAttribute("font-size", "15");
+      t.textContent = p.g;
+      markers.appendChild(t);
+      // グリフが密な合でsweepにより実際にずれた場合だけガイド線を出す
+      // (普段は動かないので、ほとんどのグリフにはガイド線が出ない)。
+      if (guides && Math.abs(((gi.deg - gi.origDeg + 540) % 360) - 180) > 0.5) {
+        drawGuideLine(markers, gi.origDeg, ringInner, x, y);
+      }
+      const di = degByKey.get(p.key);
+      const [dx, dy] = polar(200, 200, di.r, di.deg);
+      drawDegreeChip(markers, dx, dy, p.deg, color);
+      if (guides) drawGuideLine(markers, di.origDeg, ringInner, dx, dy);
+    });
+    return radii;
+  }
+
+  function fillLegend(el, planets) {
+    el.innerHTML = "";
+    planets.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<span class="legend-glyph">${p.g}</span><span class="legend-name">${p.name}</span><span class="legend-deg mono">${p.astro}</span>`;
+      el.appendChild(item);
+    });
+  }
+
+  // ---------- sabian pane (preview placeholder -- no real symbol text
+  // yet, rights not cleared, see HANDOFF) ----------
+  // Own dedicated pane now (2026-08-31) rather than a "仮" tag bolted onto
+  // the degree list. Deliberately a disclaimer sentence, not an
+  // invented-but-plausible-sounding "sample interpretation" -- writing
+  // fake poetic Sabian-style text from memory risks reading as an actual
+  // (uncredited, un-permissioned) reproduction of a real author's style/
+  // content, which is exactly the concern already flagged for the real
+  // text (rights not cleared). Its LENGTH (~34 chars) is what matters
+  // here, chosen to match what the real 松村潔 text was measured at
+  // (2026-09-01, "サビアンの詩文はかなり長いです...１行くらい" -> user
+  // counted ~30 Japanese characters), so the layout gets tested honestly
+  // even though the content itself is just a placeholder.
+  const SABIAN_PLACEHOLDER = "仮の例文です。実際の解釈内容ではありません、権利確認後に差し替えます";
+  function fillSabianList(planets) {
+    const el = document.getElementById('sabian-list');
+    if (!el) return;
+    el.innerHTML = '';
+    const full = SABIAN_PLACEHOLDER;
+    planets.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'sabian-row';
+      // 全文をDOMにそのまま入れ、1行への切り詰めは.sabian-textのCSS
+      // (white-space:nowrap + text-overflow:ellipsis)に任せている --
+      // 以前のJS側での文字数指定(14文字)切り詰めは、実際のカラム幅では
+      // それでも2行に折り返すことがあり(2026-09-01に発覚)、CSSに任せる
+      // 方が確実。title属性はPCでのホバー全文表示用。
+      row.innerHTML = `<span class="legend-glyph">${p.g}</span><span class="legend-name">${p.name}</span>` +
+        `<span class="legend-deg mono">${formatSabianDegree(p.deg)}</span>` +
+        `<span class="sabian-text" title="${full}">${full}</span>`;
+      // Click/tap toggles full (wrapped, multi-line) display inline (works
+      // on touch, where there's no hover); the title attribute above
+      // already gives desktop a native hover tooltip for the same full
+      // text without needing JS.
+      row.querySelector('.sabian-text').addEventListener('click', function () {
+        this.classList.toggle('expanded');
+      });
+      el.appendChild(row);
+    });
+  }
+
+  // The chosen origin star/galaxy defines longitude 0 by construction (its
+  // own tropical longitude is subtracted from every body, that's what
+  // "起点にする" means) -- so it always lands at the exact same screen
+  // position regardless of which star is picked. Lives in the same
+  // outer star band (STAR_R) as conjunction-star labels, drawn last
+  // (2026-09-03) with nudgeClearOfOverlap() as a safety net against
+  // #conj-markers -- band separation from the degree/planet bands makes
+  // that cross-system collision structurally impossible now, but a
+  // conjunction-star label landing right at longitude 0 (reported once,
+  // "✦シリウスとカストルが重なる") is still possible since both live in
+  // the same band.
+  function drawReferenceStarLabel() {
+    const group = document.getElementById('ref-star-marker');
+    if (!group) return;
+    group.innerHTML = "";
+    if (!isNNormal() || currentRef === 'tropical') return;
+
+    const [mx, my] = polar(200, 200, STAR_R, 0);
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    marker.setAttribute("x", mx); marker.setAttribute("y", my);
+    marker.setAttribute("text-anchor", "middle"); marker.setAttribute("dominant-baseline", "middle");
+    marker.setAttribute("font-size", "13");
+    marker.setAttribute("fill", "var(--accent-strong)");
+    marker.textContent = "✦";
+    group.appendChild(marker);
+
+    const labelDeg = 0;  // 起点は常に経度0度固定(帯レイアウトになった2026-09-03以降、恒星合ラベルとの角度クラスタ判定はもう不要)
+    const refFontSize = 11;
+    // fitStarLabel() -- キャンバス拡張(viewBox -50 -50 500 500)後の
+    // 新しい箱の半幅(250)を基準に、まずテキストを省略してSTAR_Rのまま
+    // 収まるかを試す。extraMarginでウィンドウの実際の余裕も加味する
+    // (2026-09-03、以前の版から半幅の定数(200→250)だけ更新)。
+    const extraMargin = availableEdgeMarginSvgUnits();
+    const fitted = fitStarLabel(currentRefLabel, refFontSize, labelDeg, STAR_R, 250, extraMargin);
+    const [lx, ly] = polar(200, 200, fitted.r, labelDeg);
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", lx); label.setAttribute("y", ly);
+    label.setAttribute("text-anchor", safeTextAnchor(lx));
+    label.setAttribute("dominant-baseline", "middle");
+    label.setAttribute("font-size", String(refFontSize));
+    label.setAttribute("font-weight", "700");
+    label.setAttribute("fill", "var(--accent-strong)");
+    label.textContent = fitted.text;
+    if (fitted.truncated) {
+      // 省略した分はホバー/タップで全文が読めるように(SVGのtitle子要素
+      // はブラウザ標準のツールチップとして機能する)。
+      const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      titleEl.textContent = currentRefLabel;
+      label.appendChild(titleEl);
+    }
+    group.appendChild(label);
+    // 背景チップを付ける(2026-09-03、「ぜんぜんみえない」より) --
+    // 度数ラベル(drawBodyRing)は元から背景チップで下の線・グリフから
+    // 浮かせているのに、起点ラベルにはそれがなく、近くの度数チップと
+    // 実際に重なったときに文字同士が透けて混ざり、判読不能になって
+    // いた。文字が実際に描画されてから(getBBoxで)サイズを測り、それに
+    // 合わせた背景を後ろに差し込む -- 度数ラベル側は固定サイズ(幅28)で
+    // 足りたが、こちらは省略しても文字数がまちまちなので固定サイズに
+    // できない。
+    try {
+      const bbox = label.getBBox();
+      const chip = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      chip.setAttribute("x", bbox.x - 3); chip.setAttribute("y", bbox.y - 2);
+      chip.setAttribute("width", bbox.width + 6); chip.setAttribute("height", bbox.height + 4);
+      chip.setAttribute("rx", 4);
+      chip.setAttribute("fill", "var(--bg)"); chip.setAttribute("opacity", "0.85");
+      group.insertBefore(chip, label);
+    } catch (e) { /* getBBox can throw if the element isn't laid out yet (e.g. hidden view) -- skip the chip rather than break the whole chart */ }
+    // 恒星合ラベルと実際に重なっていたら縦にずらす安全弁(2026-09-03) --
+    // 帯レイアウトになったことで惑星グリフ・度数チップとは構造上ぶつか
+    // りようがなくなったが、起点は経度0度固定・恒星合ラベルは天体の
+    // 実際の経度依存なので、同じ星帯(STAR_R)の中で偶然近くなることは
+    // まだあり得る(以前の「✦シリウスとカストルが重なる」と同種)。
+    const dy = nudgeClearOfOverlap(label, '#conj-markers text');
+    if (dy !== 0) {
+      const chipEl = label.previousSibling;
+      if (chipEl && chipEl.tagName === "rect") {
+        const bbox = label.getBBox();
+        chipEl.setAttribute("y", bbox.y - 2);
+      }
+    }
+  }
+
+  function buildChart() {
+    document.getElementById('legend-grid').className = 'legend-grid';
+    if (displayMode === 'both') { buildBiwheelChart(); return; }
+
+    drawSignRing();
+    const markers = document.getElementById('planet-markers');
+    markers.innerHTML = "";
+    document.getElementById('aspect-lines').innerHTML = "";
+
+    const planets = currentPlanets();
+    // baseRadius/stepは二重円(showDegrees=false)のときだけ使われる
+    // (staggerRadiiの段違いスタッガー用) -- 単一円はdrawBodyRing内の
+    // 固定の帯(PLANET_R/DEGREE_R)を使うので、ここでは実質無視される
+    // (2026-09-03、円の外側から恒星/サイン/度数/惑星/アスペクトの帯
+    // レイアウトに作り直した際に、単一円のグリフ・度数の半径をbaseRadius
+    // 由来から固定定数に変更したため)。
+    const markerRadii = drawBodyRing(planets, markers, {
+      ringInner: 150, color: "var(--ink)",
+    });
+    window.__markerRadii = markerRadii;  // aspect lines anchor to the same (possibly fanned-out) marker position
+
+    fillLegend(document.getElementById('legend-grid'), planets);
+    fillSabianList(planets);
+    redrawAspects();
+    drawConjunctionMarkers();
+    drawReferenceStarLabel();
+  }
+
+  function buildBiwheelChart() {
+    drawSignRing();
+    const markers = document.getElementById('planet-markers');
+    markers.innerHTML = "";
+    document.getElementById('aspect-lines').innerHTML = "";  // biwheel intentionally skips aspects/conjunctions -- too cluttered with two rings already
+    fillAspectTable();  // shows the "二重円では表示しません" message (displayMode is already 'both' here)
+    drawConjunctionMarkers();  // self-clears and no-ops for biwheel -- just here to wipe stale markers from a previous single-wheel view
+    document.getElementById('ref-star-marker').innerHTML = "";  // same -- origin-star label is single-wheel only
+
+    // dashed divider between the natal (inner) and transit (outer) rings
+    const divider = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    divider.setAttribute("cx", 200); divider.setAttribute("cy", 200); divider.setAttribute("r", 108);
+    divider.setAttribute("fill", "none"); divider.setAttribute("stroke", "var(--line-strong)");
+    divider.setAttribute("stroke-width", "1"); divider.setAttribute("stroke-dasharray", "4,4");
+    markers.appendChild(divider);
+
+    // Any N-type x any T-type combination is valid here -- e.g. N's
+    // eclipse chart biwheeled against T's current transit, or against
+    // T's own eclipse/seasonal chart. The star-reference picker still
+    // only rotates N's *normal* chart (REF_LONGITUDES[currentRef]);
+    // N's eclipse/lunar types stay tropical regardless of currentRef.
+    const nLons = resolveNLongitudes();
+    const tLons = resolveTLongitudes();
+    const natalPlanets = PLANET_META.map(p => ({ ...p, deg: nLons[p.key], astro: formatAstro(nLons[p.key]) }));
+    const transitPlanets = PLANET_META.map(p => ({ ...p, deg: tLons[p.key], astro: formatAstro(tLons[p.key]) }));
+
+    // showDegrees: false (2026-09-01、「二重円のときは度数表示自体が
+    // いらない」より) -- 内・外2つのリングで最大24個の度数ラベルが出る
+    // と、二重円ではかえって見にくいだけだった。天体グリフ自体は出す。
+    drawBodyRing(natalPlanets, markers, { baseRadius: 86, step: 10, ringInner: 108, color: "var(--ink)", showDegrees: false });
+    drawBodyRing(transitPlanets, markers, { baseRadius: 122, step: 9, ringInner: 132, color: "var(--aspect-soft)", showDegrees: false });
+
+    // N/T二重で1天体2つずつサビアンが並ぶのは見づらいだけなので、アス
+    // ペクト表と同様に二重円では非表示にする。
+    document.getElementById('sabian-list').innerHTML =
+      `<p style="color:var(--ink-faint); font-size:0.82rem;">二重円ではサビアンは表示しません。</p>`;
+
+    const legend = document.getElementById('legend-grid');
+    legend.className = 'legend-grid biwheel';
+    legend.innerHTML = "";
+    const nColLabel = 'N' + (nType === 'normal' ? '' : '　' + typeLabelJa(nType, ANCHOR_DATA.natal[nType]));
+    const tColLabel = 'T' + (tSpecialMoment ? '　' + typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : '');
+    const natalCol = document.createElement('div');
+    natalCol.innerHTML = `<div class="legend-col-head">${nColLabel}</div>`;
+    const transitCol = document.createElement('div');
+    transitCol.innerHTML = `<div class="legend-col-head" style="color:var(--aspect-soft);">${tColLabel}</div>`;
+    natalPlanets.forEach((p, i) => {
+      natalCol.innerHTML += `<div class="legend-item"><span class="legend-glyph">${p.g}</span><span class="legend-name">${p.name}</span><span class="legend-deg mono">${p.astro}</span></div>`;
+      const tp = transitPlanets[i];
+      transitCol.innerHTML += `<div class="legend-item"><span class="legend-glyph" style="color:var(--aspect-soft);">${tp.g}</span><span class="legend-name">${tp.name}</span><span class="legend-deg mono">${tp.astro}</span></div>`;
+    });
+    legend.appendChild(natalCol);
+    legend.appendChild(transitCol);
+  }
+  // Moves #settings-menu's actual button *nodes* (not copies) into the
+  // topbar's #topbar-menu-slot at desktop width, and back at mobile width
+  // (2026-09-01, "日輪の右側に起点とかのメニューも並べてほしい" -- see
+  // #topbar-menu-slot's own comment for why relocation rather than
+  // duplication). Idempotent and safe to call from either state, since it
+  // just gathers whatever's currently in *either* container and puts it
+  // all in the correct one -- so it works both on initial load and every
+  // time the matchMedia listener below fires on a breakpoint crossing.
+  const desktopMQ = window.matchMedia('(min-width: 900px)');
+  function layoutHeaderForWidth() {
+    const slot = document.getElementById('topbar-menu-slot');
+    const menu = document.getElementById('settings-menu');
+    if (!slot || !menu) return;
+    const isDesktop = desktopMQ.matches;
+    const target = isDesktop ? slot : menu;
+    [...menu.children, ...slot.children].forEach(el => target.appendChild(el));
+    // #settings-menu still has its own padding/border even with all its
+    // buttons moved out, so it'd show as an empty bar at desktop -- hide
+    // it explicitly rather than relying on a CSS :empty selector (which
+    // whitespace text nodes between the original buttons could defeat).
+    menu.style.display = isDesktop ? 'none' : '';
+  }
+  desktopMQ.addEventListener('change', layoutHeaderForWidth);
+  layoutHeaderForWidth();
+
+  // Moves #person-badge (name/date + transit scrub buttons, all still the
+  // same node -- ids like #badge-line1/#badge-scrub-prev keep working
+  // wherever it lives) into the topbar's #topbar-badge-slot at desktop
+  // width, and back to its original spot at the top of .chart-stage at
+  // mobile width (2026-09-03, "バッジ行を...トップバーに統合" -- same
+  // real-DOM-relocation pattern as layoutHeaderForWidth() above, done as
+  // a separate function/slot since the badge and the settings-menu
+  // buttons are unrelated elements that just happen to both move to the
+  // topbar at the same breakpoint). Reclaims the whole badge-avoidance
+  // row (and its margin-top) from .chart-columns back into the wheel's
+  // height budget on desktop, without losing the badge's own content or
+  // its scrub buttons' function -- see the .person-badge/.topbar-badge-
+  // slot CSS in the desktop media query for the position:absolute ->
+  // static swap this relies on.
+  function layoutBadgeForWidth() {
+    const slot = document.getElementById('topbar-badge-slot');
+    const badge = document.getElementById('person-badge');
+    const stage = document.querySelector('.chart-stage');
+    if (!slot || !badge || !stage) return;
+    if (desktopMQ.matches) {
+      slot.appendChild(badge);
+    } else {
+      stage.insertBefore(badge, stage.firstChild);
+    }
+  }
+  desktopMQ.addEventListener('change', layoutBadgeForWidth);
+  layoutBadgeForWidth();
+
+  fillMinorBodyList();
+  fillAspectTypeList();
+  buildChart();
+  updateBadge();
+
+  // .wheel-wrapの実サイズが変わったら再描画(2026-09-03、「ちょっとはみ
+  // 出た」より -- 実機で起点ラベル「アルクトゥルス」の先頭1文字がウィン
+  // ドウ左端で見切れる報告) -- 恒星ラベルの安全マージン計算
+  // (availableEdgeMarginSvgUnits)は.wheel-wrapの実測サイズに依存する
+  // "その場限り"の一回性の計算で、リサイズ後の再描画トリガーが一切なく
+  // (window.resizeすら listen していなかった)、初回描画のレイアウト確定
+  // タイミングのずれ(Google Fontsの読み込みによる再レイアウト等)や
+  // ウィンドウの実際のリサイズがあっても、古い測定値のまま固定されて
+  // しまう構造的な欠落があった。ResizeObserverで.wheel-wrap自体の実サイズ
+  // 変化を直接検知し、buildChart()を再実行して常に最新のレイアウトを
+  // 反映するようにした(displayMode==='both'ならbuildChart内部で
+  // buildBiwheelChart()に委譲されるので、呼び分けは不要)。連続リサイズ
+  // 中の過剰な再描画を避けるため150msデバウンスする。
+  let wheelResizeTimer = null;
+  const wheelResizeObserver = new ResizeObserver(() => {
+    clearTimeout(wheelResizeTimer);
+    wheelResizeTimer = setTimeout(buildChart, 150);
+  });
+  const wheelWrapEl = document.querySelector('.wheel-wrap');
+  if (wheelWrapEl) wheelResizeObserver.observe(wheelWrapEl);
+
+  // Keyboard time-scrub: arrow keys step the transit moment (by the
+  // selected unit) while the wheel has focus -- only meaningful in
+  // T + normal, so it's a no-op otherwise.
+  function scrubEnabled() {
+    // Scrubbing T only visibly does something when T is on screen (T
+    // alone, or biwheel) -- T is always scrubbable now, including right
+    // off of a jumped-to eclipse/seasonal moment (that's the whole point).
+    return displayMode !== 'N';
+  }
+  document.querySelector('.wheel-wrap').addEventListener('keydown', (e) => {
+    if (!scrubEnabled()) return;
+    if (e.key === 'ArrowUp') { e.preventDefault(); scrubTransit(1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); scrubTransit(-1); }
+  });
+
+  // Mouse-wheel scrub: scrolling over the chart itself steps time one
+  // notch per wheel tick -- this is the "ぐるぐる" (spin it round and
+  // round while watching the wheel) interaction the button clicks alone
+  // couldn't give: a physical scroll wheel already IS a rotating dial.
+  document.querySelector('.wheel-wrap').addEventListener('wheel', (e) => {
+    if (!scrubEnabled()) return;
+    e.preventDefault();
+    scrubTransit(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
+  // Press-and-hold on the scrub arrows: a single click still steps once,
+  // but holding repeats continuously (with a short ramp-up), so touch
+  // users get the same "keep it moving" feel as the scroll wheel.
+  function wireHoldToRepeat(el, direction) {
+    let intervalId = null, timeoutId = null;
+    const stop = () => { clearTimeout(timeoutId); clearInterval(intervalId); intervalId = null; };
+    const start = (e) => {
+      e.preventDefault();
+      if (!scrubEnabled()) return;
+      scrubTransit(direction);
+      timeoutId = setTimeout(() => {
+        intervalId = setInterval(() => scrubTransit(direction), 90);
+      }, 400);
+    };
+    el.addEventListener('mousedown', start);
+    el.addEventListener('touchstart', start, { passive: false });
+    ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(evt => el.addEventListener(evt, stop));
+  }
+  wireHoldToRepeat(document.getElementById('badge-scrub-prev'), -1);
+  wireHoldToRepeat(document.getElementById('badge-scrub-next'), 1);
+
+  setTimeout(() => {
+    const n = document.getElementById('flow-note');
+    n.style.transition = 'opacity 0.6s';
+    n.style.opacity = '0';
+    setTimeout(() => n.remove(), 700);
+  }, 4500);
+</script>
+
+
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="engine.js"></script>
+<script src="wheel_integration.js"></script>
+</body></html>
