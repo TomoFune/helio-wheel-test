@@ -283,20 +283,31 @@
      その分円を大きくできないか」より) -- 以前は#badge-line1(名前)と
      .badge-line2-row(日時)を縦に2段積みしていたが、横並びの1行に変更。
      浮いた高さぶんは.pane-tabs/.chart-columnsの上マージンを詰めて円の
-     高さ予算に還元している(下の該当コメント参照)。 */
+     高さ予算に還元している(下の該当コメント参照)。
+     2026-09-04、.badge-top-row導入 -- 「サンプル花子の表示をもっと
+     左に寄せて...出生図＋出生データを、サンプル花子の右わきに持って
+     くる」より。#current-state-line追加(7.69)後、3行に分かれていた
+     (名前/日付/現在値)のを2行に戻したかったが、単純にflex-wrapで
+     まとめるだけでは、#badge-line2(ellipsis指定)の"折り返さない前提の
+     フル文字列幅"がflex-wrapの折り返し判定にそのまま使われてしまい
+     (ellipsisは見た目だけ省略するだけで、レイアウト計算上のサイズには
+     関係しない)、名前+日付がいつまでも1行にまとまらなかった。名前+
+     日付を.badge-top-rowという専用のflex-wrap:nowrap行に切り出し、
+     日付側(.badge-line2-row)にflex:1 min-width:0を与えて明示的に
+     縮められるようにすることで解決。 */
   .person-badge-lines {
     min-width: 0; flex: 1;
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    display: flex; flex-direction: column; gap: 2px;
   }
+  .badge-top-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
   #badge-line1 {
     font-size: 0.84rem; font-weight: 700; color: var(--ink);
     flex-shrink: 0;
     /* 折り返し(overflow-wrap)は残す -- 二重円モードで名前+種別ラベル+
-       日付が全部ここに入ることがあり、1行に収まりきらない場合の保険。
-       通常は横に並ぶが、狭い画面では自然に2行目へ折り返す。 */
+       日付が全部ここに入ることがあり、1行に収まりきらない場合の保険。 */
     overflow-wrap: break-word;
   }
-  .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
   #badge-line2 {
     font-size: 0.8rem; color: var(--ink-dim);
     /* text-overflow:ellipsis追加(2026-09-03、実機iPhoneで「出生図の
@@ -321,11 +332,11 @@
   #current-state-line {
     /* 7.69: 旧#settings-menuの図/起点/恒星の合ボタン(値を見せる役目
        だった3つ)の現在値だけを、メニュー一本化後もバッジ直下に残す
-       (押しても何も起きない、単なる常時表示のテキスト行)。
-       flex-basis:100%は、親.person-badge-lines(display:flex;flex-wrap:
-       wrap)の中で、badge-line1/badge-line2-rowの続きに詰めて並ぶのでは
-       なく、必ず独立した行として折り返させるための指定。 */
-    flex-basis: 100%;
+       (押しても何も起きない、単なる常時表示のテキスト行)。7.76で
+       親.person-badge-linesがflex-direction:columnになったため、
+       flex-basis:100%指定(旧flex-wrap前提)は不要になり削除した --
+       単純にcolumnの2番目の子として、自動的に.badge-top-rowの下に
+       積まれる。 */
     font-size: 0.74rem; color: var(--ink-faint);
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
@@ -978,9 +989,17 @@
        修正(#settings-menu統合による広さの恩恵は、この計測時点では
        #current-state-line追加分と概ね相殺していたということ -- 恩恵を
        出すには、次はcurrent-state-lineをもっと軽くする方向で詰める
-       余地がある)。 */
-    #pane-wheel { display: flex !important; flex-direction: column; align-items: center; width: min(68vw, calc(100vh - 93px), 820px); }
-    .wheel-wrap { max-width: min(68vw, calc(100vh - 93px), 820px); margin-top: 6px; }
+       余地がある)。
+       93px -> 81pxへ、10回目の詰め(2026-09-04、同日中の続き、「サンプル
+       花子の表示をもっと左に寄せて...出生図＋出生データを、サンプル
+       花子の右わきに持ってくる」より) -- #badge-line1(名前)と
+       .badge-line2-row(日時)を.badge-top-rowという専用の横並び行に
+       まとめ、3行構成(名前/日付/現在値)から2行構成(名前+日付/現在値)
+       に戻した(実装は上の#current-state-lineのコメント参照)。実測
+       (1365×728相当)で円の上のchrome合計が88px->76pxに縮小、5px弱の
+       安全マージンを足して81pxとした。 */
+    #pane-wheel { display: flex !important; flex-direction: column; align-items: center; width: min(68vw, calc(100vh - 81px), 820px); }
+    .wheel-wrap { max-width: min(68vw, calc(100vh - 81px), 820px); margin-top: 6px; }
 
     /* min(22vw,360px)固定幅 -> flex:1で余った横幅を埋める方式に変更
        (2026-09-01、「やたらと開いている空間をもっと利用できないか」より)
@@ -1127,12 +1146,14 @@
       <div class="person-badge" id="person-badge">
         <span class="dot"></span>
         <div class="person-badge-lines">
-          <div id="badge-line1" onclick="showView('person-select')" style="cursor:pointer;" title="タップして人物を切り替え">サンプル花子</div>
-          <div class="badge-line2-row">
-            <button class="badge-scrub-btn" id="badge-scrub-prev" style="visibility:hidden;" title="選択中の単位を戻す(長押し/ホイールでも)">‹</button>
-            <span class="mono" id="badge-line2">出生図 1990-06-15 09:30:00</span>
-            <button class="badge-scrub-btn" id="badge-scrub-next" style="visibility:hidden;" title="選択中の単位を進める(長押し/ホイールでも)">›</button>
-            <button class="badge-scrub-btn badge-now-btn" id="badge-now-btn" style="visibility:hidden;" title="現在時刻に戻す" onclick="resetTransitToNow()">今</button>
+          <div class="badge-top-row">
+            <div id="badge-line1" onclick="showView('person-select')" style="cursor:pointer;" title="タップして人物を切り替え">サンプル花子</div>
+            <div class="badge-line2-row">
+              <button class="badge-scrub-btn" id="badge-scrub-prev" style="display:none;" title="選択中の単位を戻す(長押し/ホイールでも)">‹</button>
+              <span class="mono" id="badge-line2">出生図 1990-06-15 09:30:00</span>
+              <button class="badge-scrub-btn" id="badge-scrub-next" style="display:none;" title="選択中の単位を進める(長押し/ホイールでも)">›</button>
+              <button class="badge-scrub-btn badge-now-btn" id="badge-now-btn" style="display:none;" title="現在時刻に戻す" onclick="resetTransitToNow()">今</button>
+            </div>
           </div>
           <div id="current-state-line">図: <span id="menu-mode-label">出生図</span>　起点: <span id="menu-ref-label">トロピカル</span>　<span id="menu-conj-label">恒星の合</span></div>
         </div>
@@ -1180,7 +1201,10 @@
                    からはみ出ちゃった」より -- サイングリフの表示半径
                    164(font-size 15)がリング外周ぎりぎりで、文字の上半分
                    がはみ出していた。帯を少し広げて収めた。 -->
-              <circle cx="200" cy="200" r="174" fill="none" stroke="var(--ring-a)" stroke-width="1.5" opacity="0.7"/>
+              <!-- 174->178(2026-09-04、Noto Sans Symbols 2フォントの実測
+                   グリフ高25.2に合わせてサインリング帯を広げ、文字サイズ
+                   を11->13に戻すため) -->
+              <circle cx="200" cy="200" r="178" fill="none" stroke="var(--ring-a)" stroke-width="1.5" opacity="0.7"/>
               <!-- r=140の装飾円は削除(2026-09-04、「サインの内側にある、
                    度数表示と被ってる円は、いらないのではないだろうか」
                    より) -- ちょうどDEGREE_R(度数の文字が並ぶ半径)と同じ
@@ -1209,7 +1233,7 @@
                    自体をもっと大きくする話は、次のレイアウト全体見直し
                    (帯の間隔を詰めて空いた分を文字サイズに回す)で改めて
                    対応する。 -->
-              <g id="sign-glyphs" font-size="11" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
+              <g id="sign-glyphs" font-size="13" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
               <!-- degree tick ring -->
               <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
                    -- 個々の線のstroke-width(0.4〜0.6と細い)に加えて、この
@@ -1728,10 +1752,18 @@
 
     // T is always scrubbable now -- eclipse/seasonal are just a jump-to
     // shortcut on the same timeline, not a separate frozen mode.
+    // visibility:hidden -> display:none(2026-09-04、「サンプル花子の表示
+    // をもっと左に寄せて...出生図＋出生データを、サンプル花子の右わきに
+    // 持ってくる」より) -- visibility:hiddenは見えないだけでレイアウト
+    // 上の場所は使ったままなので、N(出生図単体)モードで実際には使わない
+    // このスクラブボタン3つ(合計100px超)が.badge-line2-rowの幅を常に
+    // 圧迫し、#badge-line1(名前)と同じ行に収まらせず3行構成(名前/日付/
+    // 現在値)になっていた原因の1つだった。display:noneでレイアウトから
+    // 完全に外せば、Nモードでは名前+日付が自然に1行に収まるようになる。
     const showScrubHandles = displayMode !== 'N';
-    document.getElementById('badge-scrub-prev').style.visibility = showScrubHandles ? 'visible' : 'hidden';
-    document.getElementById('badge-scrub-next').style.visibility = showScrubHandles ? 'visible' : 'hidden';
-    document.getElementById('badge-now-btn').style.visibility = showScrubHandles ? 'visible' : 'hidden';
+    document.getElementById('badge-scrub-prev').style.display = showScrubHandles ? 'flex' : 'none';
+    document.getElementById('badge-scrub-next').style.display = showScrubHandles ? 'flex' : 'none';
+    document.getElementById('badge-now-btn').style.display = showScrubHandles ? 'flex' : 'none';
   }
   const DISPLAY_MODE_LABELS = { N: '出生図', T: '経過図', both: '二重円' };
   function setDisplayMode(btn, mode) {
@@ -2437,7 +2469,7 @@
       // planet a stacked label belongs to readable even when two
       // planets' labels end up close together around the ring, and
       // reads as a visible little kink when a label's been swept.
-      const [gx1, gy1] = polar(200, 200, 175, lon);
+      const [gx1, gy1] = polar(200, 200, 179, lon);  // サインリング外側(178)のすぐ外(2026-09-04、リング拡大174->178に合わせて175->179)
       const [gx2, gy2] = polar(200, 200, pos.r - 7, pos.deg);
       const guide = document.createElementNS(svgNS, "line");
       guide.setAttribute("x1", gx1); guide.setAttribute("y1", gy1);
@@ -2814,7 +2846,7 @@
     for (let i = 0; i < 12; i++) {
       const deg = i * 30;
       const [x1, y1] = polar(200, 200, 150, deg);
-      const [x2, y2] = polar(200, 200, 174, deg);
+      const [x2, y2] = polar(200, 200, 178, deg);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
       line.setAttribute("x2", x2); line.setAttribute("y2", y2);
@@ -2827,13 +2859,13 @@
       // グリフの表示半径160->164(2026-09-03、「メモリは、サインの帯の
       // 内周に着けてほしい」より、下の度数目盛りを帯の内周(150)寄りに
       // 移した分、目盛りの届く範囲(最大158)と被らないよう外側へ寄せた)。
-      // 164->162へ(2026-09-04、7.75でNoto Sans Symbols 2フォントに切替え
-      // てグリフが縦に大きくなった影響で、サインリング帯(150〜174)の
-      // 内外どちらにもわずかにはみ出していたのを実測で発見 -- font-size
-      // 15->12との組み合わせで、はみ出しをほぼ解消(実測、内側最悪
-      // 149.4/外側最悪174.5、帯境界150/174に対して±0.6単位以内)。文字
-      // サイズ・帯幅の本格的な見直しは次のレイアウト全体見直しで行う。
-      const [gx, gy] = polar(200, 200, 162, deg + 15);
+      // 164->162へ、font-size 15->12(2026-09-04、7.75でNoto Sans Symbols 2
+      // フォントに切替えてグリフが縦に大きくなった影響で、サインリング帯
+      // (150〜174)にはみ出していたのを応急処置)。162->164、font-size
+      // 12->13へ再調整(2026-09-04、同日中の続き、レイアウト全体見直しで
+      // サインリング帯自体を150〜174から150〜178に広げたため、文字を
+      // もう少し大きく戻せるようになった)。
+      const [gx, gy] = polar(200, 200, 164, deg + 15);
       // 2026-09-04、7.72で手描きSVGアイコン化したが実機で「全然違う、
       // 読めない」と強く否定されたため、7.75でNoto Sans Symbols 2
       // フォント(#sign-glyphsのfont-family参照)によるテキスト表示に
@@ -3115,7 +3147,7 @@
     // PLANET_R/DEGREE_Rのコメント参照)より、文字だけの実サイズは元々
     // 小さいので、この程度の拡大では再度の重なりは生じない想定
     // (sweepSameTierLabelsのchipWも28->33へ比例して引き上げ済み)。
-    dtext.setAttribute("font-size", "10.5");
+    dtext.setAttribute("font-size", "12");  // 10.5->12(2026-09-04、「記号や度数は老眼にやさしく見えるようにしてほしい。大きくはっきり」より)
     dtext.setAttribute("font-weight", "700");
     const line1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
     line1.setAttribute("x", dx); line1.setAttribute("y", dy - 4);
@@ -3174,7 +3206,10 @@
   // 使い、以前の「リングのすぐ外22単位」に無理やり収める窮屈さを解消
   // した(2026-09-03、「恒星ラベルをリングから離す」より)。サイン
   // リングを狭めた(7.55)ことで、この余白はむしろ25単位に広がった。
-  const STAR_R = 195;
+  // 195 -> 190へ(2026-09-04、「それぞれが少し間延びしすぎている...
+  // スターゲイザーに近い距離が良いです」より) -- サインリング外側
+  // (150〜174 -> 150〜178に拡張)からの余白を21->12単位に詰めた。
+  const STAR_R = 190;
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
   function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, guides = true, showDegrees = true }) {
     if (!showDegrees) {
@@ -3187,7 +3222,7 @@
         t.setAttribute("x", x); t.setAttribute("y", y);
         t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
         t.setAttribute("fill", color);
-        t.setAttribute("font-size", "15");
+        t.setAttribute("font-size", "16");  // 15->16(2026-09-04、「記号や度数は老眼にやさしく見えるようにしてほしい」より)
         t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
         t.textContent = p.g;
         markers.appendChild(t);
@@ -3209,9 +3244,9 @@
     // 際、実測でグリフの高さが約21.2->25.2に増えていたのを見落として
     // いたため、6シナリオの自動チェックで重なりが83〜302px²まで悪化して
     // いるのを発見・修正)。
-    sweepSameTierLabels(glyphItems, 26);
+    sweepSameTierLabels(glyphItems, 31);  // 22->26->31(2026-09-04、惑星グリフのfont-size 15->16に合わせてさらに引き上げ)
     const degItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: DEGREE_R }));
-    sweepSameTierLabels(degItems, 33);  // チップ幅(28->33、度数文字のfont-size 9->10.5に合わせて比例で引き上げ、2026-09-03)
+    sweepSameTierLabels(degItems, 38);  // チップ幅(28->33->38、度数文字のfont-size 9->10.5->12に合わせて比例で引き上げ、2026-09-03/09-04)
     const glyphByKey = new Map(glyphItems.map(it => [it.key, it]));
     const degByKey = new Map(degItems.map(it => [it.key, it]));
     const radii = {};
@@ -3223,7 +3258,7 @@
       t.setAttribute("x", x); t.setAttribute("y", y);
       t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
       t.setAttribute("fill", color);
-      t.setAttribute("font-size", "15");
+      t.setAttribute("font-size", "16");  // 15->16(2026-09-04、「記号や度数は老眼にやさしく見えるようにしてほしい」より)
       t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
       t.textContent = p.g;
       markers.appendChild(t);
