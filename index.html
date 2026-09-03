@@ -1032,6 +1032,25 @@
          container it's currently sitting in). -->
     <div class="topbar-badge-slot" id="topbar-badge-slot"></div>
     <div class="topbar-actions">
+      <!-- 7.72: 👁(表示)・◎(図の種類・種別)の2アイコンを☰の左に追加
+           (2026-09-04、「目のアイコンと、図の種類のアイコンと、三本線の
+           メニュー、この三つが横になれば解決しませんかね」より)。
+           絵文字(👁等)や特殊なUnicode記号(◎等)は、サイン記号(♐)や
+           エリス(⯰)と同じフォント依存問題を新たに持ち込むため使わず、
+           ☰と同じ発想の手描きSVG線画にした(stroke="currentColor"で
+           .icon-btnの文字色をそのまま継承、ホバー色も自動追従)。 -->
+      <button class="icon-btn" title="表示(円・度数・アスペクト・サビアン)" onclick="openViewMenu()">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+          <path d="M2 12C2 12 6.2 6 12 6C17.8 6 22 12 22 12C22 12 17.8 18 12 18C6.2 18 2 12 2 12Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
+        </svg>
+      </button>
+      <button class="icon-btn" title="図の種類・種別" onclick="openChartTypeMenu()">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
+          <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/>
+        </svg>
+      </button>
       <button class="icon-btn" title="メニュー" onclick="openMainMenu()">☰</button>
     </div>
   </div>
@@ -1215,30 +1234,19 @@
 
     <!-- ---- side panel: メインメニュー(7.69、旧#settings-menuの6ボタン
          をここに集約) ---- -->
+    <!-- 7.72: ☰(設定専用)から「表示」グループと「図の種類/種別」を
+         分離し、👁(表示)・◎(図の種類)の2アイコンへ移した(2026-09-04、
+         トップバーに3アイコン横並びにする提案より)。☰にはどの図/表示
+         とも独立した「設定」だけが残る。 -->
     <div class="side-panel" id="main-menu-panel">
       <div class="panel-head">
-        <h2>メニュー</h2>
+        <h2>設定</h2>
         <button class="icon-btn" onclick="closeAllPanels()">✕</button>
       </div>
       <div class="panel-body" style="display:flex; flex-direction:column; gap:8px;">
-        <!-- 7.70: 円/度数/アスペクト/サビアン(旧#pane-tabs、スマホ専用の
-             タブ列)をここに統合(2026-09-03、「サビアンとかアスペクトを
-             表示すると、円表示に戻るやつがないね...ボタンいらなくない？」
-             より) -- #pane-tabsはCSSでスマホでも非表示にし、代わりに
-             ここから同じsetPane()を呼ぶ。これで「アスペクト/サビアンを
-             見ている時に円へ戻る」操作が、他の設定項目と同じ「☰を開いて
-             選ぶ」という一貫した形になる。 -->
-        <div class="section-label" style="margin:0 0 -2px;">表示</div>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('wheel');"><span>円(チャート)</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('degrees');"><span>度数</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('aspects');"><span>アスペクト</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('sabian');"><span>サビアン</span><span class="chevron">›</span></button>
-        <div class="section-label" style="margin:14px 0 -2px;">設定</div>
-        <button class="row-btn" onclick="closeAllPanels(); openPanel('mode-panel');"><span>図の種類(出生図/経過図/二重円)</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); openPanel('type-panel');"><span>種別(通常/日食図/月食図)</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); openPanel('ref-panel');"><span>起点(トロピカル/恒星)</span><span class="chevron">›</span></button>
+        <button class="row-btn" id="menu-ref-btn" onclick="closeAllPanels(); openPanel('ref-panel');"><span>起点(トロピカル/恒星)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('display-panel');"><span>表示オプション(度数・恒星名・アスペクト)</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
+        <button class="row-btn" id="menu-conj-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
         <!-- 7.71: トップバーの◐(テーマ切替)をここへ移動(2026-09-04、
              「三本線のメニューの右にあるダークモード選択のアイコンは
              Menuに入れてもいいのではないだろうか」より)。他のトグル
@@ -1253,18 +1261,55 @@
       </div>
     </div>
 
-    <!-- ---- side panel: 出生図/経過図/二重円 ---- -->
-    <div class="side-panel" id="mode-panel">
+    <!-- ---- side panel: 👁 表示(円/度数/アスペクト/サビアン、旧7.70で
+         ☰に統合していたものを7.72で独立icon化) ---- -->
+    <div class="side-panel" id="view-menu-panel">
       <div class="panel-head">
-        <h2>図の種類</h2>
+        <h2>表示</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body" style="display:flex; flex-direction:column; gap:8px;">
+        <button class="row-btn" onclick="closeAllPanels(); setPane('wheel');"><span>円(チャート)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('degrees');"><span>度数</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('aspects');"><span>アスペクト</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); setPane('sabian');"><span>サビアン</span><span class="chevron">›</span></button>
+      </div>
+    </div>
+
+    <!-- ---- side panel: 出生図/経過図/二重円 ---- -->
+    <!-- 7.72: 図の種類(出生図/経過図/二重円)+種別(通常/日食図/月食図、
+         Tのジャンプ)を1枚のパネルに統合(旧mode-panel+type-panel、
+         2026-09-04、「出生図の日食とか、経過図の日食とかは、動線は
+         めんどくない？」より) -- 「図の種類」だけ◎アイコンへ独立させると
+         「日食を見る」には結局◎(図の種類)と☰(種別)の両方を行き来する
+         必要があり、2つが離れてしまうと判断。1つのパネルの中で「どの
+         図を、どういう種類で見るか」が完結するよう統合した。 -->
+    <div class="side-panel" id="chart-type-panel">
+      <div class="panel-head">
+        <h2>図の種類・種別</h2>
         <button class="icon-btn" onclick="closeAllPanels()">✕</button>
       </div>
       <div class="panel-body">
-        <div class="segmented" id="mode-segmented" style="grid-template-columns:repeat(3,1fr);">
-          <button class="seg-btn display-mode-btn active" data-display="N" onclick="setDisplayMode(this,'N'); closeAllPanels();">出生図</button>
-          <button class="seg-btn display-mode-btn" data-display="T" onclick="setDisplayMode(this,'T'); closeAllPanels();">経過図</button>
-          <button class="seg-btn display-mode-btn" data-display="both" onclick="setDisplayMode(this,'both'); closeAllPanels();">二重円</button>
+        <div class="segmented" id="mode-segmented" style="grid-template-columns:repeat(3,1fr); margin-bottom:22px;">
+          <button class="seg-btn display-mode-btn active" data-display="N" onclick="setDisplayMode(this,'N');">出生図</button>
+          <button class="seg-btn display-mode-btn" data-display="T" onclick="setDisplayMode(this,'T');">経過図</button>
+          <button class="seg-btn display-mode-btn" data-display="both" onclick="setDisplayMode(this,'both');">二重円</button>
         </div>
+
+        <span class="field-label">N(ネイタル)の種類 — 常に保持されます</span>
+        <div class="segmented" id="n-type-segmented" style="grid-template-columns:repeat(3,1fr); margin-bottom:22px;">
+          <button class="seg-btn active" data-type="normal" onclick="setNType(this,'normal')">通常</button>
+          <button class="seg-btn" data-type="eclipseSolar" onclick="setNType(this,'eclipseSolar')">日食図</button>
+          <button class="seg-btn" data-type="eclipseLunar" onclick="setNType(this,'eclipseLunar')">月食図</button>
+        </div>
+
+        <span class="field-label">T(トランジット)を特別な瞬間へジャンプ</span>
+        <div class="segmented" id="t-jump-segmented" style="grid-template-columns:repeat(3,1fr);">
+          <button class="seg-btn" onclick="jumpTTo('eclipseSolar', this)">日食</button>
+          <button class="seg-btn" onclick="jumpTTo('eclipseLunar', this)">月食</button>
+          <button class="seg-btn" onclick="jumpTTo('seasonal', this)">四季(夏至)</button>
+        </div>
+        <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので日食/月食の表示は消えます</p>
       </div>
     </div>
 
@@ -1360,29 +1405,6 @@
     </div>
 
     <!-- ---- side panel: N/Tの種別 ---- -->
-    <div class="side-panel" id="type-panel">
-      <div class="panel-head">
-        <h2>種別</h2>
-        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
-      </div>
-      <div class="panel-body">
-        <span class="field-label">N(ネイタル)の種類 — 常に保持されます</span>
-        <div class="segmented" id="n-type-segmented" style="grid-template-columns:repeat(3,1fr); margin-bottom:22px;">
-          <button class="seg-btn active" data-type="normal" onclick="setNType(this,'normal')">通常</button>
-          <button class="seg-btn" data-type="eclipseSolar" onclick="setNType(this,'eclipseSolar')">日食図</button>
-          <button class="seg-btn" data-type="eclipseLunar" onclick="setNType(this,'eclipseLunar')">月食図</button>
-        </div>
-
-        <span class="field-label">T(トランジット)を特別な瞬間へジャンプ</span>
-        <div class="segmented" id="t-jump-segmented" style="grid-template-columns:repeat(3,1fr);">
-          <button class="seg-btn" onclick="jumpTTo('eclipseSolar', this)">日食</button>
-          <button class="seg-btn" onclick="jumpTTo('eclipseLunar', this)">月食</button>
-          <button class="seg-btn" onclick="jumpTTo('seasonal', this)">四季(夏至)</button>
-        </div>
-        <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので日食/月食の表示は消えます</p>
-      </div>
-    </div>
-
     <!-- ---- side panel: 表示オプション ---- -->
     <div class="side-panel" id="display-panel">
       <div class="panel-head">
@@ -1642,6 +1664,15 @@
   }
 
   // ---------- display mode (N / T / biwheel) + N-type + T-type ----------
+  // 7.72で発覚(実装は2026-09-04): 7.69で旧#settings-menuを削除した際、
+  // ここが参照していた#menu-ref-btn/#menu-conj-btn(旧「起点:」「恒星の
+  // 合」ボタン)を消してしまい、この関数がnullアクセスで毎回例外を投げる
+  // ようになっていた。selectPerson()/setDisplayMode()/setNType()は全部
+  // この関数を呼んでから buildChart()/updateBadge() する作りだったため、
+  // 例外で処理が止まり、以後の再描画が一切効かなくなっていた(初回ページ
+  // 読み込み時の描画とたまたま一致して見えていたため、7.69〜7.71のテスト
+  // では気づけなかった)。#menu-ref-btn/#menu-conj-btn のidを、新しい
+  // ☰(設定)内の該当row-btnへ付け直して解消。
   function updateControlAvailability() {
     const isBiwheel = displayMode === 'both';
     const refBtn = document.getElementById('menu-ref-btn');
@@ -1948,6 +1979,15 @@
     if (!document.getElementById('view-chart').classList.contains('active')) return;
     openPanel('main-menu-panel');
   }
+  // 7.72: 👁・◎も☰と同じガード(チャート画面以外では何もしない)。
+  function openViewMenu() {
+    if (!document.getElementById('view-chart').classList.contains('active')) return;
+    openPanel('view-menu-panel');
+  }
+  function openChartTypeMenu() {
+    if (!document.getElementById('view-chart').classList.contains('active')) return;
+    openPanel('chart-type-panel');
+  }
   function closeAllPanels() {
     document.getElementById('scrim').classList.remove('show');
     document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('show'));
@@ -1996,6 +2036,94 @@
     { key: "neptune", g: "♆︎", name: "海王星" },
     { key: "pluto",   g: "♇︎", name: "冥王星" },
   ];
+
+  // ---------- 記号のSVG手描き化(2026-09-04、「サインとか、その他の記号
+  // も、チェックしてほしい」より) ----------
+  // これまでサイン・惑星の記号はUnicode文字(♈等)をテキストとして表示
+  // しており、実際の見た目はOS/ブラウザが「たまたま持っている」代替
+  // フォント任せだった(明示的なfont-family指定がなかったため)。射手座
+  // (♐、本来は矢印+斜めの横棒)が実機で崩れて見えたのも、エリスの記号
+  // (⯰)がiOSで消えたのも同じ根っこの問題。ここでは円チャート本体(サイン
+  // リング・惑星マーカー)だけを対象に、記号の形そのものを単純な線画
+  // (SVGのpath/line/circle)として直接描く方式に切り替え、フォントの
+  // 存在に一切依存しないようにした。度数リスト・アスペクト表・凡例等
+  // (HTML文字列で組み立てている箇所)は今回のスコープ外で、従来通り
+  // SIGNS/PLANET_META/MINOR_META の g(Unicodeテキスト)をそのまま使う
+  // -- そちらは文字列連結ベースの実装で、DOM要素を組み立て直す今回の
+  // 方式にすぐには乗せ替えられないため、次回以降の課題として残す。
+  // 各アイコンはローカル座標(-9〜9見当の正方形)で定義し、
+  // createGlyphIcon()がtranslate+scaleして実際の位置に配置する。
+  // 伝統的な占星術記号の書道的な正確さよりも、「どの端末でも同じ形に
+  // なる」ことと「見て判別できる」ことを優先した簡略化した線画。
+  const GLYPH_ICONS = {
+    // ---- サイン(12) ----
+    aries:       [{ tag: "path", d: "M -6,-7 C -8,-2 -5,2 -1,1 L -1,7" }, { tag: "path", d: "M 6,-7 C 8,-2 5,2 1,1 L 1,7" }],
+    taurus:      [{ tag: "circle", cx: 0, cy: 3, r: 4 }, { tag: "path", d: "M -5,-2 Q -7,-8 0,-6 Q 7,-8 5,-2" }],
+    gemini:      [{ tag: "line", x1: -5, y1: -6, x2: -5, y2: 6 }, { tag: "line", x1: 5, y1: -6, x2: 5, y2: 6 }, { tag: "line", x1: -7, y1: -6, x2: 7, y2: -6 }, { tag: "line", x1: -7, y1: 6, x2: 7, y2: 6 }],
+    cancer:      [{ tag: "path", d: "M -5,-3 C -2,-3 -2,1 -5,1 C -8,1 -8,-4 -5,-4" }, { tag: "path", d: "M 5,3 C 2,3 2,-1 5,-1 C 8,-1 8,4 5,4" }],
+    leo:         [{ tag: "circle", cx: -3, cy: -3, r: 3 }, { tag: "path", d: "M 0,-3 C 6,-3 8,1 5,4 C 3,6 0,4 1,2 C 2,0 4,1 3,3" }],
+    virgo:       [{ tag: "path", d: "M -7,7 L -7,-6 C -7,-6 -4,-2 -4,-6 L -4,7 C -4,-6 -1,-2 -1,-6 L -1,7 C -1,7 4,7 4,2 C 4,-2 0,-2 0,2" }],
+    libra:       [{ tag: "path", d: "M -7,-1 Q 0,-7 7,-1" }, { tag: "line", x1: -8, y1: 2, x2: 8, y2: 2 }, { tag: "line", x1: -6, y1: 6, x2: 6, y2: 6 }],
+    scorpio:     [{ tag: "path", d: "M -7,7 L -7,-6 C -7,-6 -4,-2 -4,-6 L -4,7 C -4,-6 -1,-2 -1,-6 L -1,7" }, { tag: "line", x1: -1, y1: 7, x2: 4, y2: 7 }, { tag: "line", x1: 4, y1: 7, x2: 2, y2: 4 }, { tag: "line", x1: 4, y1: 7, x2: 4, y2: 3 }],
+    // 射手座(2026-09-04、「射手座とか、なんか変。矢印と横棒だと思う」
+    // より) -- 矢の軸(左下から右上)+矢じり(先端のV字)+軸を斜めに
+    // 横切る短い横棒、の3要素で構成される本来の形をそのまま線で描く。
+    sagittarius: [{ tag: "line", x1: -6, y1: 6, x2: 6, y2: -6 }, { tag: "line", x1: 6, y1: -6, x2: 1, y2: -6 }, { tag: "line", x1: 6, y1: -6, x2: 6, y2: -1 }, { tag: "line", x1: -2, y1: 2, x2: 0, y2: 0 }],
+    capricorn:   [{ tag: "path", d: "M -6,-6 L -2,4 L 2,-6" }, { tag: "path", d: "M 2,-6 L 2,4 C 2,7 6,7 6,4 C 6,2 4,2 4,4" }],
+    aquarius:    [{ tag: "path", d: "M -7,-3 L -3,-6 L 1,-3 L 5,-6 L 8,-3" }, { tag: "path", d: "M -7,3 L -3,0 L 1,3 L 5,0 L 8,3" }],
+    pisces:      [{ tag: "path", d: "M -6,-7 C -9,-3 -9,3 -6,7" }, { tag: "path", d: "M 6,-7 C 9,-3 9,3 6,7" }, { tag: "line", x1: -6, y1: 0, x2: 6, y2: 0 }],
+    // ---- 惑星(9、地球⊕含む、ヘリオセントリックなので太陽は描かない) ----
+    mercury:     [{ tag: "path", d: "M -3,-4 C -3,-7 3,-7 3,-4" }, { tag: "circle", cx: 0, cy: 0, r: 3.5 }, { tag: "line", x1: 0, y1: 3.5, x2: 0, y2: 8 }, { tag: "line", x1: -2.5, y1: 6, x2: 2.5, y2: 6 }],
+    venus:       [{ tag: "circle", cx: 0, cy: -2, r: 3.5 }, { tag: "line", x1: 0, y1: 1.5, x2: 0, y2: 8 }, { tag: "line", x1: -2.5, y1: 5, x2: 2.5, y2: 5 }],
+    earth:       [{ tag: "circle", cx: 0, cy: 0, r: 6 }, { tag: "line", x1: 0, y1: -6, x2: 0, y2: 6 }, { tag: "line", x1: -6, y1: 0, x2: 6, y2: 0 }],
+    mars:        [{ tag: "circle", cx: -1, cy: 1, r: 4 }, { tag: "line", x1: 2, y1: -2, x2: 7, y2: -7 }, { tag: "line", x1: 3, y1: -7, x2: 7, y2: -7 }, { tag: "line", x1: 7, y1: -7, x2: 7, y2: -3 }],
+    jupiter:     [{ tag: "path", d: "M -7,-6 C -9,-2 -3,-2 -3,-6" }, { tag: "line", x1: -3, y1: -6, x2: -3, y2: 6 }, { tag: "line", x1: -7, y1: 2, x2: 1, y2: 2 }],
+    saturn:      [{ tag: "line", x1: -5, y1: -6, x2: 1, y2: -6 }, { tag: "line", x1: -2, y1: -7, x2: -2, y2: 3 }, { tag: "path", d: "M -2,3 C -2,6 1,6 1,3" }],
+    uranus:      [{ tag: "line", x1: -5, y1: -7, x2: -5, y2: 1 }, { tag: "line", x1: 5, y1: -7, x2: 5, y2: 1 }, { tag: "line", x1: -5, y1: -3, x2: 5, y2: -3 }, { tag: "circle", cx: 0, cy: 5, r: 2 }],
+    neptune:     [{ tag: "line", x1: -5, y1: -7, x2: -5, y2: 0 }, { tag: "line", x1: 5, y1: -7, x2: 5, y2: 0 }, { tag: "path", d: "M -5,-2 C -5,3 5,3 5,-2" }, { tag: "line", x1: 0, y1: 0, x2: 0, y2: 7 }, { tag: "line", x1: -3, y1: 7, x2: 3, y2: 7 }],
+    pluto:       [{ tag: "circle", cx: 0, cy: -5, r: 2.5 }, { tag: "path", d: "M -4,-1 C -4,3 4,3 4,-1" }, { tag: "line", x1: 0, y1: 1.5, x2: 0, y2: 7 }, { tag: "line", x1: -3, y1: 4, x2: 3, y2: 4 }],
+    // ---- 準惑星・小惑星(チェックすると惑星と同じ帯に混ざって出てくる
+    // ため、揃える必要がある。エリスだけは"Er"のテキスト表記のまま
+    // なので、ここには含めない=createGlyphIcon()が未定義キーとして
+    // 自動的にテキストへフォールバックする) ----
+    ceres:       [{ tag: "circle", cx: -2, cy: 0, r: 3.5 }, { tag: "path", d: "M 1.5,-3 C 5,-3 5,3 1.5,3" }],
+    pallas:      [{ tag: "circle", cx: 0, cy: 2, r: 3.5 }, { tag: "line", x1: 0, y1: -2, x2: 0, y2: -8 }, { tag: "path", d: "M -2,-6 L 0,-8 L 2,-6" }],
+    juno:        [{ tag: "circle", cx: 0, cy: -1, r: 3 }, { tag: "line", x1: -3, y1: -5, x2: 3, y2: -5 }, { tag: "line", x1: 0, y1: 2, x2: 0, y2: 7 }, { tag: "line", x1: -2, y1: 5, x2: 2, y2: 5 }],
+    vesta:       [{ tag: "circle", cx: 0, cy: -4, r: 2 }, { tag: "path", d: "M -4,0 L -4,6 L 4,6 L 4,0" }],
+    chiron:      [{ tag: "circle", cx: 0, cy: -4, r: 2.5 }, { tag: "line", x1: 0, y1: -1.5, x2: 0, y2: 6 }, { tag: "line", x1: 0, y1: 6, x2: 3, y2: 6 }, { tag: "line", x1: 0, y1: 4, x2: 2, y2: 4 }],
+  };
+  const SIGN_ICON_KEYS = ["aries", "taurus", "gemini", "cancer", "leo", "virgo", "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"];
+  // フォントに一切依存しない、シンプルな線画としてサイン/惑星記号を描く。
+  // iconKeyがGLYPH_ICONSに無い場合(エリスの"Er"等)は、従来通りfallbackText
+  // をそのままテキストとして描画する(安全なフォールバック)。
+  function createGlyphIcon(iconKey, x, y, size, color, fallbackText) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const spec = GLYPH_ICONS[iconKey];
+    if (!spec) {
+      const t = document.createElementNS(svgNS, "text");
+      t.setAttribute("x", x); t.setAttribute("y", y);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.setAttribute("fill", color);
+      t.setAttribute("font-size", String(size));
+      t.textContent = fallbackText || "?";
+      return t;
+    }
+    const g = document.createElementNS(svgNS, "g");
+    g.setAttribute("class", "glyph-icon");
+    g.setAttribute("transform", `translate(${x},${y}) scale(${size / 18})`);
+    g.setAttribute("stroke", color);
+    g.setAttribute("fill", "none");
+    g.setAttribute("stroke-width", "1.6");
+    g.setAttribute("stroke-linecap", "round");
+    g.setAttribute("stroke-linejoin", "round");
+    spec.forEach((shape) => {
+      const el = document.createElementNS(svgNS, shape.tag);
+      Object.entries(shape).forEach(([k, v]) => { if (k !== "tag") el.setAttribute(k, v); });
+      g.appendChild(el);
+    });
+    return g;
+  }
+
   // Real computed longitudes (helio-app CLI, `--stars ... --transpose --csv`),
   // not placeholders -- サンプル人物(架空)1990-06-15 09:30 Asia/Tokyo、
   // 東京都(35.6762N 139.6503E)、for every reference point offered in the
@@ -2037,9 +2165,15 @@
     // エリスの正式な天文記号(U+2BF0)は、iOSの標準フォントに全く収録
     // されておらず、VS-15を付けても(そもそも土台のグリフが無いため)
     // 空白になって消えてしまう(2026-09-03、実機iPhoneで「エリスが
-    // 消えている」より)。他の準惑星の記号よりずっと対応状況が悪い
-    // ため、この1つだけ丸囲みの"E"(U+24BA、広く対応)に差し替えた。
-    { key: "eris",            g: "Ⓔ", name: "エリス" },
+    // 消えている」より)。丸囲みの"E"(U+24BA)に差し替えたが、2026-09-04、
+    // 実際に他社占星術ソフト2種(アストロゴールド・アストロバイザー)を
+    // 確認したところ、どちらも記号ではなく"Er"(逆行時"ErR")とテキスト
+    // 表記していることが判明。エリスにはまだ業界標準の統一記号が無く、
+    // 記号を使うソフトごとに形がバラバラという事情もあり、それに倣って
+    // 通常のラテン文字"Er"にした -- 特殊なUnicode記号と違い、普通の
+    // アルファベットはどのフォント・端末でも確実に表示されるため、
+    // クロスプラットフォーム問題そのものからも解放される。
+    { key: "eris",            g: "Er", name: "エリス" },
   ];
   const NATAL_MINOR = {
     ceres: 130.602188, pallas: 71.406816, juno: 232.6101, vesta: 16.30325,
@@ -2741,11 +2875,11 @@
       // 内周に着けてほしい」より、下の度数目盛りを帯の内周(150)寄りに
       // 移した分、目盛りの届く範囲(最大158)と被らないよう外側へ寄せた)。
       const [gx, gy] = polar(200, 200, 164, deg + 15);
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", gx); t.setAttribute("y", gy);
-      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-      t.textContent = SIGNS[i];
-      glyphs.appendChild(t);
+      // 2026-09-04、SVG手描きアイコン化(フォント依存の解消、GLYPH_ICONS
+      // 参照)。#sign-glyphsグループの旧font-size/fill属性はテキスト時代
+      // の名残りでもう使われないが、createGlyphIcon()にそのまま同じ
+      // サイズ・色を渡している。
+      glyphs.appendChild(createGlyphIcon(SIGN_ICON_KEYS[i], gx, gy, 15, "var(--ink)", SIGNS[i]));
     }
     // 10度/20度は大きい目盛り、5度/15度/25度は小さい目盛り(2026-09-01、
     // スターゲイザー/ケプラーの参考画像より) -- サインの境目(0度/30度)は
@@ -3085,13 +3219,7 @@
       const radii = staggerRadii(planets.map(p => ({ key: p.key, deg: p.deg })), baseRadius, step);
       planets.forEach(p => {
         const [x, y] = polar(200, 200, radii[p.key], p.deg);
-        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        t.setAttribute("x", x); t.setAttribute("y", y);
-        t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-        t.setAttribute("fill", color);
-        t.setAttribute("font-size", "15");
-        t.textContent = p.g;
-        markers.appendChild(t);
+        markers.appendChild(createGlyphIcon(p.key, x, y, 15, color, p.g));
       });
       return radii;
     }
@@ -3117,13 +3245,7 @@
       const gi = glyphByKey.get(p.key);
       radii[p.key] = gi.r;  // アスペクト線のアンカーは実際に描かれたグリフの位置(スイープ後)
       const [x, y] = polar(200, 200, gi.r, gi.deg);
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", x); t.setAttribute("y", y);
-      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-      t.setAttribute("fill", color);
-      t.setAttribute("font-size", "15");
-      t.textContent = p.g;
-      markers.appendChild(t);
+      markers.appendChild(createGlyphIcon(p.key, x, y, 15, color, p.g));
       // グリフが密な合でsweepにより実際にずれた場合だけガイド線を出す
       // (普段は動かないので、ほとんどのグリフにはガイド線が出ない)。
       if (guides && Math.abs(((gi.deg - gi.origDeg + 540) % 360) - 180) > 0.5) {
