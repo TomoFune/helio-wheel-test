@@ -1,4 +1,5 @@
-<!doctype html><html><meta charset="utf-8">
+<!doctype html><html>
+<meta charset="utf-8">
 <!-- viewport meta追加(2026-09-03、「スマホ版が、ひどかったです」より) --
      Artifact版はホスト側のフレームが独自にviewportメタを注入してくれて
      いた(Browser paneでの検証で問題が出なかったのはそのため)が、単体の
@@ -2479,13 +2480,30 @@
     if (!showAll) return;
     const lons = currentDisplayLongitudes();  // main 9 + whichever minor bodies are checked -- see the note by minorBodiesOn
     const aspects = computeAspects(lons);
+    const svgNS = "http://www.w3.org/2000/svg";
+    // 各天体のグリフ位置(PLANET_R)から、アスペクト専用の内側の帯
+    // (ASPECT_R)まで短いスポークを1本だけ引く(2026-09-03、「アスペクト
+    // 線が惑星記号に食い込んでいる」の修正、ASPECT_R宣言のコメント参照)
+    // -- 同じ天体が複数のアスペクトを持っていても、スポークは天体ごとに
+    // 1本で足りる(角度が同じなので重複して引く意味がない)。
+    const spokeDrawn = new Set();
+    function drawAspectSpoke(key, color) {
+      if (spokeDrawn.has(key)) return;
+      spokeDrawn.add(key);
+      const [gx, gy] = polar(200, 200, PLANET_R, lons[key]);
+      const [ax, ay] = polar(200, 200, ASPECT_R, lons[key]);
+      const spoke = document.createElementNS(svgNS, "line");
+      spoke.setAttribute("x1", gx); spoke.setAttribute("y1", gy);
+      spoke.setAttribute("x2", ax); spoke.setAttribute("y2", ay);
+      spoke.setAttribute("stroke", "var(--ink-faint)"); spoke.setAttribute("stroke-width", "1");
+      spoke.setAttribute("opacity", "0.4");
+      group.appendChild(spoke);
+    }
     aspects.filter(a => aspectTypesOn.has(a.type)).forEach(a => {
-      const ra = window.__markerRadii?.[a.a] ?? 108;
-      const rb = window.__markerRadii?.[a.b] ?? 108;
-      const [rawX1, rawY1] = polar(200, 200, ra, lons[a.a]);
-      const [rawX2, rawY2] = polar(200, 200, rb, lons[a.b]);
-      const [x1, y1, x2, y2] = insetLineEndpoints(rawX1, rawY1, rawX2, rawY2, 9);
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      drawAspectSpoke(a.a); drawAspectSpoke(a.b);
+      const [x1, y1] = polar(200, 200, ASPECT_R, lons[a.a]);
+      const [x2, y2] = polar(200, 200, ASPECT_R, lons[a.b]);
+      const line = document.createElementNS(svgNS, "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
       line.setAttribute("x2", x2); line.setAttribute("y2", y2);
       line.setAttribute("stroke", a.color);
@@ -2980,6 +2998,17 @@
   // 惑星グリフ・度数帯に回した(2026-09-03、「サインの帯を狭くしても
   // いいのではないですか？そうすると、その他の内側の円が大きく
   // できますね」より)。
+  // アスペクト線専用の帯(2026-09-03、実機で「アスペクト線が、惑星記号
+  // に食い込んでいる。惑星の帯と、アスペクトの交点の帯は分けるんじゃ
+  // なかったっけ」より) -- 元の帯レイアウト(7.53)は度数/サイン/恒星の
+  // 帯同士は分離したが、アスペクト線自体は各天体の実際のPLANET_R位置
+  // (=グリフと同じ半径)を直接結んでいたため、2天体の角度差が小さい
+  // (合など)ほど弦がPLANET_R付近に張り付き、間に挟まった別の天体の
+  // グリフに重なって見えることがあった。アスペクト線をこの内側専用の
+  // 帯(半径ASPECT_R)だけで結び、各グリフからはこの帯まで短いスポーク
+  // (drawGuideLineと同じ発想)を伸ばす形にして、線の本体がPLANET_Rに
+  // 触れないようにした。
+  const ASPECT_R = 66;
   const PLANET_R = 106;
   // DEGREE_Rは、PLANET_Rから34単位離す(2026-09-03、実測で判明) --
   // 半径だけ十分離れていれば安全、と思っていたが(24単位で試した)、
@@ -3404,9 +3433,4 @@
   }, 4500);
 </script>
 
-
-
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-<script src="engine.js"></script>
-<script src="wheel_integration.js"></script>
-</body></html>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script><script src="engine.js"></script><script src="wheel_integration.js"></script></body></html>
