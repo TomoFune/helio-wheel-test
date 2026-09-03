@@ -449,7 +449,12 @@
      あっても常にちょうど1行に収まる。 */
   .sabian-text {
     flex: 1; min-width: 0; cursor: pointer;
-    color: var(--ink-dim); font-size: 0.82rem; line-height: 1.45;
+    /* --ink-dim(薄い青灰色)は「副次的な情報」の見た目としては意図通り
+       だったが、実際にはサビアンの本文(読むための本文)にまで使われて
+       いて見にくかった(2026-09-04、「サインとか、サビアンの詩文の
+       青い色、これもどうかして見えにくいのよね」より) -- 本文は
+       --ink(通常の文字色)に上げてコントラストを底上げした。 */
+    color: var(--ink); font-size: 0.82rem; line-height: 1.45;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sabian-text.expanded { white-space: normal; overflow: visible; text-overflow: clip; }
