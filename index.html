@@ -430,11 +430,18 @@
     border-bottom: 1px solid var(--line);
     font-size: 0.86rem;
   }
+  /* font-family追加(2026-09-05、7.75/7.78で円チャート本体だけNoto Sans
+     Symbols 2に切り替えていたのを、度数リスト・アスペクト表・凡例にも
+     広げる「③」の対応) -- Noto Sans Symbols 2は記号(♑等)だけを持ち
+     数字・アポストロフィは含まないため、後続のフォールバックへ自動的に
+     譲られる(1つのspan内で記号と数字が混在するformatAstro()/
+     formatSabianDegree()の出力でも、文字ごとに適切なフォントが選ばれる)。 */
   .legend-glyph {
     width: 20px; text-align: center; color: var(--accent); flex-shrink: 0;
+    font-family: "Noto Sans Symbols 2", sans-serif;
   }
   .legend-name { flex: 1; color: var(--ink); }
-  .legend-deg { color: var(--ink-dim); }
+  .legend-deg { color: var(--ink-dim); font-family: "Noto Sans Symbols 2", "Space Mono", "JetBrains Mono", monospace; }
   .legend-col-head {
     font-size: 0.78rem; font-weight: 700; color: var(--ink);
     letter-spacing: 0.04em; margin-bottom: 4px; padding-bottom: 4px;
@@ -512,6 +519,7 @@
   .aspect-grid th {
     color: var(--accent); font-size: 0.9rem; font-weight: 400;
     background: var(--bg-elevated); position: sticky; cursor: default;
+    font-family: "Noto Sans Symbols 2", sans-serif;  /* 2026-09-05、③(度数リスト・アスペクト表・凡例のフォント統一) */
   }
   .aspect-grid th:first-child { left: 0; z-index: 1; }
   .aspect-grid tr:first-child th { top: 0; z-index: 1; }
@@ -699,6 +707,7 @@
     width: 22px; height: 22px; border-radius: 50%;
     background: var(--accent-soft); color: var(--accent-strong);
     display: flex; align-items: center; justify-content: center; font-size: 0.86rem;
+    font-family: "Noto Sans Symbols 2", sans-serif;  /* 2026-09-05、③ */
   }
   .conj-hit {
     display: flex; align-items: center; gap: 10px;
@@ -2032,7 +2041,7 @@
       const row = document.createElement('div');
       row.className = 'check-row';
       row.innerHTML = `<span class="mini-check${isOn ? ' on' : ''}" data-key="${m.key}" onclick="toggleMinorBody(this)">${isOn ? '✓' : ''}</span>` +
-        `<span>${m.g ? m.g + ' ' : ''}${m.name}</span>`;
+        `<span>${m.g ? `<span style="font-family:'Noto Sans Symbols 2', sans-serif;">${m.g}</span> ` : ''}${m.name}</span>`;
       container.appendChild(row);
     });
   }
