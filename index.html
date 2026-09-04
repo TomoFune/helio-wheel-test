@@ -48,13 +48,15 @@
       --ink: #f1ede4;
       --ink-dim: #9199b5;
       --ink-faint: #8993b8;
-      --accent: #e8a94c;
-      --accent-strong: #f4c274;
-      --accent-soft: rgba(232, 169, 76, 0.14);
+      /* #e8a94c -> #f2b558(2026-09-04、「オレンジ色も、くすんでいる？」
+         より、心持ち明るく・鮮やかに) */
+      --accent: #f2b558;
+      --accent-strong: #f8c876;
+      --accent-soft: rgba(242, 181, 88, 0.16);
       --line: rgba(241, 237, 228, 0.1);
       --line-strong: rgba(241, 237, 228, 0.2);
       --good: #7fbf7a;
-      --ring-a: #e8a94c;
+      --ring-a: #f2b558;
       --ring-b: #6b7299;
       --aspect-hard: #e08670;
       --aspect-soft: #7fb3d9;
@@ -70,13 +72,13 @@
     --ink: #f1ede4;
     --ink-dim: #9199b5;
     --ink-faint: #8993b8;
-    --accent: #e8a94c;
-    --accent-strong: #f4c274;
-    --accent-soft: rgba(232, 169, 76, 0.14);
+    --accent: #f2b558;
+    --accent-strong: #f8c876;
+    --accent-soft: rgba(242, 181, 88, 0.16);
     --line: rgba(241, 237, 228, 0.1);
     --line-strong: rgba(241, 237, 228, 0.2);
     --good: #7fbf7a;
-    --ring-a: #e8a94c;
+    --ring-a: #f2b558;
     --ring-b: #6b7299;
     --aspect-hard: #e08670;
     --aspect-soft: #7fb3d9;
@@ -180,13 +182,22 @@
     border-radius: 50%;
     border: 1px solid var(--line-strong);
     background: var(--bg-elevated);
-    color: var(--ink-dim);
+    /* --ink-dim -> --ink(2026-09-04、「アイコンのマーク、目とか、メニュー
+       のとこも、控えめすぎて存在感がなさすぎる」より) -- SVGアイコン
+       (👁・◎)はstroke="currentColor"でこの色を継承するため、薄い色の
+       せいでアイコン自体も薄く見えていた。 */
+    color: var(--ink);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
     font-size: 1rem;
-    transition: border-color 0.15s, color 0.15s;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
   .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* パネルが開いている間、対応するアイコンを「選択中」と分かる見た目に
+     (2026-09-04、「選択したときは、選択したのがわかる表示にしてほしい」
+     より) -- openMainMenu()/openViewMenu()/openChartTypeMenu()がそれぞれ
+     このクラスを自分のボタンに付け、closeAllPanels()で全部外す。 */
+  .icon-btn.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
   .view { display: none; flex: 1; flex-direction: column; min-height: 0; }
   .view.active { display: flex; }
@@ -309,7 +320,11 @@
   }
   .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
   #badge-line2 {
-    font-size: 0.8rem; color: var(--ink-dim);
+    /* --ink-dim -> --ink(2026-09-04、「出生図　1990-06-15 09:30:00
+       (Asia/Tokyo)　この青灰色が、くらい」より) -- サビアン本文(7.74)と
+       同じ理由で、副次的な色のまま読むための情報(出生日時)に使われて
+       いた。 */
+    font-size: 0.8rem; color: var(--ink);
     /* text-overflow:ellipsis追加(2026-09-03、実機iPhoneで「出生図の
        データの右側の[みたいなやつはなんだろう」より) -- overflow:hidden
        だけだと、幅が足りない時に文字列の途中でぶつ切りになり(タイム
@@ -1072,19 +1087,19 @@
            エリス(⯰)と同じフォント依存問題を新たに持ち込むため使わず、
            ☰と同じ発想の手描きSVG線画にした(stroke="currentColor"で
            .icon-btnの文字色をそのまま継承、ホバー色も自動追従)。 -->
-      <button class="icon-btn" title="表示(円・度数・アスペクト・サビアン)" onclick="openViewMenu()">
+      <button class="icon-btn" id="icon-btn-view" title="表示(円・度数・アスペクト・サビアン)" onclick="openViewMenu()">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
           <path d="M2 12C2 12 6.2 6 12 6C17.8 6 22 12 22 12C22 12 17.8 18 12 18C6.2 18 2 12 2 12Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
           <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
         </svg>
       </button>
-      <button class="icon-btn" title="図の種類・種別" onclick="openChartTypeMenu()">
+      <button class="icon-btn" id="icon-btn-chart-type" title="図の種類・種別" onclick="openChartTypeMenu()">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
           <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/>
         </svg>
       </button>
-      <button class="icon-btn" title="メニュー" onclick="openMainMenu()">☰</button>
+      <button class="icon-btn" id="icon-btn-main-menu" title="メニュー" onclick="openMainMenu()">☰</button>
     </div>
   </div>
 
@@ -1193,7 +1208,7 @@
                   <stop offset="100%" stop-color="transparent"/>
                 </radialGradient>
               </defs>
-              <circle cx="200" cy="200" r="180" fill="url(#skyfade)"/>
+              <circle cx="200" cy="200" r="200" fill="url(#skyfade)"/>
               <!-- 太さ・不透明度を底上げ(2026-09-03、「線とか文字が、
                    見にくいのよね」「色？線の太さ？コントラストかな？」
                    より、1.2/0.55, 1/0.35, 0.75/0.5 -> それぞれ下記に)。
@@ -1201,16 +1216,18 @@
                    からはみ出ちゃった」より -- サイングリフの表示半径
                    164(font-size 15)がリング外周ぎりぎりで、文字の上半分
                    がはみ出していた。帯を少し広げて収めた。 -->
-              <!-- 174->178(2026-09-04、Noto Sans Symbols 2フォントの実測
-                   グリフ高25.2に合わせてサインリング帯を広げ、文字サイズ
-                   を11->13に戻すため) -->
-              <circle cx="200" cy="200" r="178" fill="none" stroke="var(--ring-a)" stroke-width="1.5" opacity="0.7"/>
+              <!-- 178->196(2026-09-04、7.78で全帯を再設計 -- 「円が小さい
+                   /隙間が多い」の主因だった未使用の外周余白を使い、円を
+                   一回り大きく見せる)。太さも1.5->2(「線を全体的に太く」
+                   より)。 -->
+              <circle cx="200" cy="200" r="196" fill="none" stroke="var(--ring-a)" stroke-width="2" opacity="0.75"/>
               <!-- r=140の装飾円は削除(2026-09-04、「サインの内側にある、
                    度数表示と被ってる円は、いらないのではないだろうか」
                    より) -- ちょうどDEGREE_R(度数の文字が並ぶ半径)と同じ
                    位置にあり、古い帯レイアウト時代の名残りの境界線が
-                   度数の文字と重なって見えるだけの装飾になっていた。 -->
-              <circle cx="200" cy="200" r="150" fill="none" stroke="var(--ring-a)" stroke-width="1" opacity="0.65"/>
+                   度数の文字と重なって見えるだけの装飾になっていた。
+                   150->165(7.78、下のsign-ticks/degree-ticksと連動)。 -->
+              <circle cx="200" cy="200" r="165" fill="none" stroke="var(--ring-a)" stroke-width="1.4" opacity="0.7"/>
               <!-- 12 sign divisions -->
               <g id="sign-ticks"></g>
               <!-- class="mono"を外した(2026-09-03、「サインの背景の四角い
@@ -1233,7 +1250,7 @@
                    自体をもっと大きくする話は、次のレイアウト全体見直し
                    (帯の間隔を詰めて空いた分を文字サイズに回す)で改めて
                    対応する。 -->
-              <g id="sign-glyphs" font-size="13" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
+              <g id="sign-glyphs" font-size="15" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
               <!-- degree tick ring -->
               <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
                    -- 個々の線のstroke-width(0.4〜0.6と細い)に加えて、この
@@ -2039,22 +2056,33 @@
   // 選択・人物管理)で押しても見た目には何も起きない -- ただしその2画面
   // では元々メニューを開く必要がない(設定はチャートを見ながら触るもの
   // なので)、実害はない想定。
+  // 7.78: パネルが開いている間、呼び出し元のアイコンボタンに.activeを
+  // 付けて「選択中」と分かるようにする(「選択したときは、選択したのが
+  // わかる表示にしてほしい」より)。closeAllPanels()側で全部まとめて外す。
+  function setActiveIconBtn(btnId) {
+    document.querySelectorAll('.topbar-actions .icon-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(btnId)?.classList.add('active');
+  }
   function openMainMenu() {
     if (!document.getElementById('view-chart').classList.contains('active')) return;
     openPanel('main-menu-panel');
+    setActiveIconBtn('icon-btn-main-menu');
   }
   // 7.72: 👁・◎も☰と同じガード(チャート画面以外では何もしない)。
   function openViewMenu() {
     if (!document.getElementById('view-chart').classList.contains('active')) return;
     openPanel('view-menu-panel');
+    setActiveIconBtn('icon-btn-view');
   }
   function openChartTypeMenu() {
     if (!document.getElementById('view-chart').classList.contains('active')) return;
     openPanel('chart-type-panel');
+    setActiveIconBtn('icon-btn-chart-type');
   }
   function closeAllPanels() {
     document.getElementById('scrim').classList.remove('show');
     document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('show'));
+    document.querySelectorAll('.topbar-actions .icon-btn').forEach(b => b.classList.remove('active'));
   }
   let currentRef = 'tropical';
   let currentRefLabel = 'トロピカル';
@@ -2469,7 +2497,7 @@
       // planet a stacked label belongs to readable even when two
       // planets' labels end up close together around the ring, and
       // reads as a visible little kink when a label's been swept.
-      const [gx1, gy1] = polar(200, 200, 179, lon);  // サインリング外側(178)のすぐ外(2026-09-04、リング拡大174->178に合わせて175->179)
+      const [gx1, gy1] = polar(200, 200, 198, lon);  // サインリング外側(196)のすぐ外(2026-09-04、7.78でリング拡大178->196に合わせて179->198)
       const [gx2, gy2] = polar(200, 200, pos.r - 7, pos.deg);
       const guide = document.createElementNS(svgNS, "line");
       guide.setAttribute("x1", gx1); guide.setAttribute("y1", gy1);
@@ -2669,7 +2697,7 @@
       line.setAttribute("stroke", a.color);
       // 太さ1/1.5->1.4/2、不透明度0.75->0.9(2026-09-03、「線とか文字が、
       // 見にくいのよね」「色？線の太さ？コントラストかな？」より)。
-      line.setAttribute("stroke-width", a.type === "conjunction" ? "2" : "1.4");
+      line.setAttribute("stroke-width", a.type === "conjunction" ? "2.4" : "1.7");  // 2/1.4->2.4/1.7(2026-09-04、「円チャートの線を、もうちょっと全体的に太く」より)
       line.setAttribute("stroke-dasharray", a.dash);
       line.setAttribute("opacity", "0.9");
       group.appendChild(line);
@@ -2831,34 +2859,26 @@
     const dticks = document.getElementById('degree-ticks');
     ticks.innerHTML = ""; glyphs.innerHTML = ""; dticks.innerHTML = "";
 
+    // 7.78: サインリング帯を150〜178から165〜196へ拡大(円が使っていな
+    // かった外周の余白を使う)。度数チップ(140帯)との間隔も150->165で
+    // 24単位に広がり、「目盛りと度数が重なる」問題を解消。
     for (let i = 0; i < 12; i++) {
       const deg = i * 30;
-      const [x1, y1] = polar(200, 200, 150, deg);
-      const [x2, y2] = polar(200, 200, 178, deg);
+      const [x1, y1] = polar(200, 200, 165, deg);
+      const [x2, y2] = polar(200, 200, 196, deg);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
       line.setAttribute("x2", x2); line.setAttribute("y2", y2);
-      // 太さ・不透明度を底上げ(2026-09-03、「線とか文字が、見にくいのよね」
-      // 「色？線の太さ？コントラストかな？」より、0.75/0.4 -> 1.1/0.6)。
-      line.setAttribute("stroke", "var(--ring-a)"); line.setAttribute("stroke-width", "1.1");
-      line.setAttribute("opacity", "0.6");
+      // 太さ1.1->1.5(2026-09-04、「円チャートの線を、もうちょっと全体的
+      // に太く」より)。
+      line.setAttribute("stroke", "var(--ring-a)"); line.setAttribute("stroke-width", "1.5");
+      line.setAttribute("opacity", "0.65");
       ticks.appendChild(line);
 
-      // グリフの表示半径160->164(2026-09-03、「メモリは、サインの帯の
-      // 内周に着けてほしい」より、下の度数目盛りを帯の内周(150)寄りに
-      // 移した分、目盛りの届く範囲(最大158)と被らないよう外側へ寄せた)。
-      // 164->162へ、font-size 15->12(2026-09-04、7.75でNoto Sans Symbols 2
-      // フォントに切替えてグリフが縦に大きくなった影響で、サインリング帯
-      // (150〜174)にはみ出していたのを応急処置)。162->164、font-size
-      // 12->13へ再調整(2026-09-04、同日中の続き、レイアウト全体見直しで
-      // サインリング帯自体を150〜174から150〜178に広げたため、文字を
-      // もう少し大きく戻せるようになった)。
-      const [gx, gy] = polar(200, 200, 164, deg + 15);
-      // 2026-09-04、7.72で手描きSVGアイコン化したが実機で「全然違う、
-      // 読めない」と強く否定されたため、7.75でNoto Sans Symbols 2
-      // フォント(#sign-glyphsのfont-family参照)によるテキスト表示に
-      // 戻した -- 本来の記号の形そのままで、かつWebフォントなので端末
-      // 依存もない。
+      // グリフの表示半径164->180(帯の中央、7.78で帯自体を165〜196に
+      // 拡大したのに合わせて)、font-size 13->15(「サインと惑星記号を
+      // 一回り大きくしてほしい」より)。
+      const [gx, gy] = polar(200, 200, 180, deg + 15);
       const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
       t.setAttribute("x", gx); t.setAttribute("y", gy);
       t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
@@ -2873,22 +2893,18 @@
     for (let d = 0; d < 360; d += 5) {
       if (d % 30 === 0) continue;  // サインの境目は上のループの太い線が既にある
       const isMajor = d % 10 === 0;
-      // 帯の外周(170)寄り→内周(150)寄りに変更(2026-09-03、「メモリは、
-      // サインの帯の内周に着けてほしいかな」より) -- 惑星グリフ・度数
-      // 表示は帯の内側(半径150未満)にあるので、目盛りを内周に付けた
-      // 方が「どの目盛りの上に惑星があるか」を目で追いやすくなる。
-      // 長さ自体は変えていない(大6単位/小3単位、外周版と同じ)。
-      const [x1, y1] = polar(200, 200, 150, d);
-      const [x2, y2] = polar(200, 200, isMajor ? 156 : 153, d);
+      // 帯の内周(150->165)に付ける(2026-09-03の方針は維持) -- 惑星
+      // グリフ・度数表示は帯の内側にあるので、目盛りを内周に付けた方が
+      // 「どの目盛りの上に惑星があるか」を目で追いやすい。長さは据え置き
+      // (大6単位/小3単位)。
+      const [x1, y1] = polar(200, 200, 165, d);
+      const [x2, y2] = polar(200, 200, isMajor ? 171 : 168, d);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
       line.setAttribute("x2", x2); line.setAttribute("y2", y2);
-      // stroke-widthも少し太く(0.6/0.4 -> 0.9/0.6、2026-09-01、「メモリ
-      // がない」より) -- グループのopacity引き上げ(#degree-ticksタグの
-      // コメント参照)と合わせて、実際に見える太さにした。0.9/0.6 ->
-      // 1.2/0.9へさらに太く(2026-09-03、「線とか文字が、見にくいのよね」
-      // 「色？線の太さ？コントラストかな？」より)。
-      line.setAttribute("stroke", "var(--ink-faint)"); line.setAttribute("stroke-width", isMajor ? "1.2" : "0.9");
+      // 太さ1.2/0.9->1.6/1.2(2026-09-04、「円チャートの線を、もうちょっと
+      // 全体的に太く」より)。
+      line.setAttribute("stroke", "var(--ink-faint)"); line.setAttribute("stroke-width", isMajor ? "1.6" : "1.2");
       dticks.appendChild(line);
     }
   }
@@ -3111,8 +3127,8 @@
     const guide = document.createElementNS("http://www.w3.org/2000/svg", "line");
     guide.setAttribute("x1", xRing); guide.setAttribute("y1", yRing);
     guide.setAttribute("x2", xOut); guide.setAttribute("y2", yOut);
-    guide.setAttribute("stroke", "var(--ink-faint)"); guide.setAttribute("stroke-width", "0.6");
-    guide.setAttribute("opacity", "0.5");
+    guide.setAttribute("stroke", "var(--ink-faint)"); guide.setAttribute("stroke-width", "0.9");  // 0.6->0.9(2026-09-04、「線を全体的に太く」より)
+    guide.setAttribute("opacity", "0.55");
     markers.insertBefore(guide, markers.firstChild);
   }
   // 度数の文字を(dx,dy)中心に描く(孤立した天体用) -- 度数/分を2段に
@@ -3135,7 +3151,7 @@
     // PLANET_R/DEGREE_Rのコメント参照)より、文字だけの実サイズは元々
     // 小さいので、この程度の拡大では再度の重なりは生じない想定
     // (sweepSameTierLabelsのchipWも28->33へ比例して引き上げ済み)。
-    dtext.setAttribute("font-size", "12");  // 10.5->12(2026-09-04、「記号や度数は老眼にやさしく見えるようにしてほしい。大きくはっきり」より)
+    dtext.setAttribute("font-size", "14");  // 10.5->12->14(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」、7.78で帯の余裕が増えたので再度引き上げ)
     dtext.setAttribute("font-weight", "700");
     const line1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
     line1.setAttribute("x", dx); line1.setAttribute("y", dy - 4);
@@ -3186,25 +3202,33 @@
   // 問題(合に近いアスペクトほど弦がPLANET_R付近に張り付き、間に挟まる
   // 第3の天体に重なる)自体は、ASPECT_RがPLANET_Rより十分小さい限り
   // 再発しない(半径の絶対差40が必要だったわけではない)。
-  const ASPECT_R = 86;
-  const PLANET_R = 106;
-  // DEGREE_Rは、PLANET_Rから34単位離す(2026-09-03、実測で判明) --
-  // 半径だけ十分離れていれば安全、と思っていたが(24単位で試した)、
-  // グリフとチップの中心を結ぶ「半径方向の変位」は、実際にはその角度
-  // によってx成分・y成分に分解される(斜めの角度では両方に分散する)。
-  // グリフ半幅7.5+チップ半幅14=21.5(x方向に必要)、グリフ半高10.6+
-  // チップ半高10=20.6(y方向に必要)の釣り合う角度(約44度)で最大に
-  // なる必要半径を逆算すると約29.8。そこに安全マージンを足した値。
-  const DEGREE_R = 140;
-  // 恒星ラベル(恒星の合・起点)専用の帯。サインリング外側(170)から
-  // 十分離す -- キャンバス拡張(viewBox -50 -50 500 500)で得た余白を
-  // 使い、以前の「リングのすぐ外22単位」に無理やり収める窮屈さを解消
-  // した(2026-09-03、「恒星ラベルをリングから離す」より)。サイン
-  // リングを狭めた(7.55)ことで、この余白はむしろ25単位に広がった。
-  // 195 -> 190へ(2026-09-04、「それぞれが少し間延びしすぎている...
-  // スターゲイザーに近い距離が良いです」より) -- サインリング外側
-  // (150〜174 -> 150〜178に拡張)からの余白を21->12単位に詰めた。
-  const STAR_R = 190;
+  // 7.78: 全帯の半径を再設計(2026-09-04、「円を、もう少し大きくしたい。
+  // サインと惑星記号を一回り大きくしてほしい」「目盛りと、度数が重なって
+  // いる...度数表示が、いまの目盛りと惑星記号の帯の間に入って、目盛りとは
+  // 重ならないように」より)。実測で判明した2つの問題を踏まえて再設計:
+  // (1) 円チャート自体が見えている範囲(サインリング外側178)は、実は
+  // wheel-wrapの実サイズ(viewBox上の半径250相当)の71%程度しか使って
+  // おらず、178の外側は恒星ラベルがまばらに浮いているだけの余白だった
+  // -- 「円が小さい/隙間が多い」という体感は、ここが主因だったと判断し、
+  // サインリング外側を178->205まで押し出して、この余白を使う方向にした。
+  // (2) 度数チップ(2段組み、font-size 12)の実測での外側到達距離は、
+  // 中心からDEGREE_R+20.8だった(旧DEGREE_R=140で実測160.8) -- 旧サイン
+  // リング内周(150)との余白はわずか10しかなく、この20.8に対して全く
+  // 足りていなかった。新しいサインリング内周からは24以上の余白を確保
+  // する形でDEGREE_Rを設定し直した。
+  // ASPECT_R/PLANET_Rを再調整(2026-09-04、同日中の続き) -- 惑星グリフ
+  // font-size 16->18、度数チップfont-size 12->14に伴い、実測で
+  // グリフ半幅4.96+チップ半幅11.37=16.33(x方向)、グリフ半高15.46+
+  // チップ半高15.05=30.51(y方向、こちらが支配的)だったため、PLANET_R
+  // ⇔DEGREE_R(141固定、目盛りとの分離条件で決まっている)の間隔を
+  // 24->37に拡大する必要があると判明(実測でPLANET_R⇔DEGREE_Rの重なり
+  // 最大252px²を検出)。DEGREE_Rは目盛りとの分離条件で動かせないため、
+  // PLANET_R側を117->104に下げて間隔を確保、ASPECT_Rも095->84へ連動
+  // (PLANET_Rとの間隔20を維持)。
+  const ASPECT_R = 84;
+  const PLANET_R = 104;
+  const DEGREE_R = 141;
+  const STAR_R = 206;
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
   function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, guides = true, showDegrees = true }) {
     if (!showDegrees) {
@@ -3217,7 +3241,7 @@
         t.setAttribute("x", x); t.setAttribute("y", y);
         t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
         t.setAttribute("fill", color);
-        t.setAttribute("font-size", "16");  // 15->16(2026-09-04、「記号や度数は老眼にやさしく見えるようにしてほしい」より)
+        t.setAttribute("font-size", "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)
         t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
         t.textContent = p.g;
         markers.appendChild(t);
@@ -3239,9 +3263,9 @@
     // 際、実測でグリフの高さが約21.2->25.2に増えていたのを見落として
     // いたため、6シナリオの自動チェックで重なりが83〜302px²まで悪化して
     // いるのを発見・修正)。
-    sweepSameTierLabels(glyphItems, 31);  // 22->26->31(2026-09-04、惑星グリフのfont-size 15->16に合わせてさらに引き上げ)
+    sweepSameTierLabels(glyphItems, 35);  // 22->26->31->35(2026-09-04、惑星グリフのfont-size 16->18に合わせてさらに引き上げ)
     const degItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: DEGREE_R }));
-    sweepSameTierLabels(degItems, 38);  // チップ幅(28->33->38、度数文字のfont-size 9->10.5->12に合わせて比例で引き上げ、2026-09-03/09-04)
+    sweepSameTierLabels(degItems, 44);  // チップ幅(28->33->38->44、度数文字のfont-size 9->10.5->12->14に合わせて比例で引き上げ、2026-09-03/09-04)
     const glyphByKey = new Map(glyphItems.map(it => [it.key, it]));
     const degByKey = new Map(degItems.map(it => [it.key, it]));
     const radii = {};
@@ -3253,7 +3277,7 @@
       t.setAttribute("x", x); t.setAttribute("y", y);
       t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
       t.setAttribute("fill", color);
-      t.setAttribute("font-size", "16");  // 15->16(2026-09-04、「記号や度数は老眼にやさしく見えるようにしてほしい」より)
+      t.setAttribute("font-size", "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)
       t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
       t.textContent = p.g;
       markers.appendChild(t);
@@ -3439,7 +3463,7 @@
     // レイアウトに作り直した際に、単一円のグリフ・度数の半径をbaseRadius
     // 由来から固定定数に変更したため)。
     const markerRadii = drawBodyRing(planets, markers, {
-      ringInner: 150, color: "var(--ink)",
+      ringInner: 165, color: "var(--ink)",  // 150->165(7.78、サインリング内周の拡大に連動)
     });
     window.__markerRadii = markerRadii;  // aspect lines anchor to the same (possibly fanned-out) marker position
 
