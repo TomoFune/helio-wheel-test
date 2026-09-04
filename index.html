@@ -2653,26 +2653,14 @@
     const lons = currentDisplayLongitudes();  // main 9 + whichever minor bodies are checked -- see the note by minorBodiesOn
     const aspects = computeAspects(lons);
     const svgNS = "http://www.w3.org/2000/svg";
-    // 各天体のグリフ位置(PLANET_R)から、アスペクト専用の内側の帯
-    // (ASPECT_R)まで短いスポークを1本だけ引く(2026-09-03、「アスペクト
-    // 線が惑星記号に食い込んでいる」の修正、ASPECT_R宣言のコメント参照)
-    // -- 同じ天体が複数のアスペクトを持っていても、スポークは天体ごとに
-    // 1本で足りる(角度が同じなので重複して引く意味がない)。
-    const spokeDrawn = new Set();
-    function drawAspectSpoke(key, color) {
-      if (spokeDrawn.has(key)) return;
-      spokeDrawn.add(key);
-      const [gx, gy] = polar(200, 200, PLANET_R, lons[key]);
-      const [ax, ay] = polar(200, 200, ASPECT_R, lons[key]);
-      const spoke = document.createElementNS(svgNS, "line");
-      spoke.setAttribute("x1", gx); spoke.setAttribute("y1", gy);
-      spoke.setAttribute("x2", ax); spoke.setAttribute("y2", ay);
-      spoke.setAttribute("stroke", "var(--ink-faint)"); spoke.setAttribute("stroke-width", "1");
-      spoke.setAttribute("opacity", "0.4");
-      group.appendChild(spoke);
-    }
+    // スポーク線(惑星グリフ⇔ASPECT_Rを結ぶ短い線)は廃止(2026-09-04、
+    // 「惑星とアスペクトの間に、それらを結ぶ線はいらないと思う」より)。
+    // 7.66でスポークを導入した理由(合に近いアスペクトの弦がPLANET_R
+    // 付近に張り付いて第3の天体のグリフに重なる)自体は、同日中に
+    // ASPECT_Rの間隔を66->86(PLANET_Rとの差40->20)に詰めても、
+    // ASPECT_RがPLANET_Rより十分小さい限り再発しないため、スポークが
+    // なくても実害はない。
     aspects.filter(a => aspectTypesOn.has(a.type)).forEach(a => {
-      drawAspectSpoke(a.a); drawAspectSpoke(a.b);
       const [x1, y1] = polar(200, 200, ASPECT_R, lons[a.a]);
       const [x2, y2] = polar(200, 200, ASPECT_R, lons[a.b]);
       const line = document.createElementNS(svgNS, "line");
@@ -3191,7 +3179,14 @@
   // 帯(半径ASPECT_R)だけで結び、各グリフからはこの帯まで短いスポーク
   // (drawGuideLineと同じ発想)を伸ばす形にして、線の本体がPLANET_Rに
   // 触れないようにした。
-  const ASPECT_R = 66;
+  // 66 -> 86へ(2026-09-04、「惑星とアスペクトの交点とか、無駄な隙間が
+  // いっぱい」より) -- PLANET_R(106)との間隔を40->20単位に詰めた。
+  // スポーク線自体は同日中に廃止(下のdrawAspectSpoke関連コメント参照)
+  // したので、間隔を詰めても「アスペクト線が惑星記号に食い込む」7.66の
+  // 問題(合に近いアスペクトほど弦がPLANET_R付近に張り付き、間に挟まる
+  // 第3の天体に重なる)自体は、ASPECT_RがPLANET_Rより十分小さい限り
+  // 再発しない(半径の絶対差40が必要だったわけではない)。
+  const ASPECT_R = 86;
   const PLANET_R = 106;
   // DEGREE_Rは、PLANET_Rから34単位離す(2026-09-03、実測で判明) --
   // 半径だけ十分離れていれば安全、と思っていたが(24単位で試した)、
@@ -3270,7 +3265,17 @@
       const di = degByKey.get(p.key);
       const [dx, dy] = polar(200, 200, di.r, di.deg);
       drawDegreeChip(markers, dx, dy, p.deg, color);
-      if (guides) drawGuideLine(markers, di.origDeg, ringInner, dx, dy);
+      // 常時表示->ズレた時だけ表示に変更(2026-09-04、「度数とサインの
+      // メモリを指す線は...ただの直線にしてもらえますか」「惑星→度数の
+      // 間は、度数表示と惑星の表示はそんなに離れないと思う。度数から
+      // 直線でメモリの位置を指し示せば、わかりそうな気がする」より)。
+      // 元々は天体ごとに毎回(ズレていなくても)出ていたため線が多く
+      // ゴチャついていた -- 上の惑星グリフ側と同じ「実際にスイープで
+      // ズレた時だけ」の条件に揃えることで、スターゲイザーが合の時だけ
+      // 特別な線を出すのと同じ考え方になり、線の数がグッと減る。
+      if (guides && Math.abs(((di.deg - di.origDeg + 540) % 360) - 180) > 0.5) {
+        drawGuideLine(markers, di.origDeg, ringInner, dx, dy);
+      }
     });
     return radii;
   }
