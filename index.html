@@ -3281,11 +3281,10 @@
       t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
       t.textContent = p.g;
       markers.appendChild(t);
-      // グリフが密な合でsweepにより実際にずれた場合だけガイド線を出す
-      // (普段は動かないので、ほとんどのグリフにはガイド線が出ない)。
-      if (guides && Math.abs(((gi.deg - gi.origDeg + 540) % 360) - 180) > 0.5) {
-        drawGuideLine(markers, gi.origDeg, ringInner, x, y);
-      }
+      // 惑星グリフ自体のガイド線(目盛り⇔惑星)は廃止(2026-09-04、
+      // 「惑星から目盛りへの線、いらないっていったじゃん」より) --
+      // 度数チップ側のガイド線(下)が同じ役目(ズレた時に本来の目盛り
+      // 位置を示す)を既に果たしているため、両方出すと冗長だった。
       const di = degByKey.get(p.key);
       const [dx, dy] = polar(200, 200, di.r, di.deg);
       drawDegreeChip(markers, dx, dy, p.deg, color);
