@@ -432,16 +432,20 @@
   }
   /* font-family追加(2026-09-05、7.75/7.78で円チャート本体だけNoto Sans
      Symbols 2に切り替えていたのを、度数リスト・アスペクト表・凡例にも
-     広げる「③」の対応) -- Noto Sans Symbols 2は記号(♑等)だけを持ち
-     数字・アポストロフィは含まないため、後続のフォールバックへ自動的に
-     譲られる(1つのspan内で記号と数字が混在するformatAstro()/
-     formatSabianDegree()の出力でも、文字ごとに適切なフォントが選ばれる)。 */
+     広げる「③」の対応)。7.81で判明: Noto Sans Symbols 2は数字・アポスト
+     ロフィ用のグリフも実は持っており、狙った通りにフォールバックへ
+     譲られなかった -- formatAstro()/formatSabianDegree()が返す「記号+
+     数字」の1本の文字列に丸ごとこのfont-familyを当てると、数字まで
+     Noto Sans Symbols 2の書体で描画され、以前(Space Mono)と見た目が
+     変わってしまっていた。そのため.legend-degからは外し、サイン記号
+     だけをformatAstro側で個別<span>にラップして直接フォントを当てる
+     方式(.legend-glyphや.conj-body-glyphと同じやり方)に統一した。 */
   .legend-glyph {
     width: 20px; text-align: center; color: var(--accent); flex-shrink: 0;
     font-family: "Noto Sans Symbols 2", sans-serif;
   }
   .legend-name { flex: 1; color: var(--ink); }
-  .legend-deg { color: var(--ink-dim); font-family: "Noto Sans Symbols 2", "Space Mono", "JetBrains Mono", monospace; }
+  .legend-deg { color: var(--ink-dim); font-family: "Space Mono", "JetBrains Mono", monospace; }
   .legend-col-head {
     font-size: 0.78rem; font-weight: 700; color: var(--ink);
     letter-spacing: 0.04em; margin-bottom: 4px; padding-bottom: 4px;
@@ -2545,13 +2549,19 @@
     seasonal: Date.UTC(2026, 5, 21, 8, 19, 19),
   };
 
+  // サイン記号だけをNoto Sans Symbols 2固定のspanで包む -- 数字・°・'を
+  // 同じフォント指定に巻き込むと、そのフォントが持つ数字グリフで描画
+  // されてしまい見た目が変わる(2026-09-05、7.81で発覚)。
+  function signGlyphSpan(g) {
+    return `<span style="font-family:'Noto Sans Symbols 2', sans-serif;">${g}</span>`;
+  }
   function formatAstro(deg) {
     const norm = ((deg % 360) + 360) % 360;
     const signIdx = Math.floor(norm / 30);
     const inSign = norm - signIdx * 30;
     const d = Math.floor(inSign);
     const m = Math.floor((inSign - d) * 60);
-    return SIGNS[signIdx] + d + "°" + String(m).padStart(2, "0") + "'";
+    return signGlyphSpan(SIGNS[signIdx]) + d + "°" + String(m).padStart(2, "0") + "'";
   }
   // サビアン用の数え度数表記(2026-09-01、「サビアンは数え度数表記でい
   // いのでは。その方が字数も少ない?」より) -- サビアンシンボルは伝統的
@@ -2564,7 +2574,7 @@
     const signIdx = Math.floor(norm / 30);
     const inSign = norm - signIdx * 30;
     const counting = Math.min(30, Math.floor(inSign) + 1);
-    return SIGNS[signIdx] + counting + "°";
+    return signGlyphSpan(SIGNS[signIdx]) + counting + "°";
   }
   // Same as formatAstro but without the sign glyph -- used right on the
   // wheel next to each body's marker, where the ring position already
@@ -3707,4 +3717,7 @@
   }, 4500);
 </script>
 
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script><script src="engine.js"></script><script src="wheel_integration.js"></script></body></html>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="engine.js"></script>
+<script src="wheel_integration.js"></script>
+</body></html>
