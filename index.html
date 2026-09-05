@@ -1801,7 +1801,7 @@
     currentPersonName = personRecord.name;
     nType = 'normal';
     tSpecialMoment = null;
-    transitTime = TRANSIT_BASE_TIME;
+    transitTime = Date.now();
     displayMode = 'N';
     document.getElementById('t-eclipse-stepper').style.display = 'none';
     document.querySelectorAll('.display-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.display === 'N'));
@@ -2208,14 +2208,44 @@
     updateBadge();
     updateConjunctionUI();
   }
-  function resetTransitToNow() {
-    transitTime = TRANSIT_BASE_TIME;
+  // 実際にPyodideで「今」の瞬間の主要9天体を計算し、MEAN_MOTION近似の
+  // アンカー(TRANSIT_BASE_TIME/ANCHOR_DATA.transit.normal)を最新化する
+  // -- エンジンが使える環境でだけ実行、失敗しても近似のまま動き続ける
+  // ようフェイルソフトにしてある(2026-09-06、「今」が今にならないバグの
+  // 修正)。
+  async function refreshTransitNowAnchor() {
+    if (!engineAvailable) return;
+    try {
+      await ensureEngineReady();
+      const now = new Date();
+      const lons = await HelioEngine.computeMainLongitudes({
+        year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, day: now.getUTCDate(),
+        hour: now.getUTCHours(), minute: now.getUTCMinutes(), second: now.getUTCSeconds(),
+        tzName: 'UTC', starKey: null,
+      });
+      TRANSIT_BASE_TIME = now.getTime();
+      ANCHOR_DATA.transit.normal = { lons, date: formatUtcMs(TRANSIT_BASE_TIME) };
+    } catch (err) {
+      console.warn('[engine] failed to refresh live transit anchor', err);
+    }
+  }
+  async function resetTransitToNow() {
+    transitTime = Date.now();
     tSpecialMoment = null;
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('t-eclipse-stepper').style.display = 'none';
     if (displayMode !== 'N') buildChart();
     updateBadge();
     updateConjunctionUI();
+    // アンカーを実際に計算し直す(数百ms程度) -- 完了時にまだ「今」を見て
+    // いれば(スクラブ/ジャンプで離れていなければ)、より正確な値で再描画。
+    await refreshTransitNowAnchor();
+    if (displayMode !== 'N' && !tSpecialMoment) {
+      transitTime = Date.now();
+      buildChart();
+      updateBadge();
+      updateConjunctionUI();
+    }
   }
 
   // 7.71: switch要素(度数表示/恒星名表示/アスペクト線/恒星の合)は全部
@@ -2485,8 +2515,21 @@
     mars: 360 / 686.980, jupiter: 360 / 4332.59, saturn: 360 / 10759.22,
     uranus: 360 / 30688.5, neptune: 360 / 60182, pluto: 360 / 90560,
   };
-  const TRANSIT_BASE_TIME = Date.UTC(2026, 7, 28, 12, 0, 0);  // month is 0-indexed: 7 = August
-  let transitTime = TRANSIT_BASE_TIME;
+  // 2026-09-06に発覚したバグの修正: 以前はTRANSIT_BASE_TIME(2026-08-28
+  // 固定)を「今」の意味で使っており、「今」ボタン(resetTransitToNow())も
+  // 単にこの固定値へ戻すだけだった -- 日付が進むほど「今」が過去の
+  // 固定日付のまま動かなくなっていた。TRANSIT_BASE_TIMEはあくまで
+  // MEAN_MOTION_DEG_PER_DAY近似の「起点(アンカー)」であって「今」その
+  // ものではない、という区別を明確にした。実際の「今」は常に
+  // `Date.now()`を使う(下のtransitTime初期値・resetTransitToNow()参照)。
+  // アンカー自体はlet化し、エンジンが使える環境ではrefreshTransitNowAnchor()
+  // が実際にPyodideで「今」を計算してアンカーを最新化する(近似の起点を
+  // 定期的に実時刻へ引き寄せることで、時間が経つほど近似誤差が積み上が
+  // るのも防ぐ) -- エンジンが無い環境(Artifactフォールバック)では、この
+  // 固定アンカーからの近似のままだが、それでも「今」が正しい日付を指す
+  // ことは保証される。
+  let TRANSIT_BASE_TIME = Date.UTC(2026, 7, 28, 12, 0, 0);  // month is 0-indexed: 7 = August
+  let transitTime = Date.now();
   let scrubUnit = 'day';
 
   // N and T are always both "loaded" independently -- each has its own
@@ -3894,7 +3937,21 @@
   // アクティブなので、起動が終わるまでは#person-select-listの「読み込み
   // 中...」表示のまま(wheel_integration.js側のshowBootStatusが進捗を書き
   // 込む)。
-  window.onHelioEngineReady = refreshPeopleList;
+  async function onHelioEngineReadyHandler() {
+    await refreshPeopleList();
+    // 起動完了時点でも「今」のアンカーを一度実計算しておく(2026-09-06、
+    // 「今」が今にならないバグの修正) -- ボタンを押さずTを見ただけでも
+    // 精度の良い値が出るように。既にスクラブ/ジャンプで「今」から離れて
+    // いれば再描画しない。
+    await refreshTransitNowAnchor();
+    if (displayMode !== 'N' && !tSpecialMoment) {
+      transitTime = Date.now();
+      buildChart();
+      updateBadge();
+      updateConjunctionUI();
+    }
+  }
+  window.onHelioEngineReady = onHelioEngineReadyHandler;
   // Artifact/スタンドアロン公開(engine.js/wheel_integration.js未読み込み、
   // Pyodideなし)向けフォールバック -- window.loadの時点でHelioEngineが
   // 定義されていなければ、engine.js自体が読み込まれていない(=単独公開)
