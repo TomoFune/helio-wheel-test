@@ -129,5 +129,131 @@ json.dumps(lons)
     return JSON.parse(json);
   }
 
-  return { boot, computeMainLongitudes };
+  // トランジットの日食/月食ジャンプ用(HANDOFF「②」、2026-09-05)。
+  // utcMsを起点に、直近の(previous)/次の(next)日食・月食の瞬間を実際に
+  // 検索し、その瞬間の主要9天体の黄経も同じ呼び出しで返す -- 固定の
+  // T_SPECIAL_TIMES(2026年8月の1組の日付)しか使えなかったのを、実際に
+  // 計算して前後どちらへも動的にジャンプできるようにする。
+  async function findTransitEclipse(utcMs, kind, direction) {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    pyodide.globals.set("_unix_s", utcMs / 1000);
+    pyodide.globals.set("_kind", kind === "eclipseSolar" ? "solar" : "lunar");
+    pyodide.globals.set("_direction", direction); // "previous" | "next"
+    const json = await pyodide.runPythonAsync(`
+import json
+from astropy.time import Time
+from helio.eclipses import find_previous_eclipse, find_next_eclipse
+from helio.ephemeris import heliocentric_longitudes
+
+t0 = Time(_unix_s, format="unix", scale="utc")
+finder = find_previous_eclipse if _direction == "previous" else find_next_eclipse
+event = finder(t0, _kind)
+lons = heliocentric_longitudes(event.time)
+json.dumps({"lons": lons, "utcMs": event.time.unix * 1000, "moonLatitudeDeg": event.moon_latitude_deg})
+`);
+    return JSON.parse(json);
+  }
+
+  // 出生図の日食図/月食図用(HANDOFF「①」、2026-09-05)。resolve_birth_time
+  // (タイムゾーン込みの現地日時->UTC)からfind_previous_eclipseまでを
+  // 1回のPython呼び出しで完結させる -- CLIの`--mode eclipse-solar`と同じ
+  // 処理(出生時刻より前の直近の日食/月食を探し、その瞬間のヘリオ図を出す)。
+  async function computeNatalEclipseChart({ year, month, day, hour, minute, second = 0, tzName, kind }) {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    pyodide.globals.set("_year", year);
+    pyodide.globals.set("_month", month);
+    pyodide.globals.set("_day", day);
+    pyodide.globals.set("_hour", hour);
+    pyodide.globals.set("_minute", minute);
+    pyodide.globals.set("_second", second);
+    pyodide.globals.set("_tz_name", tzName);
+    pyodide.globals.set("_kind", kind === "eclipseSolar" ? "solar" : "lunar");
+    const json = await pyodide.runPythonAsync(`
+import json
+from helio.time_resolve import resolve_birth_time
+from helio.eclipses import find_previous_eclipse
+from helio.ephemeris import heliocentric_longitudes
+
+resolved = resolve_birth_time(_year, _month, _day, _hour, _minute, _second, tz_name=_tz_name)
+event = find_previous_eclipse(resolved.time, _kind)
+lons = heliocentric_longitudes(event.time)
+json.dumps({"lons": lons, "isoUtc": event.time.isot, "moonLatitudeDeg": event.moon_latitude_deg})
+`);
+    return JSON.parse(json);
+  }
+
+  // ---------- 人物データ(storage.py)のCRUD、HANDOFF「①」 ----------
+  // IDBFSは起動時にsyncIDBFS(true)で一度読み込み済み(bootOnce参照)。
+  // 書き込み系(save/delete)は最後に必ずsyncIDBFS(false)でIndexedDBへ
+  // 書き戻す -- これをしないと、このタブのメモリ上のFSにしか変わらず、
+  // リロードすると保存したはずのデータが消える。
+  async function listPeople() {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    const json = await pyodide.runPythonAsync(`
+import json
+from dataclasses import asdict
+from helio.storage import Storage
+
+with Storage() as store:
+    people = [asdict(p) for p in store.list_people()]
+json.dumps(people, ensure_ascii=False)
+`);
+    return JSON.parse(json);
+  }
+
+  async function savePerson(person) {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    pyodide.globals.set("_id", person.id ?? null);
+    pyodide.globals.set("_name", person.name);
+    pyodide.globals.set("_birth_date", person.birthDate);
+    pyodide.globals.set("_birth_time", person.birthTime ?? null);
+    pyodide.globals.set("_time_unknown", !!person.timeUnknown);
+    pyodide.globals.set("_timezone", person.timezone);
+    pyodide.globals.set("_latitude", person.latitude);
+    pyodide.globals.set("_longitude", person.longitude);
+    pyodide.globals.set("_place_name", person.placeName || "");
+    pyodide.globals.set("_category", person.category || "");
+    pyodide.globals.set("_notes", person.notes || "");
+    const savedId = await pyodide.runPythonAsync(`
+from helio.storage import Storage, Person
+
+with Storage() as store:
+    if _id is None:
+        new_person = Person(
+            id=None, name=_name, birth_date=_birth_date, birth_time=_birth_time,
+            time_unknown=bool(_time_unknown), timezone=_timezone,
+            latitude=_latitude, longitude=_longitude, place_name=_place_name,
+            category=_category, notes=_notes,
+        )
+        result_id = store.add_person(new_person)
+    else:
+        store.update_person(
+            _id, name=_name, birth_date=_birth_date, birth_time=_birth_time,
+            time_unknown=int(bool(_time_unknown)), timezone=_timezone,
+            latitude=_latitude, longitude=_longitude, place_name=_place_name,
+            category=_category, notes=_notes,
+        )
+        result_id = _id
+result_id
+`);
+    await syncIDBFS(false);
+    return savedId;
+  }
+
+  async function deletePerson(id) {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    pyodide.globals.set("_id", id);
+    await pyodide.runPythonAsync(`
+from helio.storage import Storage
+
+with Storage() as store:
+    store.delete_person(_id)
+`);
+    await syncIDBFS(false);
+  }
+
+  return {
+    boot, computeMainLongitudes, findTransitEclipse, computeNatalEclipseChart,
+    listPeople, savePerson, deletePerson,
+  };
 })();

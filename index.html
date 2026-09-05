@@ -1,5 +1,4 @@
-<!doctype html><html>
-<meta charset="utf-8">
+<!doctype html><html><meta charset="utf-8">
 <!-- viewport meta追加(2026-09-03、「スマホ版が、ひどかったです」より) --
      Artifact版はホスト側のフレームが独自にviewportメタを注入してくれて
      いた(Browser paneでの検証で問題が出なかったのはそのため)が、単体の
@@ -1123,28 +1122,11 @@
       <h1 style="font-size:1.5rem; margin-top:6px;">だれの図を見ますか</h1>
       <p class="lead">保存済みの人物を選ぶか、その場で日時を入力してすぐに図を出せます。</p>
 
-      <div class="person-list">
-        <button class="person-card" onclick="selectPerson('サンプル花子', '1990-06-15 09:30 ・ 東京都')">
-          <div class="person-avatar"></div>
-          <div class="person-meta">
-            <div class="person-name">サンプル花子</div>
-            <div class="person-detail">1990-06-15 09:30 ・ 東京都</div>
-            <div class="person-tags"><span class="tag">サンプル</span></div>
-          </div>
-          <span class="chevron">›</span>
-        </button>
-        <button class="person-card" onclick="selectPerson('アインシュタイン', '1879-03-14 ・ 出生時刻不明')">
-          <div class="person-avatar" style="background: conic-gradient(from 40deg, var(--ring-b), var(--accent-soft), var(--ring-b));"></div>
-          <div class="person-meta">
-            <div class="person-name">アインシュタイン</div>
-            <div class="person-detail">1879-03-14 ・ 出生時刻不明(正午で近似)</div>
-            <div class="person-tags"><span class="tag">偉人</span></div>
-          </div>
-          <span class="chevron">›</span>
-        </button>
+      <div class="person-list" id="person-select-list">
+        <div class="person-detail" style="padding:14px 4px;">読み込み中...</div>
       </div>
 
-      <button class="quick-entry-btn" onclick="selectPerson('新規入力', 'その場で入力した日時')">+ 保存せず、その場で日時を入力する</button>
+      <button class="quick-entry-btn" onclick="openPersonEdit(null)">+ 保存せず、その場で日時を入力する</button>
 
       <div class="section-label">その他</div>
       <button class="person-card" onclick="showView('person-manage')">
@@ -1395,6 +1377,13 @@
           <button class="seg-btn" onclick="jumpTTo('eclipseLunar', this)">月食</button>
           <button class="seg-btn" onclick="jumpTTo('seasonal', this)">四季(夏至)</button>
         </div>
+        <!-- 日食/月食は実際に検索して求めた瞬間へジャンプする(2026-09-05、
+             「ちゃんと計算して実装できるようにしましょう」より、HANDOFF
+             「②」)。ジャンプ後はここでさらに前後の日食/月食へ移動できる。 -->
+        <div id="t-eclipse-stepper" style="display:none; align-items:center; justify-content:center; gap:10px; margin-top:10px;">
+          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(-1)">‹ 前の日食/月食</button>
+          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(1)">次の日食/月食 ›</button>
+        </div>
         <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので日食/月食の表示は消えます</p>
       </div>
     </div>
@@ -1544,29 +1533,10 @@
     </div>
     <div class="screen-pad">
       <div class="pm-toolbar">
-        <span style="font-size: 0.86rem; color:var(--ink-faint);">2人 登録済み</span>
+        <span style="font-size: 0.86rem; color:var(--ink-faint);" id="pm-count">0人 登録済み</span>
         <button class="add-btn" onclick="openPersonEdit(null)">+ 新規追加</button>
       </div>
-      <div class="person-list">
-        <div class="person-card" style="cursor:default;">
-          <div class="person-avatar"></div>
-          <div class="person-meta">
-            <div class="person-name">サンプル花子</div>
-            <div class="person-detail">1990-06-15 09:30 ・ 東京都</div>
-            <div class="person-tags"><span class="tag">サンプル</span></div>
-          </div>
-          <span class="chevron" style="font-size:0.9rem; cursor:pointer;" onclick="openPersonEdit(0)">✎</span>
-        </div>
-        <div class="person-card" style="cursor:default;">
-          <div class="person-avatar" style="background: conic-gradient(from 40deg, var(--ring-b), var(--accent-soft), var(--ring-b));"></div>
-          <div class="person-meta">
-            <div class="person-name">アインシュタイン</div>
-            <div class="person-detail">1879-03-14 ・ 出生時刻不明</div>
-            <div class="person-tags"><span class="tag">偉人</span></div>
-          </div>
-          <span class="chevron" style="font-size:0.9rem; cursor:pointer;" onclick="openPersonEdit(1)">✎</span>
-        </div>
-      </div>
+      <div class="person-list" id="person-manage-list"></div>
     </div>
   </div>
 
@@ -1574,9 +1544,10 @@
        storage.pyのPersonとほぼ1対1のフィールド(name/birth_date/birth_time/
        time_unknown/timezone/latitude/longitude/place_name/category/notes)。
        アストロゴールドのEdit Chart画面を参考にした項目立て(2026-08-30)。
-       このモックアップは架空データのみなので「保存」は実際には永続化せず、
-       トーストを出して一覧に戻るだけ -- 本物のUIとエンジンを繋ぐ作業で
-       実際にstorage.pyへ保存する処理に差し替える想定。 -->
+       2026-09-05(HANDOFF「①」)、実際にPyodide経由でstorage.pyへ保存する
+       処理に差し替えた -- 「保存して図を見る」は本当に永続化し、「保存
+       せず、今だけ図を見る」はDBに書かずその場の入力値だけで図を計算する
+       (旧「+ 保存せず、その場で日時を入力する」ボタンの実装先もここ)。 -->
   <div class="view" id="view-person-edit">
     <div class="subnav">
       <button class="back-btn" onclick="showView('person-manage')">←</button>
@@ -1615,7 +1586,7 @@
         <input type="text" id="pe-lon" class="pe-input" placeholder="経度 (例: 139.70)">
       </div>
 
-      <span class="field-label" style="margin-top:8px;">タイムゾーン</span>
+      <span class="field-label" style="margin-top:8px;">タイムゾーン<span id="pe-tz-auto" style="font-weight:normal; color:var(--ink-faint);"></span></span>
       <input type="text" id="pe-tz" class="pe-input" placeholder="例: Asia/Tokyo">
 
       <span class="field-label" style="margin-top:18px;">分類</span>
@@ -1624,7 +1595,9 @@
       <span class="field-label" style="margin-top:18px;">メモ</span>
       <textarea id="pe-notes" class="pe-input pe-textarea" placeholder="自由に記入"></textarea>
 
-      <button class="add-btn" style="width:100%; justify-content:center; margin-top:26px; padding:14px; font-size:0.88rem;" onclick="savePersonEdit()">保存</button>
+      <button class="add-btn" style="width:100%; justify-content:center; margin-top:26px; padding:14px; font-size:0.88rem;" onclick="savePersonEdit(true)">保存して図を見る</button>
+      <button class="add-btn" style="width:100%; justify-content:center; margin-top:10px; padding:14px; font-size:0.88rem; background:var(--bg-sunken); color:var(--ink);" onclick="savePersonEdit(false)">保存せず、今だけ図を見る</button>
+      <button id="pe-delete-btn" style="width:100%; justify-content:center; margin-top:20px; padding:10px; font-size:0.82rem; color:#c0392b; background:none; border:none; cursor:pointer; display:none;" onclick="deletePersonEdit()">この人物を削除</button>
     </div>
   </div>
 
@@ -1681,72 +1654,294 @@
     closeAllPanels();
   }
 
-  // ---------- person add/edit (storage.py Person fields) ----------
-  // Matches the real Person dataclass 1:1 (name/birth_date/birth_time/
-  // time_unknown/timezone/latitude/longitude/place_name/category/notes).
-  // Field layout follows AstroGoldのEdit Chart画面(2026-08-30の相談で確認)。
-  // "保存" doesn't actually persist anything -- this mockup has no real
-  // backing store (see the person-list's own hardcoded HTML) -- it just
-  // proves out the form, matching this file's existing scope everywhere
-  // else (real persistence happens once this UI is wired to the real
-  // engine/storage.py).
-  const EXAMPLE_PEOPLE = [
-    { name: "サンプル花子", year: 1990, month: 6, day: 15, timeUnknown: false, hour: 9, minute: 30,
-      place: "東京都", lat: "35.68", lon: "139.65", tz: "Asia/Tokyo", category: "サンプル", notes: "" },
-    { name: "アインシュタイン", year: 1879, month: 3, day: 14, timeUnknown: true, hour: 12, minute: 0,
-      place: "ドイツ ウルム", lat: "48.40", lon: "9.99", tz: "Europe/Berlin", category: "偉人", notes: "" },
+  // ---------- person management: real storage.py CRUD over Pyodide ----------
+  // (2026-09-05、HANDOFF「①」) storage.pyのPersonとほぼ1対1(name/
+  // birth_date/birth_time/time_unknown/timezone/latitude/longitude/
+  // place_name/category/notes)。人物一覧はもうハードコードのHTMLでは
+  // なく、engine.js経由のHelioEngine.listPeople()から毎回組み立てる。
+  // 初回起動(DBが空)だけ、以前このモックアップに埋め込まれていた2人
+  // (サンプル花子・アインシュタイン)をそのまま実データとしてseedする
+  // -- 配布テストで見た目が変わらないようにするため。
+  let people = [];
+  let currentPersonId = null;
+  let currentPersonName = '';
+  let editingPersonId = null;
+  // Pyodide(HelioEngine)はArtifact/スタンドアロン公開では動かせない
+  // (CDN許可リストにpyodideの実行時fetchが含まれないため、2026-09-05に
+  // 判明) -- engine.js/wheel_integration.jsが読み込まれていない環境では
+  // 静的なプレースホルダー(以前のREF_LONGITUDES/ANCHOR_DATAの初期値、
+  // サンプル花子のもの)のまま人物選択・閲覧だけできるようにし、追加/
+  // 編集/削除・日食/月食の動的検索は「Pyodide版でのみ利用可」と案内する
+  // (window.addEventListener('load', ...)以下、ファイル末尾付近を参照)。
+  let engineAvailable = true;
+  const GCS_STAR_KEYS = ['sirius', 'arcturus', 'antares', 'alcyone', 'thuban', 'orion_belt', 'big_dipper', 'andromeda_galaxy'];
+  const SEED_PEOPLE = [
+    { name: "サンプル花子", birthDate: "1990-06-15", birthTime: "09:30:00", timeUnknown: false,
+      timezone: "Asia/Tokyo", latitude: 35.68, longitude: 139.65, placeName: "東京都", category: "サンプル", notes: "" },
+    { name: "アインシュタイン", birthDate: "1879-03-14", birthTime: null, timeUnknown: true,
+      timezone: "Europe/Berlin", latitude: 48.40, longitude: 9.99, placeName: "ドイツ ウルム", category: "偉人", notes: "" },
   ];
-  function updatePersonEditTimeState() {
-    const unknown = document.getElementById('pe-time-unknown-switch').classList.contains('on');
-    document.getElementById('pe-hour').disabled = unknown;
-    document.getElementById('pe-minute').disabled = unknown;
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
-  function openPersonEdit(index) {
-    const isNew = index === null;
-    document.getElementById('person-edit-title').textContent = isNew ? '人物を追加' : '人物を編集';
-    const p = isNew ? null : EXAMPLE_PEOPLE[index];
-    document.getElementById('pe-name').value = p ? p.name : '';
-    document.getElementById('pe-year').value = p ? p.year : '';
-    document.getElementById('pe-month').value = p ? p.month : '';
-    document.getElementById('pe-day').value = p ? p.day : '';
-    document.getElementById('pe-hour').value = p ? p.hour : '';
-    document.getElementById('pe-minute').value = p ? p.minute : '';
-    document.getElementById('pe-place').value = p ? p.place : '';
-    document.getElementById('pe-lat').value = p ? p.lat : '';
-    document.getElementById('pe-lon').value = p ? p.lon : '';
-    document.getElementById('pe-tz').value = p ? p.tz : 'Asia/Tokyo';
-    document.getElementById('pe-category').value = p ? p.category : '';
-    document.getElementById('pe-notes').value = p ? p.notes : '';
-    const timeUnknownSwitch = document.getElementById('pe-time-unknown-switch');
-    timeUnknownSwitch.classList.toggle('on', !!(p && p.timeUnknown));
-    updatePersonEditTimeState();
-    showView('person-edit');
+  function personCardMetaHtml(p) {
+    const timePart = p.time_unknown ? '出生時刻不明(正午で近似)' : (p.birth_time || '').slice(0, 5);
+    const detail = `${p.birth_date}${timePart ? ' ' + timePart : ''} ・ ${p.place_name || p.timezone}`;
+    const avatarStyle = p.category === '偉人' ? ' style="background: conic-gradient(from 40deg, var(--ring-b), var(--accent-soft), var(--ring-b));"' : '';
+    return `<div class="person-avatar"${avatarStyle}></div>
+      <div class="person-meta">
+        <div class="person-name">${escapeHtml(p.name)}</div>
+        <div class="person-detail">${escapeHtml(detail)}</div>
+        <div class="person-tags">${p.category ? `<span class="tag">${escapeHtml(p.category)}</span>` : ''}</div>
+      </div>`;
   }
-  function savePersonEdit() {
-    const name = document.getElementById('pe-name').value.trim() || '(名前未入力)';
+  function renderPersonLists() {
+    const selectList = document.getElementById('person-select-list');
+    if (selectList) {
+      selectList.innerHTML = people.length
+        ? people.map(p => `<button class="person-card" onclick="selectPerson(${p.id})">${personCardMetaHtml(p)}<span class="chevron">›</span></button>`).join('')
+        : '<div class="person-detail" style="padding:14px 4px;">まだ登録がありません。「人物データを管理」から追加できます。</div>';
+    }
+    const manageList = document.getElementById('person-manage-list');
+    if (manageList) {
+      manageList.innerHTML = people.map(p => `<div class="person-card" style="cursor:default;">${personCardMetaHtml(p)}<span class="chevron" style="font-size:0.9rem; cursor:pointer;" onclick="openPersonEdit(${p.id})">✎</span></div>`).join('');
+    }
+    const countEl = document.getElementById('pm-count');
+    if (countEl) countEl.textContent = `${people.length}人 登録済み`;
+  }
+  async function ensureEngineReady() {
+    if (!engineAvailable) {
+      throw new Error('この機能はPyodide版(GitHub Pages/ローカル起動)でのみ利用できます');
+    }
+    await HelioEngine.boot();
+  }
+  async function refreshPeopleList() {
+    await ensureEngineReady();
+    people = await HelioEngine.listPeople();
+    if (people.length === 0) {
+      for (const p of SEED_PEOPLE) await HelioEngine.savePerson(p);
+      people = await HelioEngine.listPeople();
+    }
+    renderPersonLists();
+  }
+
+  function showPeToast(msg) {
     const n = document.getElementById('pe-toast');
-    n.textContent = `「${name}」を保存しました(モックアップのため実際には保存されません)`;
+    n.textContent = msg;
     n.style.opacity = '0.88';
     clearTimeout(window.__peToastTimer);
     window.__peToastTimer = setTimeout(() => { n.style.opacity = '0'; }, 2600);
-    showView('person-manage');
+  }
+  function formatUtcMs(ms) {
+    const d = new Date(ms);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
   }
 
-  let currentPersonName = 'サンプル花子';
-  function selectPerson(name, detail) {
-    currentPersonName = name;
+  // 選択中の人物の本物の出生図データをPyodideで実際に計算し、REF_LONGITUDES
+  // (主要9天体、トロピカル+全GCS起点)とANCHOR_DATA.natal(通常/日食図/月食図)
+  // を丸ごと差し替える -- wheel_integration.js旧loadRealNatalData()を
+  // 「起動時に1回だけ・サンプル花子固定」から「人物選択のたびに・その人物の
+  // データで」実行できるよう一般化したもの。小惑星・準惑星(NATAL_MINOR)と
+  // 恒星・銀河との合(CATALOG_STARS)は、既知の別課題(前者はJPL Horizonsへの
+  // ネット接続が必要、後者はまだ固定カタログのまま)のため今回は対象外 --
+  // 引き続きサンプル花子の値を暫定的に使い回す(以前からの制約であり、今回
+  // 新たに悪化したものではない)。
+  async function applyPersonNatalData(person) {
+    if (!engineAvailable) {
+      // フォールバック中はREF_LONGITUDES/ANCHOR_DATA.natalの初期値
+      // (サンプル花子の実データ)をそのまま使う -- 何もしない。
+      return;
+    }
+    await ensureEngineReady();
+    const [y, m, d] = person.birth_date.split('-').map(Number);
+    let hour = 12, minute = 0, second = 0;
+    if (!person.time_unknown && person.birth_time) {
+      const parts = person.birth_time.split(':').map(Number);
+      hour = parts[0] || 0; minute = parts[1] || 0; second = parts[2] || 0;
+    }
+    const base = { year: y, month: m, day: d, hour, minute, second, tzName: person.timezone };
+
+    try {
+      REF_LONGITUDES.tropical = await HelioEngine.computeMainLongitudes({ ...base, starKey: null });
+      for (const key of GCS_STAR_KEYS) {
+        try {
+          REF_LONGITUDES[key] = await HelioEngine.computeMainLongitudes({ ...base, starKey: key });
+        } catch (err) {
+          console.warn('[engine] failed to compute star origin', key, err);
+        }
+      }
+      for (const refKey of Object.keys(REF_LONGITUDES)) {
+        if (refKey === 'tropical') continue;
+        REF_TROPICAL_LON[refKey] = ((REF_LONGITUDES.tropical.mercury - REF_LONGITUDES[refKey].mercury) % 360 + 360) % 360;
+      }
+    } catch (err) {
+      console.error('[engine] failed to compute natal longitudes', err);
+      showPeToast('出生図の計算に失敗しました');
+    }
+
+    const timeLabel = person.time_unknown
+      ? '時刻不明(正午で近似)'
+      : `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+    ANCHOR_DATA.natal.normal.date = `${person.birth_date} ${timeLabel} (${person.timezone})`;
+
+    for (const kind of ['eclipseSolar', 'eclipseLunar']) {
+      try {
+        const r = await HelioEngine.computeNatalEclipseChart({ ...base, kind });
+        ANCHOR_DATA.natal[kind] = { lons: r.lons, date: r.isoUtc.replace('T', ' ') + ' UTC' };
+        N_TYPE_EPOCH_MS[kind] = Date.parse(r.isoUtc + 'Z');
+      } catch (err) {
+        console.warn('[engine] natal eclipse search failed for', kind, err);
+      }
+    }
+  }
+
+  async function showChartForPerson(personRecord) {
+    currentPersonId = personRecord.id;
+    currentPersonName = personRecord.name;
     nType = 'normal';
     tSpecialMoment = null;
     transitTime = TRANSIT_BASE_TIME;
     displayMode = 'N';
+    document.getElementById('t-eclipse-stepper').style.display = 'none';
     document.querySelectorAll('.display-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.display === 'N'));
     document.getElementById('menu-mode-label').textContent = DISPLAY_MODE_LABELS.N;
     document.querySelectorAll('#n-type-segmented .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'normal'));
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     showView('chart');
+    document.getElementById('badge-line1').textContent = `${personRecord.name}(計算中...)`;
+    await applyPersonNatalData(personRecord);
     updateControlAvailability();
     buildChart();
     updateBadge();
+  }
+  async function selectPerson(personId) {
+    const person = people.find(p => p.id === personId);
+    if (!person) return;
+    await showChartForPerson(person);
+  }
+
+  // ---------- person add/edit/delete ----------
+  function updatePersonEditTimeState() {
+    const unknown = document.getElementById('pe-time-unknown-switch').classList.contains('on');
+    document.getElementById('pe-hour').disabled = unknown;
+    document.getElementById('pe-minute').disabled = unknown;
+  }
+  // 緯度経度からタイムゾーンを自動判定(app.jsの`tz-lookup`ライブラリと同じ
+  // 仕組み -- Pyodide側のtimezonefinderはh3のWASM非対応でスタブ止まりの
+  // ため、JS側でtz-lookupを使い、明示的なtz_nameとして渡す設計)。
+  function wirePersonEditTzAutofill() {
+    const latEl = document.getElementById('pe-lat');
+    const lonEl = document.getElementById('pe-lon');
+    const tzEl = document.getElementById('pe-tz');
+    const autoNoteEl = document.getElementById('pe-tz-auto');
+    function recompute() {
+      const lat = parseFloat(latEl.value);
+      const lon = parseFloat(lonEl.value);
+      if (Number.isNaN(lat) || Number.isNaN(lon) || typeof tzlookup !== 'function') return;
+      try {
+        tzEl.value = tzlookup(lat, lon);
+        autoNoteEl.textContent = '(緯度経度から自動判定)';
+      } catch (err) {
+        autoNoteEl.textContent = '(自動判定できませんでした -- 手入力してください)';
+      }
+    }
+    latEl.addEventListener('change', recompute);
+    lonEl.addEventListener('change', recompute);
+  }
+  function openPersonEdit(id) {
+    editingPersonId = id;
+    const isNew = id === null;
+    document.getElementById('person-edit-title').textContent = isNew ? '人物を追加' : '人物を編集';
+    document.getElementById('pe-delete-btn').style.display = isNew ? 'none' : '';
+    document.getElementById('pe-tz-auto').textContent = '';
+    const p = isNew ? null : people.find(x => x.id === id);
+    document.getElementById('pe-name').value = p ? p.name : '';
+    const [py, pm, pd] = p ? p.birth_date.split('-') : ['', '', ''];
+    document.getElementById('pe-year').value = py;
+    document.getElementById('pe-month').value = pm ? String(Number(pm)) : '';
+    document.getElementById('pe-day').value = pd ? String(Number(pd)) : '';
+    const [ph, pmin] = p && p.birth_time ? p.birth_time.split(':') : ['', ''];
+    document.getElementById('pe-hour').value = ph ? String(Number(ph)) : '';
+    document.getElementById('pe-minute').value = pmin ? String(Number(pmin)) : '';
+    document.getElementById('pe-place').value = p ? p.place_name : '';
+    document.getElementById('pe-lat').value = p ? p.latitude : '';
+    document.getElementById('pe-lon').value = p ? p.longitude : '';
+    document.getElementById('pe-tz').value = p ? p.timezone : 'Asia/Tokyo';
+    document.getElementById('pe-category').value = p ? p.category : '';
+    document.getElementById('pe-notes').value = p ? p.notes : '';
+    const timeUnknownSwitch = document.getElementById('pe-time-unknown-switch');
+    timeUnknownSwitch.classList.toggle('on', !!(p && p.time_unknown));
+    updatePersonEditTimeState();
+    showView('person-edit');
+  }
+  function readPersonEditForm() {
+    const name = document.getElementById('pe-name').value.trim();
+    const year = parseInt(document.getElementById('pe-year').value, 10);
+    const month = parseInt(document.getElementById('pe-month').value, 10);
+    const day = parseInt(document.getElementById('pe-day').value, 10);
+    const timeUnknown = document.getElementById('pe-time-unknown-switch').classList.contains('on');
+    const lat = parseFloat(document.getElementById('pe-lat').value);
+    const lon = parseFloat(document.getElementById('pe-lon').value);
+    const tz = document.getElementById('pe-tz').value.trim();
+    if (!name || !year || !month || !day || Number.isNaN(lat) || Number.isNaN(lon) || !tz) return null;
+    const birthDate = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    let birthTime = null;
+    if (!timeUnknown) {
+      const hour = parseInt(document.getElementById('pe-hour').value, 10) || 0;
+      const minute = parseInt(document.getElementById('pe-minute').value, 10) || 0;
+      birthTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    }
+    return {
+      id: editingPersonId, name, birthDate, birthTime, timeUnknown,
+      timezone: tz, latitude: lat, longitude: lon,
+      placeName: document.getElementById('pe-place').value.trim(),
+      category: document.getElementById('pe-category').value.trim(),
+      notes: document.getElementById('pe-notes').value,
+    };
+  }
+  async function savePersonEdit(persist) {
+    const form = readPersonEditForm();
+    if (!form) {
+      showPeToast('名前・生年月日・緯度経度・タイムゾーンは必須です');
+      return;
+    }
+    try {
+      await ensureEngineReady();
+    } catch (err) {
+      showPeToast(err.message || 'エラーが発生しました');
+      return;
+    }
+    let personRecord;
+    if (persist) {
+      const savedId = await HelioEngine.savePerson(form);
+      people = await HelioEngine.listPeople();
+      renderPersonLists();
+      personRecord = people.find(p => p.id === savedId);
+      showPeToast(`「${form.name}」を保存しました`);
+    } else {
+      personRecord = {
+        id: null, name: form.name, birth_date: form.birthDate, birth_time: form.birthTime,
+        time_unknown: form.timeUnknown, timezone: form.timezone,
+        latitude: form.latitude, longitude: form.longitude,
+        place_name: form.placeName, category: form.category, notes: form.notes,
+      };
+    }
+    await showChartForPerson(personRecord);
+  }
+  async function deletePersonEdit() {
+    if (editingPersonId === null) return;
+    try {
+      await ensureEngineReady();
+    } catch (err) {
+      showPeToast(err.message || 'エラーが発生しました');
+      return;
+    }
+    await HelioEngine.deletePerson(editingPersonId);
+    people = await HelioEngine.listPeople();
+    renderPersonLists();
+    showPeToast('削除しました');
+    showView('person-manage');
   }
 
   // ---------- display mode (N / T / biwheel) + N-type + T-type ----------
@@ -1814,14 +2009,62 @@
     updateControlAvailability();
     if (displayMode !== 'T') { buildChart(); updateBadge(); }
   }
-  function jumpTTo(special, btn) {
+  // 日食/月食は実際に検索して求める(2026-09-05、HANDOFF「②」)。四季図
+  // (夏至)は今回のスコープ外のため、引き続き固定のT_SPECIAL_TIMES.seasonal
+  // を使う(元々の「あとでやる」保留対象は日食/月食のみだったため)。
+  async function jumpTTo(special, btn) {
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    tSpecialMoment = special;
-    transitTime = T_SPECIAL_TIMES[special];
+    const stepper = document.getElementById('t-eclipse-stepper');
+    if (special === 'seasonal') {
+      tSpecialMoment = special;
+      transitTime = T_SPECIAL_TIMES[special];
+      stepper.style.display = 'none';
+    } else {
+      btn.disabled = true;
+      try {
+        await ensureEngineReady();
+        const result = await HelioEngine.findTransitEclipse(transitTime, special, 'previous');
+        ANCHOR_DATA.transit[special] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
+        tSpecialMoment = special;
+        transitTime = result.utcMs;
+        stepper.style.display = 'flex';
+      } catch (err) {
+        console.error('[engine] transit eclipse search failed', err);
+        showPeToast(err.message || '日食/月食の検索に失敗しました');
+        btn.disabled = false;
+        return;
+      }
+      btn.disabled = false;
+    }
     if (displayMode !== 'N') buildChart();
     updateBadge();
     updateConjunctionUI();
+  }
+  // ‹/›: 今ジャンプしている日食/月食から、さらに前/次を検索する。ちょうど
+  // その瞬間そのものから1日ずらして探索を始める(浮動小数点誤差でその瞬間
+  // 自体を「次の交差」と誤検出しないための安全マージン、eclipses.pyの
+  // _find_syzygy自体はstrictly before/after保証だが念のため)。
+  async function stepTEclipse(direction) {
+    if (!tSpecialMoment || tSpecialMoment === 'seasonal') return;
+    const kind = tSpecialMoment;
+    const stepper = document.getElementById('t-eclipse-stepper');
+    stepper.style.pointerEvents = 'none';
+    try {
+      await ensureEngineReady();
+      const searchFrom = transitTime + direction * 86400000;
+      const result = await HelioEngine.findTransitEclipse(searchFrom, kind, direction > 0 ? 'next' : 'previous');
+      ANCHOR_DATA.transit[kind] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
+      transitTime = result.utcMs;
+      if (displayMode !== 'N') buildChart();
+      updateBadge();
+      updateConjunctionUI();
+    } catch (err) {
+      console.error('[engine] transit eclipse step failed', err);
+      showPeToast(err.message || '日食/月食の検索に失敗しました');
+    } finally {
+      stepper.style.pointerEvents = '';
+    }
   }
   function formatTransitTime() {
     const d = new Date(transitTime);
@@ -1937,6 +2180,7 @@
     if (tSpecialMoment) {
       tSpecialMoment = null;
       document.querySelectorAll('#t-jump-segmented .seg-btn').forEach((b) => b.classList.remove('active'));
+      document.getElementById('t-eclipse-stepper').style.display = 'none';
     }
     if (displayMode !== 'N') buildChart();
     updateBadge();
@@ -1958,6 +2202,7 @@
     if (tSpecialMoment) {
       tSpecialMoment = null;
       document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('t-eclipse-stepper').style.display = 'none';
     }
     if (displayMode !== 'N') buildChart();
     updateBadge();
@@ -1967,6 +2212,7 @@
     transitTime = TRANSIT_BASE_TIME;
     tSpecialMoment = null;
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('t-eclipse-stepper').style.display = 'none';
     if (displayMode !== 'N') buildChart();
     updateBadge();
     updateConjunctionUI();
@@ -2205,16 +2451,16 @@
     ceres: 130.602188, pallas: 71.406816, juno: 232.6101, vesta: 16.30325,
     chiron: 108.041235, eris: 16.952841, lilith_asteroid: 295.24316,
   };
-  // Real longitudes for every (基準点=anchor) x (種類=chart type) combination
-  // this mockup offers, all from the real helio-app CLI/eclipses.py/a quick
-  // Earth-heliocentric-longitude-crosses-a-multiple-of-90 root-finder for
-  // 四季図 (equinox/solstice: Earth's heliocentric longitude is always
-  // exactly 180 deg from the geocentric tropical Sun by construction, so
-  // Earth_helio=180/270/0/90 <-> geocentric Sun at 0/90/180/270 <-> spring
-  // equinox/summer solstice/autumn equinox/winter solstice). The star-
-  // reference picker only applies to natal+normal (REF_LONGITUDES above);
-  // every other cell here is tropical-only, a scope simplification for
-  // this discussion prototype, not a real-app limitation.
+  // 初期値はサンプル花子のCLI計算値(以前と同じ、人物一覧の読み込みが
+  // 終わるまでの一時的なプレースホルダー)。2026-09-05(HANDOFF「①②」)
+  // 以降、natal.normal/eclipseSolar/eclipseLunarはapplyPersonNatalData()
+  // が選択中の人物のデータで、transit.eclipseSolar/eclipseLunarはjumpTTo()/
+  // stepTEclipse()がその都度実際に検索した瞬間のデータで、それぞれ丸ごと
+  // 上書きする -- ここにある数値は「まだ誰も選ばれていない/まだジャンプ
+  // していない」間だけの初期値。natal.seasonalとtransit.seasonalは今回の
+  // スコープ外(四季図の動的検索は別課題として保留中)で、transit.seasonalの
+  // 数値のみ引き続き使う。星起点(REF_LONGITUDES)はnatal.normalのみ対応、
+  // それ以外のセルはトロピカルのみ(元々のスコープ限定、変更なし)。
   const ANCHOR_DATA = {
     natal: {
       normal:       { lons: null /* uses REF_LONGITUDES[currentRef] instead */, date: "1990-06-15 09:30:00 (Asia/Tokyo)" },
@@ -2543,9 +2789,10 @@
   // scrub away from it clears the label -- you can't be "at the eclipse"
   // and also somewhere else at the same time.
   let tSpecialMoment = null;
+  // 日食/月食は2026-09-05にjumpTTo()側で実際に検索するよう変更したため、
+  // ここには残さない(固定日付のまま放置すると紛らわしいため削除) --
+  // 四季図(夏至)だけ今回のスコープ外で、引き続きこの固定値を使う。
   const T_SPECIAL_TIMES = {
-    eclipseSolar: Date.UTC(2026, 7, 12, 17, 36, 45),
-    eclipseLunar: Date.UTC(2026, 7, 28, 4, 18, 32),
     seasonal: Date.UTC(2026, 5, 21, 8, 19, 19),
   };
 
@@ -3641,6 +3888,32 @@
   updateWheelDegreeVisibility();
   buildChart();
   updateBadge();
+  wirePersonEditTzAutofill();
+  // wheel_integration.jsがHelioEngine.boot()完了後にこれを呼ぶ -- 人物一覧
+  // (storage.py経由)をここで初めて読み込む。person-selectビューは既定で
+  // アクティブなので、起動が終わるまでは#person-select-listの「読み込み
+  // 中...」表示のまま(wheel_integration.js側のshowBootStatusが進捗を書き
+  // 込む)。
+  window.onHelioEngineReady = refreshPeopleList;
+  // Artifact/スタンドアロン公開(engine.js/wheel_integration.js未読み込み、
+  // Pyodideなし)向けフォールバック -- window.loadの時点でHelioEngineが
+  // 定義されていなければ、engine.js自体が読み込まれていない(=単独公開)
+  // と判断し、ここで初めて静的なデフォルト値(サンプル花子/アインシュ
+  // タインの2人)を人物一覧に出す。engine.js側は同期的にHelioEngine定数
+  // を定義するだけなので、window.load時点で存在するかどうかで判定できる
+  // (boot()の完了を待つ必要はない)。
+  window.addEventListener('load', () => {
+    if (typeof HelioEngine === 'undefined') {
+      engineAvailable = false;
+      people = SEED_PEOPLE.map((p, i) => ({
+        id: -(i + 1), name: p.name, birth_date: p.birthDate, birth_time: p.birthTime,
+        time_unknown: p.timeUnknown, timezone: p.timezone,
+        latitude: p.latitude, longitude: p.longitude,
+        place_name: p.placeName, category: p.category, notes: p.notes,
+      }));
+      renderPersonLists();
+    }
+  });
 
   // .wheel-wrapの実サイズが変わったら再描画(2026-09-03、「ちょっとはみ
   // 出た」より -- 実機で起点ラベル「アルクトゥルス」の先頭1文字がウィン
@@ -3717,6 +3990,8 @@
   }, 4500);
 </script>
 
+
+<script src="https://cdn.jsdelivr.net/npm/tz-lookup@6.1.25/tz.js"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
 <script src="engine.js"></script>
 <script src="wheel_integration.js"></script>

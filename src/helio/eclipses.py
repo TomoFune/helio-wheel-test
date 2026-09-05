@@ -74,33 +74,36 @@ def _phase_diff_at(t: Time, target_deg: float) -> float:
     return _wrapped_phase_diff(elongation, target_deg)
 
 
-def _find_syzygy_before(t0: Time, target_deg: float) -> Time:
+def _find_syzygy(t0: Time, target_deg: float, *, direction: int) -> Time:
     """Exact time of the nearest new-moon (target_deg=0) or full-moon
-    (target_deg=180) syzygy strictly before `t0`. Brackets the sign
-    change in the wrapped phase difference by stepping back a day at a
-    time (elongation advances ~13 deg/day, so a full synodic month
-    -- ~29.5 days -- is always enough to bracket exactly one crossing),
-    then bisects for the precise instant."""
-    step = TimeDelta(1.0, format="jd")
-    t_hi = t0
-    f_hi = _phase_diff_at(t_hi, target_deg)
-    t_lo = t_hi
-    f_lo = f_hi
+    (target_deg=180) syzygy strictly before (`direction=-1`) or after
+    (`direction=+1`) `t0`. Brackets the sign change in the wrapped
+    phase difference by stepping a day at a time in the given direction
+    (elongation advances ~13 deg/day, so a full synodic month -- ~29.5
+    days -- is always enough to bracket exactly one crossing), then
+    bisects for the precise instant."""
+    step = TimeDelta(direction * 1.0, format="jd")
+    t_near = t0
+    f_near = _phase_diff_at(t_near, target_deg)
+    t_far = t_near
+    f_far = f_near
     for _ in range(40):
-        t_lo = t_hi - step
-        f_lo = _phase_diff_at(t_lo, target_deg)
+        t_far = t_near + step
+        f_far = _phase_diff_at(t_far, target_deg)
         # A real root crossing moves by ~13 deg/day (the daily
         # elongation rate); a sign flip caused by the phase-diff's own
         # +-180 deg wraparound (the *opposite* syzygy, half a synodic
         # month away) jumps by ~347 deg instead -- the `< 180` check
         # tells these apart so the wraparound isn't mistaken for the
         # target crossing.
-        if (f_lo < 0) != (f_hi < 0) and abs(f_hi - f_lo) < 180.0:
+        if (f_far < 0) != (f_near < 0) and abs(f_near - f_far) < 180.0:
             break
-        t_hi, f_hi = t_lo, f_lo
+        t_near, f_near = t_far, f_far
     else:
         raise RuntimeError("could not bracket a syzygy within 40 days -- unexpected")
 
+    t_lo, f_lo = (t_near, f_near) if direction > 0 else (t_far, f_far)
+    t_hi, f_hi = (t_far, f_far) if direction > 0 else (t_near, f_near)
     for _ in range(40):
         mid = t_lo + (t_hi - t_lo) / 2
         f_mid = _phase_diff_at(mid, target_deg)
@@ -111,11 +114,7 @@ def _find_syzygy_before(t0: Time, target_deg: float) -> Time:
     return t_lo + (t_hi - t_lo) / 2
 
 
-def find_previous_eclipse(t0: Time, kind: str) -> EclipseEvent:
-    """The most recent solar (`kind="solar"`) or lunar (`kind="lunar"`)
-    eclipse strictly before `t0`. Walks back through consecutive
-    syzygies (skipping ordinary new/full moons that aren't eclipses)
-    until the Moon-latitude screen passes."""
+def _find_eclipse(t0: Time, kind: str, *, direction: int) -> EclipseEvent:
     if kind == "solar":
         target, limit = 0.0, SOLAR_ECLIPSE_LATITUDE_LIMIT_DEG
     elif kind == "lunar":
@@ -128,9 +127,26 @@ def find_previous_eclipse(t0: Time, kind: str) -> EclipseEvent:
     # search window (~5 years of synodic months) is a generous margin,
     # not a tuned/fragile bound.
     for _ in range(65):
-        syzygy_t = _find_syzygy_before(search_from, target)
+        syzygy_t = _find_syzygy(search_from, target, direction=direction)
         _, moon_lat = _sun_moon_elongation_and_moon_latitude(syzygy_t)
         if abs(moon_lat) <= limit:
             return EclipseEvent(time=syzygy_t, kind=kind, moon_latitude_deg=moon_lat)
-        search_from = syzygy_t - TimeDelta(1.0, format="jd")
+        search_from = syzygy_t + TimeDelta(direction * 1.0, format="jd")
     raise RuntimeError(f"no {kind} eclipse found within the search window")
+
+
+def find_previous_eclipse(t0: Time, kind: str) -> EclipseEvent:
+    """The most recent solar (`kind="solar"`) or lunar (`kind="lunar"`)
+    eclipse strictly before `t0`. Walks back through consecutive
+    syzygies (skipping ordinary new/full moons that aren't eclipses)
+    until the Moon-latitude screen passes."""
+    return _find_eclipse(t0, kind, direction=-1)
+
+
+def find_next_eclipse(t0: Time, kind: str) -> EclipseEvent:
+    """The next solar (`kind="solar"`) or lunar (`kind="lunar"`) eclipse
+    strictly after `t0` -- same search as `find_previous_eclipse`, just
+    walking forward instead of backward (added 2026-09-05 so the UI's
+    transit eclipse jump can step to either side of the current moment
+    instead of only ever landing on a fixed pair of dates)."""
+    return _find_eclipse(t0, kind, direction=1)
