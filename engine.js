@@ -19,6 +19,34 @@ const HelioEngine = (() => {
     "eclipses.py", "time_resolve.py", "minor_bodies.py", "storage.py",
   ];
 
+  // (2026-09-07) src/helio/*.py と web/assets/de440s.bsp を、以前は
+  // fetch("/src/...")のような絶対パス(サイト直下からの絶対パス)で
+  // 取得していた -- ローカル開発サーバー(helio-appのプロジェクト直下を
+  // ルートとして配信、ページ自体はweb/wheel.htmlに1段ネストされている)
+  // ではこれでもたまたま正しく解決していたが、GitHub Pagesのプロジェクト
+  // ページ(https://tomofune.github.io/helio-wheel-test/、リポジトリ名の
+  // サブパス配下で配信される)では絶対パスがドメイン直下(/src/...)を
+  // 指してしまい404になっていた(ユーザー報告「failed to fetch
+  // __init__.py: 404」で発覚)。gh_upload(index.htmlがリポジトリ直下)と
+  // ローカル(wheel.htmlがweb/配下)とでは、ページ自身からsrc/web-assets
+  // までの相対的な深さが異なる(前者は"src/helio/"、後者は"../src/helio/"
+  // が正しい)ため、単純な相対パス1本には統一できない -- 両方のパターン
+  // を順に試し、成功した方を使う。
+  async function fetchAsset(relPathFromSiteRoot) {
+    const candidates = [relPathFromSiteRoot, "../" + relPathFromSiteRoot];
+    let lastErr;
+    for (const path of candidates) {
+      try {
+        const resp = await fetch(path);
+        if (resp.ok) return resp;
+        lastErr = new Error("failed to fetch " + path + ": " + resp.status);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr;
+  }
+
   let pyodide = null;
   let bootPromise = null;
 
@@ -63,8 +91,7 @@ sys.modules["timezonefinder"] = _stub
     log("helio本体のソースコードを読み込んでいます...");
     pyodide.FS.mkdirTree("/home/pyodide/pkg/helio");
     for (const name of HELIO_MODULES) {
-      const resp = await fetch("/src/helio/" + name);
-      if (!resp.ok) throw new Error("failed to fetch " + name + ": " + resp.status);
+      const resp = await fetchAsset("src/helio/" + name);
       const text = await resp.text();
       pyodide.FS.writeFile("/home/pyodide/pkg/helio/" + name, text);
     }
@@ -72,7 +99,7 @@ sys.modules["timezonefinder"] = _stub
 
     log("天体暦データ(de440s、約31MB、初回のみ)を読み込んでいます...");
     const t1 = performance.now();
-    const kernelResp = await fetch("/web/assets/de440s.bsp");
+    const kernelResp = await fetchAsset("web/assets/de440s.bsp");
     const kernelBytes = new Uint8Array(await kernelResp.arrayBuffer());
     pyodide.FS.writeFile("/home/pyodide/de440s.bsp", kernelBytes);
     log("天体暦データ読み込み完了 (" + Math.round(performance.now() - t1) + "ms)");
