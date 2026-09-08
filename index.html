@@ -33,6 +33,14 @@
     --aspect-hard: #b5453a;
     --aspect-soft: #3f6f8f;
     --aspect-neutral: #6f6650;
+    /* 惑星記号専用の色(2026-09-08、「惑星記号の色もライトもダークも、
+       見やすい色にしてほしい。背景になじむ色だと、老眼には見えない」
+       より) -- 以前は度数の数字・サインの記号と同じ--inkを使い回して
+       おり、密集した場所でアスペクト線やサイン記号と見分けがつきにくい
+       という指摘があった。--ink/--accent(暖色系)とは違う寒色系の
+       濃い青系にして、暖色でまとまったこのアプリの配色の中でも惑星記号
+       だけが一目でそれと分かるようにした。 */
+    --planet-glyph: #33488f;
     --shadow: 0 12px 32px rgba(30, 27, 20, 0.16);
     --radius-lg: 20px;
     --radius-md: 14px;
@@ -60,6 +68,7 @@
       --aspect-hard: #e08670;
       --aspect-soft: #7fb3d9;
       --aspect-neutral: #9ba3c2;
+      --planet-glyph: #a9bcff;
       --shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
       color-scheme: dark;
     }
@@ -82,6 +91,7 @@
     --aspect-hard: #e08670;
     --aspect-soft: #7fb3d9;
     --aspect-neutral: #7a8099;
+    --planet-glyph: #a9bcff;
     --shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
@@ -3599,11 +3609,18 @@
     // (sweepSameTierLabelsのchipWも28->33へ比例して引き上げ済み)。
     dtext.setAttribute("font-size", "14");  // 10.5->12->14(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」、7.78で帯の余裕が増えたので再度引き上げ)
     dtext.setAttribute("font-weight", "700");
+    // 2段の行間(dy-4/dy+6、差10)を(dy-7/dy+8、差15)に拡大(2026-09-08、
+    // 「度数の、何度、と何分、がくっつきすぎていませんか」より) -- 実測
+    // (getBoundingClientRect)したところ、font-size 14の1行の実高さは
+    // 約20単位(SVG単位換算)あるのに対し、旧の差10ではその半分しかなく、
+    // 2行が視覚的に重なっていた(2行目の上端が1行目の下端より約13px上に
+    // 食い込んでいた)。文字サイズは過去に9->10.5->12->14と拡大されて
+    // きたが、この行間はその都度更新されていなかったのが原因。
     const line1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-    line1.setAttribute("x", dx); line1.setAttribute("y", dy - 4);
+    line1.setAttribute("x", dx); line1.setAttribute("y", dy - 7);
     line1.textContent = degStr;
     const line2 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-    line2.setAttribute("x", dx); line2.setAttribute("y", dy + 6);
+    line2.setAttribute("x", dx); line2.setAttribute("y", dy + 8);
     line2.textContent = minStr;
     dtext.appendChild(line1); dtext.appendChild(line2);
     markers.appendChild(dtext);
@@ -3676,7 +3693,7 @@
   const DEGREE_R = 141;
   const STAR_R = 206;
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
-  function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, guides = true, showDegrees = true }) {
+  function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, glyphColor = color, guides = true, showDegrees = true }) {
     if (!showDegrees) {
       // 二重円: 度数は出さないので、以前通りグリフだけを段違いスタッガー
       // で描く(帯レイアウトは単一円のときだけ)。
@@ -3686,7 +3703,7 @@
         const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
         t.setAttribute("x", x); t.setAttribute("y", y);
         t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-        t.setAttribute("fill", color);
+        t.setAttribute("fill", glyphColor);
         t.setAttribute("font-size", "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)
         t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
         t.textContent = p.g;
@@ -3722,7 +3739,7 @@
       const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
       t.setAttribute("x", x); t.setAttribute("y", y);
       t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-      t.setAttribute("fill", color);
+      t.setAttribute("fill", glyphColor);
       t.setAttribute("font-size", "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)
       t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
       t.textContent = p.g;
@@ -3908,7 +3925,11 @@
     // レイアウトに作り直した際に、単一円のグリフ・度数の半径をbaseRadius
     // 由来から固定定数に変更したため)。
     const markerRadii = drawBodyRing(planets, markers, {
-      ringInner: 165, color: "var(--ink)",  // 150->165(7.78、サインリング内周の拡大に連動)
+      // color: 度数の数字用(--ink)。glyphColor: 惑星記号だけ別の見やすい
+      // 色にする(2026-09-08、「惑星記号の色もライトもダークも、見やすい
+      // 色にしてほしい」より) -- 度数の数字・サインの記号と同じ色だと
+      // 密集した場所で見分けがつきにくかったため。
+      ringInner: 165, color: "var(--ink)", glyphColor: "var(--planet-glyph)",  // 150->165(7.78、サインリング内周の拡大に連動)
     });
     window.__markerRadii = markerRadii;  // aspect lines anchor to the same (possibly fanned-out) marker position
 
@@ -3948,7 +3969,7 @@
     // showDegrees: false (2026-09-01、「二重円のときは度数表示自体が
     // いらない」より) -- 内・外2つのリングで最大24個の度数ラベルが出る
     // と、二重円ではかえって見にくいだけだった。天体グリフ自体は出す。
-    drawBodyRing(natalPlanets, markers, { baseRadius: 86, step: 10, ringInner: 108, color: "var(--ink)", showDegrees: false });
+    drawBodyRing(natalPlanets, markers, { baseRadius: 86, step: 10, ringInner: 108, color: "var(--planet-glyph)", showDegrees: false });
     drawBodyRing(transitPlanets, markers, { baseRadius: 122, step: 9, ringInner: 132, color: "var(--aspect-soft)", showDegrees: false });
 
     // N/T二重で1天体2つずつサビアンが並ぶのは見づらいだけなので、アス
