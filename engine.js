@@ -122,8 +122,20 @@ config.EPHEMERIS_KERNEL = "/home/pyodide/de440s.bsp"  # local file, not the "de4
   // 呼び出し側が何度呼んでも、実際のブート処理は1回しか走らない(2回目
   // 以降は同じPromiseを返すだけ)。UIの複数箇所が「エンジンが要る」と
   // 思ったタイミングでそれぞれ呼んでも安全にするため。
+  // 2026-09-08: 失敗した場合はbootPromiseをnullに戻し、次の呼び出しで
+  // 再挑戦できるようにした -- 以前は一度失敗すると(GitHub Pagesの
+  // デプロイ直後のCDN反映待ちなど、一過性のネットワークエラーでも)
+  // 失敗したPromiseをそのまま覚え続けてしまい、ページを再読み込みする
+  // までずっと同じエラーを返し続けていた(「トランジットの日食/月食は
+  // 相変わらずエラー」という報告で発覚 -- 実際は起動時の一時的な失敗が
+  // 尾を引いていただけで、日食/月食検索自体のコードの問題ではなかった)。
   function boot(onProgress) {
-    if (!bootPromise) bootPromise = bootOnce(onProgress);
+    if (!bootPromise) {
+      bootPromise = bootOnce(onProgress).catch((err) => {
+        bootPromise = null;
+        throw err;
+      });
+    }
     return bootPromise;
   }
 
