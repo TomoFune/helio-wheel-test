@@ -9,6 +9,16 @@
      機能せず、常にデスクトップ版が縮小されて表示されていた。 -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helio Wheel</title>
+<!-- ホーム画面に追加・オフライン対応用(2026-09-10、HANDOFF 7.89) --
+     manifest.json/アイコンはローカル/GitHub Pagesのみに存在し、Artifact
+     単体公開では単にfetchが静かに失敗するだけで実害はないため、環境で
+     分岐させていない。sw.js自体の登録はwheel_integration.js側(実配布
+     版にしか読み込まれない)で行う。 -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="日輪">
+<meta name="theme-color" content="#0b0e1a">
 <style>
   /* --aspect-neutral(合・セミセクスタイル・クインタイル等5種のアス
      ペクト線に使う色)を、ダーク#7a8099->#9ba3c2、ライト#8a8168->

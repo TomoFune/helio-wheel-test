@@ -12,6 +12,23 @@
 // (applyPersonNatalData()/selectPerson()/jumpTTo()等)へ移した。この
 // ファイルの役目は「エンジンを起動し、準備できたら知らせる」だけに縮小。
 (function () {
+  // オフライン(PWA)対応(2026-09-10、HANDOFF 7.89) -- Pyodide本体・科学
+  // 計算パッケージ・天体暦カーネル(約31MB)を一度キャッシュしておけば、
+  // 2回目以降の起動はネットワークを介さず一瞬で終わる(「おそろしく
+  // おそい」への対応)。sw.js/manifest.jsonはこのファイルと同じ場所に
+  // 置かれる前提(ローカルはweb/配下、gh_uploadはリポジトリ直下)なので、
+  // 相対パスで登録すればどちらでも正しいscopeになる。Artifact単体公開
+  // ではこのファイル自体が読み込まれない(wheel_integration.jsはローカル
+  // /GitHub Pages版にしか組み込まれていない)ため、登録を分岐する必要は
+  // ない。
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => {
+        console.warn('[pwa] service worker registration failed', err);
+      });
+    });
+  }
+
   function showBootStatus(msg) {
     console.log('[engine]', msg);
     // 人物一覧(#person-select-list)は起動完了までここに進捗を出す --
