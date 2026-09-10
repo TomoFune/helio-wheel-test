@@ -89,8 +89,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // cache: "no-store"で明示的にブラウザ自身のHTTPキャッシュも迂回する
+  // (2026-09-10、eclipses.pyの高速化を検証中に発覚) -- ここは自前で
+  // APP_CACHEに保存・提供しているので、fetch()自体がブラウザの通常の
+  // HTTPキャッシュ(ヒューリスティックキャッシュ、Cache-Controlヘッダー
+  // が無いレスポンスでもブラウザが独自に「しばらく新鮮」とみなして
+  // ネットワークに一切出ずキャッシュを返すことがある)にヒットしてしまう
+  // と、オンラインなのに「network-first」のつもりが実は何日も古い
+  // ファイルを返し続ける、という事故になりうる(ページの再読み込みでも
+  // 直らない)。
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then((resp) => {
         if (resp && resp.ok) {
           const copy = resp.clone();

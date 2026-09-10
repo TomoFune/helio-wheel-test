@@ -32,12 +32,24 @@ const HelioEngine = (() => {
   // までの相対的な深さが異なる(前者は"src/helio/"、後者は"../src/helio/"
   // が正しい)ため、単純な相対パス1本には統一できない -- 両方のパターン
   // を順に試し、成功した方を使う。
-  async function fetchAsset(relPathFromSiteRoot) {
+  // noCache: true for the small, actively-edited python source files --
+  // without it, the browser's own heuristic HTTP cache (separate from,
+  // and not bypassed by, sw.js's network-first strategy -- that still
+  // calls plain fetch() under the hood) can silently keep serving an
+  // old cached copy of a .py file across page loads even though a
+  // network request nominally went out and "succeeded" (2026-09-10,
+  // discovered while verifying an eclipses.py performance fix: the old
+  // algorithm kept running after the file was edited and the page was
+  // reloaded, with no error of any kind -- just silently stale code).
+  // Left off for the ~31MB kernel, where the opposite is wanted (let
+  // the browser/SW cache do its job, see sw.js's ASSET_CACHE).
+  async function fetchAsset(relPathFromSiteRoot, { noCache = false } = {}) {
     const candidates = [relPathFromSiteRoot, "../" + relPathFromSiteRoot];
+    const init = noCache ? { cache: "no-store" } : undefined;
     let lastErr;
     for (const path of candidates) {
       try {
-        const resp = await fetch(path);
+        const resp = await fetch(path, init);
         if (resp.ok) return resp;
         lastErr = new Error("failed to fetch " + path + ": " + resp.status);
       } catch (err) {
@@ -91,7 +103,7 @@ sys.modules["timezonefinder"] = _stub
     log("helio本体のソースコードを読み込んでいます...");
     pyodide.FS.mkdirTree("/home/pyodide/pkg/helio");
     for (const name of HELIO_MODULES) {
-      const resp = await fetchAsset("src/helio/" + name);
+      const resp = await fetchAsset("src/helio/" + name, { noCache: true });
       const text = await resp.text();
       pyodide.FS.writeFile("/home/pyodide/pkg/helio/" + name, text);
     }
