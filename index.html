@@ -1856,6 +1856,26 @@
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
   }
 
+  // REF_LONGITUDES(主要9天体、トロピカル+全GCS起点)とREF_TROPICAL_LON
+  // (各起点自身のトロピカル黄経)を、指定した瞬間(base = {year,month,day,
+  // hour,minute,second,tzName})で計算し直す -- 以前はapplyPersonNatalData()
+  // 専用の処理だったが、2026-09-10(「経過図単体でも恒星起点変更して
+  // ほしい」より)、人物のnatal時刻に限らず「今」など任意の瞬間でも同じ
+  // ことができるよう切り出した。
+  async function computeReferenceOrigins(base) {
+    REF_LONGITUDES.tropical = await HelioEngine.computeMainLongitudes({ ...base, starKey: null });
+    for (const key of GCS_STAR_KEYS) {
+      try {
+        REF_LONGITUDES[key] = await HelioEngine.computeMainLongitudes({ ...base, starKey: key });
+      } catch (err) {
+        console.warn('[engine] failed to compute star origin', key, err);
+      }
+    }
+    for (const refKey of Object.keys(REF_LONGITUDES)) {
+      if (refKey === 'tropical') continue;
+      REF_TROPICAL_LON[refKey] = ((REF_LONGITUDES.tropical.mercury - REF_LONGITUDES[refKey].mercury) % 360 + 360) % 360;
+    }
+  }
   // 選択中の人物の本物の出生図データをPyodideで実際に計算し、REF_LONGITUDES
   // (主要9天体、トロピカル+全GCS起点)とANCHOR_DATA.natal(通常/日食図/月食図)
   // を丸ごと差し替える -- wheel_integration.js旧loadRealNatalData()を
@@ -1881,18 +1901,7 @@
     const base = { year: y, month: m, day: d, hour, minute, second, tzName: person.timezone };
 
     try {
-      REF_LONGITUDES.tropical = await HelioEngine.computeMainLongitudes({ ...base, starKey: null });
-      for (const key of GCS_STAR_KEYS) {
-        try {
-          REF_LONGITUDES[key] = await HelioEngine.computeMainLongitudes({ ...base, starKey: key });
-        } catch (err) {
-          console.warn('[engine] failed to compute star origin', key, err);
-        }
-      }
-      for (const refKey of Object.keys(REF_LONGITUDES)) {
-        if (refKey === 'tropical') continue;
-        REF_TROPICAL_LON[refKey] = ((REF_LONGITUDES.tropical.mercury - REF_LONGITUDES[refKey].mercury) % 360 + 360) % 360;
-      }
+      await computeReferenceOrigins(base);
     } catch (err) {
       console.error('[engine] failed to compute natal longitudes', err);
       showPeToast('出生図の計算に失敗しました');
@@ -2538,13 +2547,34 @@
   }
   let currentRef = 'tropical';
   let currentRefLabel = 'トロピカル';
-  function pickRef(el, key, label) {
+  async function pickRef(el, key, label) {
     document.querySelectorAll('.ref-item').forEach(i => i.classList.remove('selected'));
     el.classList.add('selected');
     document.getElementById('menu-ref-label').textContent = label;
     currentRef = key;
     currentRefLabel = label;
     saveSetting('currentRef', { key, label });
+    // 「経過図(今)を見る」経由(currentPersonId===null && currentPersonName
+    // ===''、= 一度も人物のnatalデータを計算していない)でTを見ている時に
+    // 恒星起点を選ぶと、REF_TROPICAL_LONがまだ初期プレースホルダーのまま
+    // で回転量が不正確になる -- ここで初めて「今」を基準に起点データを
+    // 計算する(2026-09-10、「経過図単体でも恒星起点変更してほしい」
+    // より)。人物選択済みならapplyPersonNatalData()で既に正しいデータが
+    // あるのでスキップ(起点を切り替えるたびに毎回計算し直す必要はない)。
+    if (key !== 'tropical' && engineAvailable && displayMode === 'T' && currentPersonId === null && currentPersonName === '') {
+      try {
+        await ensureEngineReady();
+        const now = new Date();
+        await computeReferenceOrigins({
+          year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, day: now.getUTCDate(),
+          hour: now.getUTCHours(), minute: now.getUTCMinutes(), second: now.getUTCSeconds(),
+          tzName: 'UTC',
+        });
+      } catch (err) {
+        console.warn('[engine] failed to compute reference origins for standalone transit', err);
+        showPeToast('起点の計算に失敗しました');
+      }
+    }
     buildChart();  // selection propagates immediately, no separate "apply" step
     closeAllPanels();
   }
