@@ -1355,6 +1355,9 @@
         <button class="row-btn" id="menu-ref-btn" onclick="closeAllPanels(); openPanel('ref-panel');"><span>起点(トロピカル/恒星)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('display-panel');"><span>表示オプション(度数・恒星名・アスペクト)</span><span class="chevron">›</span></button>
         <button class="row-btn" id="menu-conj-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
+        <!-- 2026-09-11: 「経過図(今)を見る」の日付表示に使う場所(タイム
+             ゾーン)。天体位置の計算自体には影響しない、表示専用。 -->
+        <button class="row-btn" id="menu-tz-btn" onclick="closeAllPanels(); openPanel('tz-panel');"><span>経過図の場所(<span id="menu-tz-label">東京</span>)</span><span class="chevron">›</span></button>
         <!-- 7.71: トップバーの◐(テーマ切替)をここへ移動(2026-09-04、
              「三本線のメニューの右にあるダークモード選択のアイコンは
              Menuに入れてもいいのではないだろうか」より)。他のトグル
@@ -1492,6 +1495,18 @@
           <div class="ref-item-main"><span class="ref-item-name">アンドロメダ銀河</span><span class="ref-item-cat">M31</span></div>
           <div class="ref-item-check"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ---- side panel: 経過図(今)の場所(2026-09-11) ---- -->
+    <div class="side-panel" id="tz-panel">
+      <div class="panel-head">
+        <h2>経過図の場所</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body">
+        <p class="scrub-note" style="margin-top:0;">「経過図(今)を見る」で表示する日付・時刻を、選んだ場所のカレンダー・時計で読み替えます。天体の位置自体はこの選択に関係なく同じです — 同じ瞬間なら、どこで見ても同じヘリオ図になります。</p>
+        <select id="tz-select" class="pe-input" onchange="applyTransitTimezoneSelection()"></select>
       </div>
     </div>
 
@@ -2322,7 +2337,10 @@
       return;
     }
     if (displayMode === 'T') {
-      line1.textContent = 'トランジット';
+      // 場所ラベルを添える(2026-09-11) -- 天体の位置計算自体には影響
+      // しないが、表示中の日付がどのタイムゾームの読みかを常に見える
+      // ようにしておく(「海外の場所だと日が一日ずれる」の混乱対策)。
+      line1.textContent = `トランジット(${transitTzLabel})`;
       const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
       renderEditableTime(line2, tLabel ? `${tLabel}　` : '');
       return;
@@ -2364,7 +2382,12 @@
     }
     const row = document.createElement('span');
     row.className = 'time-seg-row';
-    const d = new Date(transitTime);
+    // transitTime(本物のUTCエポックms)そのままではなく、選んだ場所の
+    // タイムゾーンでの壁時計値が見える偽物のDateを使う(2026-09-11、
+    // zonedDateFor()のコメント参照) -- こうすることで、下のtimeSegValue/
+    // timeSegTextは変更なしで、UTCでも任意のタイムゾーンでも同じコードで
+    // 動く。
+    const d = zonedDateFor(transitTime, transitTzName);
     TIME_SEG_UNITS.forEach((unit) => {
       const input = document.createElement('input');
       input.type = 'text';
@@ -2383,7 +2406,7 @@
       input.addEventListener('change', () => {
         const n = parseInt(input.value, 10);
         if (!Number.isNaN(n)) applyTransitFieldEdit(unit, n);
-        else input.value = timeSegText(unit, timeSegValue(unit, new Date(transitTime)));
+        else input.value = timeSegText(unit, timeSegValue(unit, zonedDateFor(transitTime, transitTzName)));
       });
       row.appendChild(input);
       if (TIME_SEG_SEP[unit]) {
@@ -2396,14 +2419,14 @@
     container.appendChild(row);
   }
   function applyTransitFieldEdit(unit, value) {
-    const d = new Date(transitTime);
+    const d = zonedDateFor(transitTime, transitTzName);
     if (unit === 'year') d.setUTCFullYear(value);
     else if (unit === 'month') d.setUTCMonth(value - 1);
     else if (unit === 'day') d.setUTCDate(value);
     else if (unit === 'hour') d.setUTCHours(value);
     else if (unit === 'minute') d.setUTCMinutes(value);
     else if (unit === 'second') d.setUTCSeconds(value);
-    transitTime = d.getTime();
+    transitTime = utcMsFromZonedDate(d, transitTzName);
     if (tSpecialMoment) {
       tSpecialMoment = null;
       document.querySelectorAll('#t-jump-segmented .seg-btn').forEach((b) => b.classList.remove('active'));
@@ -2416,14 +2439,14 @@
 
   // ---------- transit time-scrub ----------
   function scrubTransit(direction) {
-    const d = new Date(transitTime);
+    const d = zonedDateFor(transitTime, transitTzName);
     if (scrubUnit === 'year') d.setUTCFullYear(d.getUTCFullYear() + direction);
     else if (scrubUnit === 'month') d.setUTCMonth(d.getUTCMonth() + direction);
     else if (scrubUnit === 'day') d.setUTCDate(d.getUTCDate() + direction);
     else if (scrubUnit === 'hour') d.setUTCHours(d.getUTCHours() + direction);
     else if (scrubUnit === 'minute') d.setUTCMinutes(d.getUTCMinutes() + direction);
     else if (scrubUnit === 'second') d.setUTCSeconds(d.getUTCSeconds() + direction);
-    transitTime = d.getTime();
+    transitTime = utcMsFromZonedDate(d, transitTzName);
     // Moved off whatever special moment we were on (if any) -- it's no
     // longer "the eclipse", just some other point in time now.
     if (tSpecialMoment) {
@@ -2806,6 +2829,92 @@
   let nType = 'normal';
   let displayMode = 'N';
   let conjOrb = 1.5;
+
+  // ---------- transit "今" の表示タイムゾーン(2026-09-11、「海外の場所
+  // だと、日が一日ずれますよね？」より) ----------
+  // ヘリオセントリック黄経の計算自体は場所に関係ない(同じ瞬間なら地球上
+  // どこで見ても同じヘリオ図になる)ため、ここで選ぶ「場所」は天体の位置
+  // 計算には一切影響しない -- 「経過図(今)を見る」で表示される日付・
+  // 時刻の"読み方"(どのタイムゾームのカレンダーで見せるか)だけを変える。
+  // 既定は東京。緯度経度は不要(タイムゾーン名だけで表示の変換が完結する
+  // ため)、出生地の都道府県セレクターとは別に、世界の代表的なタイム
+  // ゾーンを地域別にまとめた軽量な一覧を用意した。
+  const TRANSIT_TZ_REGIONS = [
+    { region: '日本', zones: [['東京', 'Asia/Tokyo']] },
+    { region: 'アジア', zones: [
+      ['ソウル', 'Asia/Seoul'], ['上海', 'Asia/Shanghai'], ['台北', 'Asia/Taipei'],
+      ['シンガポール', 'Asia/Singapore'], ['バンコク', 'Asia/Bangkok'],
+      ['デリー/ムンバイ', 'Asia/Kolkata'], ['ドバイ', 'Asia/Dubai'],
+    ] },
+    { region: 'オセアニア', zones: [['シドニー', 'Australia/Sydney'], ['オークランド', 'Pacific/Auckland']] },
+    { region: 'ヨーロッパ', zones: [
+      ['ロンドン', 'Europe/London'], ['パリ', 'Europe/Paris'], ['ベルリン', 'Europe/Berlin'],
+      ['モスクワ', 'Europe/Moscow'],
+    ] },
+    { region: 'アフリカ', zones: [['カイロ', 'Africa/Cairo'], ['ヨハネスブルグ', 'Africa/Johannesburg']] },
+    { region: '北米', zones: [
+      ['ニューヨーク', 'America/New_York'], ['シカゴ', 'America/Chicago'],
+      ['デンバー', 'America/Denver'], ['ロサンゼルス', 'America/Los_Angeles'],
+    ] },
+    { region: '南米', zones: [['サンパウロ', 'America/Sao_Paulo'], ['ブエノスアイレス', 'America/Argentina/Buenos_Aires']] },
+  ];
+  let transitTzName = loadSetting('transitTzName', 'Asia/Tokyo');
+  let transitTzLabel = loadSetting('transitTzLabel', '東京');
+  function populateTzSelect() {
+    const sel = document.getElementById('tz-select');
+    if (!sel || sel.dataset.populated) return;
+    sel.dataset.populated = '1';
+    for (const { region, zones } of TRANSIT_TZ_REGIONS) {
+      const group = document.createElement('optgroup');
+      group.label = region;
+      for (const [name, tz] of zones) {
+        const opt = document.createElement('option');
+        opt.value = `${name}|${tz}`;
+        opt.textContent = name;
+        group.appendChild(opt);
+      }
+      sel.appendChild(group);
+    }
+  }
+  function applyTransitTimezoneSelection() {
+    const sel = document.getElementById('tz-select');
+    if (!sel.value) return;
+    const [name, tz] = sel.value.split('|');
+    transitTzName = tz;
+    transitTzLabel = name;
+    saveSetting('transitTzName', tz);
+    saveSetting('transitTzLabel', name);
+    document.getElementById('menu-tz-label').textContent = name;
+    // 実際の瞬間(transitTime、UTCのエポックms)自体は変えない -- 表示の
+    // 読み替えだけなので、再計算は不要でバッジの再描画だけで足りる。
+    updateBadge();
+  }
+  // UTCのエポックms -> 「UTCゲッター/セッターで読み書きすると、実際には
+  // tzName側の壁時計の値になっている」偽物のDateオブジェクト。既存の
+  // timeSegValue()/scrubTransit()等のUTCゲッターベースのコードを、
+  // 「常にUTCそのもの」から「選んだタイムゾーンの壁時計」に対応させる際、
+  // 呼び出し側のロジックを書き換えずに済むようにするための変換ヘルパー。
+  function zonedDateFor(utcMs, tzName) {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tzName, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    const parts = Object.fromEntries(dtf.formatToParts(new Date(utcMs)).map(p => [p.type, p.value]));
+    return new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second));
+  }
+  // zonedDateFor()の逆変換: 「この壁時計の値をtzNameで表示したい」という
+  // 偽物のDate(のUTCゲッター値)から、実際にそれを表示する本物のUTC
+  // エポックmsを求める。その瞬間のtzNameのUTCオフセットをguess時点の値で
+  // 近似する(1回の補正で足りる -- 誤差が出るのはDST切り替えの数時間の
+  // 窓だけで、このアプリの他の近似(トランジットのスクラブ用平均運動近似
+  // 等)と同程度の許容範囲)。
+  function utcMsFromZonedDate(zonedDate, tzName) {
+    const guessMs = zonedDate.getTime();
+    const asZoned = zonedDateFor(guessMs, tzName);
+    const driftMs = asZoned.getTime() - guessMs;
+    return guessMs - driftMs;
+  }
 
   // 恒星・銀河との合(コンジャンクション)を、選択中の人物・瞬間で毎回
   // 実際に検索するようにした(2026-09-10、「恒星・銀河との合を任意の
@@ -3749,7 +3858,7 @@
   // 構造的に重ならなくなったため、下地を隠す目的の背景板はもう実質的に
   // 不要だった(アスペクト線も、両端がPLANET_R上にある弦である以上、
   // 弦が円の外側であるDEGREE_Rまで届くことはない)。
-  function drawDegreeChip(markers, dx, dy, deg, color) {
+  function drawDegreeChip(markers, dx, dy, deg, color, fontSize = 14) {
     const [degStr, minStr] = formatDegMinParts(deg);
     const dtext = document.createElementNS("http://www.w3.org/2000/svg", "text");
     dtext.setAttribute("class", "wheel-degree-label");
@@ -3762,7 +3871,10 @@
     // PLANET_R/DEGREE_Rのコメント参照)より、文字だけの実サイズは元々
     // 小さいので、この程度の拡大では再度の重なりは生じない想定
     // (sweepSameTierLabelsのchipWも28->33へ比例して引き上げ済み)。
-    dtext.setAttribute("font-size", "14");  // 10.5->12->14(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」、7.78で帯の余裕が増えたので再度引き上げ)
+    // 引数化(2026-09-11) -- 孤立天体(クラスタ化で個別配置)は17に底上げ
+    // (「文字が小さくて見にくい、老眼にきつい」より)、密集クラスタ側は
+    // drawDegreeCluster()が別に描く。既定14は呼び出し忘れ対策の後方互換。
+    dtext.setAttribute("font-size", String(fontSize));
     dtext.setAttribute("font-weight", "700");
     // 2段の行間(dy-4/dy+6、差10)を(dy-7/dy+8、差15)に拡大(2026-09-08、
     // 「度数の、何度、と何分、がくっつきすぎていませんか」より) -- 実測
@@ -3770,15 +3882,49 @@
     // 約20単位(SVG単位換算)あるのに対し、旧の差10ではその半分しかなく、
     // 2行が視覚的に重なっていた(2行目の上端が1行目の下端より約13px上に
     // 食い込んでいた)。文字サイズは過去に9->10.5->12->14と拡大されて
-    // きたが、この行間はその都度更新されていなかったのが原因。
+    // きたが、この行間はその都度更新されていなかったのが原因。fontSize
+    // が14から変わる場合は行間もそれに比例させる(2026-09-11)。
+    const lineScale = fontSize / 14;
     const line1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-    line1.setAttribute("x", dx); line1.setAttribute("y", dy - 7);
+    line1.setAttribute("x", dx); line1.setAttribute("y", dy - 7 * lineScale);
     line1.textContent = degStr;
     const line2 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-    line2.setAttribute("x", dx); line2.setAttribute("y", dy + 8);
+    line2.setAttribute("x", dx); line2.setAttribute("y", dy + 8 * lineScale);
     line2.textContent = minStr;
     dtext.appendChild(line1); dtext.appendChild(line2);
     markers.appendChild(dtext);
+  }
+  // 密集クラスタ(8度以内に2体以上)用: 1箇所に「グリフ + d°mm'」を
+  // メンバー数ぶん縦積みで描く(2026-09-11、恒星の合パネルの「タグ」と
+  // 同じ発想) -- 円周上の"横の場所"を取り合わないので、天体が増えても
+  // 縦に伸びるだけで文字サイズは保てる。
+  function drawDegreeCluster(markers, cx, cy, membersMeta, color) {
+    const fontSize = 14;
+    // 18->26(2026-09-11、実機計測で発覚した重なりの修正) -- グリフ部分
+    // (Noto Sans Symbols 2)の実際の縦幅は、度数文字と混在させると同じ
+    // font-size指定でも約25.2単位まで大きくレンダリングされる(既存の
+    // グリフ帯コメント参照)。18のままだと隣接行同士が実測で約5px重なって
+    // いた。CLUSTER_LINE_HEIGHTと同じ値に揃えてある(drawBodyRing側の
+    // 半径計算もこれに依存)。
+    const lineHeight = CLUSTER_LINE_HEIGHT;
+    const n = membersMeta.length;
+    membersMeta.forEach((m, i) => {
+      const y = cy - ((n - 1) / 2 - i) * lineHeight;
+      const [degStr, minStr] = formatDegMinParts(m.deg);
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", cx); t.setAttribute("y", y);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.setAttribute("font-size", String(fontSize));
+      t.setAttribute("font-weight", "700");
+      t.setAttribute("fill", color);
+      const glyphSpan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      glyphSpan.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
+      glyphSpan.textContent = m.g + " ";
+      const degSpan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      degSpan.textContent = degStr + minStr;
+      t.appendChild(glyphSpan); t.appendChild(degSpan);
+      markers.appendChild(t);
+    });
   }
   // 惑星の記号(グリフ)専用の帯(PLANET_R)と、度数表示専用の帯
   // (DEGREE_R)を、それぞれ固定の半径として分離する(2026-09-03、
@@ -3848,6 +3994,11 @@
   const DEGREE_R = 141;
   const STAR_R = 206;
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
+  // 度数の密集クラスタ(drawDegreeCluster/drawBodyRing両方が参照、
+  // 2026-09-11) -- 1行の実測縦幅(グリフ+度数混在、約25.2単位)に合わせた
+  // 値。drawBodyRing側の半径計算(PLANET_R帯と食い合わないための余白)も
+  // 同じ値を使う必要があるため、どちらか一方だけを変えないよう共通定数化。
+  const CLUSTER_LINE_HEIGHT = 26;
   function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, glyphColor = color, guides = true, showDegrees = true }) {
     if (!showDegrees) {
       // 二重円: 度数は出さないので、以前通りグリフだけを段違いスタッガー
@@ -3882,10 +4033,22 @@
     // いたため、6シナリオの自動チェックで重なりが83〜302px²まで悪化して
     // いるのを発見・修正)。
     sweepSameTierLabels(glyphItems, 35);  // 22->26->31->35(2026-09-04、惑星グリフのfont-size 16->18に合わせてさらに引き上げ)
-    const degItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: DEGREE_R }));
-    sweepSameTierLabels(degItems, 44);  // チップ幅(28->33->38->44、度数文字のfont-size 9->10.5->12->14に合わせて比例で引き上げ、2026-09-03/09-04)
+    // 度数表示の作り直し(2026-09-11、フィードバック「本来の位置から
+    // かなりズレたところに惑星と度数が表示されている」「文字が小さくて
+    // 見にくい、老眼にきつい」より) -- 以前は全天体の度数をDEGREE_Rの
+    // 円周1本にsweepSameTierLabels()で押し広げていたため、天体が多い
+    // (小惑星・準惑星の追加で最大16体に)ほど、混み合った塊を遠くまで
+    // 押しのける必要が生じ、ガイド線が蜘蛛の巣状になっていた。文字も
+    // 小さめ(14)で、実測するとスマホ幅では10px未満まで縮んでいた。
+    // 恒星の合ラベル(drawConjunctionMarkers)が複数件を1本の縦積み
+    // タグにまとめているのと同じ発想で、8度以内の塊(clusterByGap、
+    // staggerRadiiと同じクラスタ判定)は1個の縦積みチップにまとめて
+    // 表示し、孤立した天体だけ個別の位置で大きめの文字を使う -- 円周上
+    // の"横の場所"を取り合うのはクラスタの個数ぶんだけで済み、天体が
+    // 増えてもクラスタ内は縦に伸びるだけなので、文字を大きくしても
+    // 破綻しない。
     const glyphByKey = new Map(glyphItems.map(it => [it.key, it]));
-    const degByKey = new Map(degItems.map(it => [it.key, it]));
+    const planetByKey = new Map(planets.map(p => [p.key, p]));
     const radii = {};
     planets.forEach(p => {
       const gi = glyphByKey.get(p.key);
@@ -3899,25 +4062,83 @@
       t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
       t.textContent = p.g;
       markers.appendChild(t);
-      // 惑星グリフ自体のガイド線(目盛り⇔惑星)は廃止(2026-09-04、
-      // 「惑星から目盛りへの線、いらないっていったじゃん」より) --
-      // 度数チップ側のガイド線(下)が同じ役目(ズレた時に本来の目盛り
-      // 位置を示す)を既に果たしているため、両方出すと冗長だった。
-      const di = degByKey.get(p.key);
+    });
+
+    const clusters = clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0);
+    // 孤立した天体(クラスタ1件)は、これまで通り個別に配置するが、
+    // 文字は少し大きく(14->17)した -- クラスタ化で「複数が押し合う」
+    // 状況自体が減ったぶん、1件ずつはより大きな文字でも重ならない。
+    const isolated = clusters.filter(c => c.members.length === 1).map(c => c.members[0]);
+    const isoItems = isolated.map(m => ({ key: m.key, deg: m.deg, origDeg: m.deg, r: DEGREE_R }));
+    sweepSameTierLabels(isoItems, 50);  // 44->50(度数文字14->17に合わせて比例で引き上げ)
+    const isoByKey = new Map(isoItems.map(it => [it.key, it]));
+    isolated.forEach(m => {
+      const di = isoByKey.get(m.key);
       const [dx, dy] = polar(200, 200, di.r, di.deg);
-      drawDegreeChip(markers, dx, dy, p.deg, color);
-      // 常時表示->ズレた時だけ表示に変更(2026-09-04、「度数とサインの
-      // メモリを指す線は...ただの直線にしてもらえますか」「惑星→度数の
-      // 間は、度数表示と惑星の表示はそんなに離れないと思う。度数から
-      // 直線でメモリの位置を指し示せば、わかりそうな気がする」より)。
-      // 元々は天体ごとに毎回(ズレていなくても)出ていたため線が多く
-      // ゴチャついていた -- 上の惑星グリフ側と同じ「実際にスイープで
-      // ズレた時だけ」の条件に揃えることで、スターゲイザーが合の時だけ
-      // 特別な線を出すのと同じ考え方になり、線の数がグッと減る。
+      drawDegreeChip(markers, dx, dy, m.deg, color, 17);
+      // 常時表示->ズレた時だけ表示(2026-09-04、「度数とサインのメモリを
+      // 指す線は...ただの直線にしてもらえますか」より)。
       if (guides && Math.abs(((di.deg - di.origDeg + 540) % 360) - 180) > 0.5) {
         drawGuideLine(markers, di.origDeg, ringInner, dx, dy);
       }
     });
+    // 2件以上のクラスタは、平均角度(円環をまたぐ塊でも安全な、先頭
+    // メンバーからの相対オフセット平均)に1個の縦積みチップを置き、
+    // 各メンバーの実際のグリフ位置からそこへ細いガイド線を引く --
+    // 恒星の合パネルの「タグ+ガイド線」と同じ考え方。
+    const multiClusters = clusters.filter(c => c.members.length >= 2);
+    if (multiClusters.length > 0) {
+      const clusterLineHeight = CLUSTER_LINE_HEIGHT;
+      // 全クラスタ共通の1本の半径にする(2026-09-11、実機検証で発覚した
+      // バグの修正) -- クラスタごとに人数で半径を変えていた版は、(1)一番
+      // 縦長のクラスタでもPLANET_R側のグリフ帯と食い合わないだけの余白を
+      // 計算し切れておらず実際に重なった、(2)違う半径のクラスタ同士は
+      // sweepSameTierLabels(同じ半径同士でないと角度の押し合いが効かない)
+      // の対象外になり、隣り合う2つのクラスタの縦積みチップ同士が重なる
+      // ケースがあった。この図の中で一番人数が多いクラスタが必要とする
+      // 高さから、共通の半径を1つだけ計算して全クラスタに使う。
+      const maxMembers = Math.max(...multiClusters.map(c => c.members.length));
+      // 孤立天体側のチップ(DEGREE_R中心、font-size 17の2段)の実測の外周
+      // (141 + 半分の高さ約24単位、2026-09-11実機計測)より確実に外側に
+      // 出す -- 単に「PLANET_R帯と食い合わない」だけでは、DEGREE_R帯に
+      // 元々いる孤立天体のチップとクラスタのチップ同士が重なるケースが
+      // 別に残っていた(隣り合う孤立天体とクラスタが8度ちょうど離れている
+      // 場合など)。
+      // clusterRからクラスタ半分の高さを引いた「内側の縁」がisoChip
+      // OuterEdgeより確実に外側になるよう、その差(12)を直接足し込む
+      // (最初mathmax(isoChipOuterEdge+12, ...)としていたが、それだと
+      // clusterR自体がisoChipOuterEdgeを超えるだけで、人数が多いクラスタ
+      // ほど内側の縁がisoChipOuterEdgeへ食い込む計算ミスだった)。
+      const isoChipOuterEdge = DEGREE_R + 24;
+      const clusterR = isoChipOuterEdge + 12 + maxMembers * clusterLineHeight / 2;
+      const clusterItems = multiClusters.map((c, idx) => {
+        const anchor = c.members[0].deg;
+        let sumOffset = 0;
+        c.members.forEach(m => { sumOffset += ((m.deg - anchor + 540) % 360) - 180; });
+        const clusterDeg = (anchor + sumOffset / c.members.length + 360) % 360;
+        return { key: 'cluster' + idx, deg: clusterDeg, origDeg: clusterDeg, r: clusterR };
+      });
+      // チップ幅は「このクラスタ群の中で一番長い1行」基準(安全側) --
+      // クラスタごとに違う幅を個別に渡せないsweepSameTierLabelsの仕様上、
+      // 一番幅が要る想定で統一する(結果、幅の要らないクラスタは少し
+      // 余分に間隔が空くだけで、重なりはしない)。
+      let maxLineW = 0;
+      multiClusters.forEach(c => c.members.forEach(m => {
+        const [d, mi] = formatDegMinParts(m.deg);
+        maxLineW = Math.max(maxLineW, estimateLabelWidth(m.g + ' ' + d + mi, 14));
+      }));
+      sweepSameTierLabels(clusterItems, maxLineW);
+      multiClusters.forEach((c, idx) => {
+        const item = clusterItems[idx];
+        const [cx, cy] = polar(200, 200, item.r, item.deg);
+        drawDegreeCluster(markers, cx, cy, c.members.map(m => planetByKey.get(m.key)), color);
+        if (guides) {
+          // m.deg(スイープ前の本当の度数、目盛りの実位置)を起点にする --
+          // 孤立天体のガイド線(di.origDeg)と同じ考え方。
+          c.members.forEach(m => drawGuideLine(markers, m.deg, ringInner, cx, cy));
+        }
+      });
+    }
     return radii;
   }
 
@@ -4242,6 +4463,12 @@
       const isMatch = btn.getAttribute('onclick')?.includes("'" + conjunctionCategory + "'");
       btn.classList.toggle('active', !!isMatch);
     });
+    // transitTzName/transitTzLabel自体もスクリプト上部で既にloadSetting
+    // 済み(デフォルト東京/Asia/Tokyo) -- ここではセレクトの中身を作り、
+    // 選択状態とメニュー上のラベルをそれに合わせるだけ。
+    populateTzSelect();
+    document.getElementById('tz-select').value = `${transitTzLabel}|${transitTzName}`;
+    document.getElementById('menu-tz-label').textContent = transitTzLabel;
   }
   restoreSettings();
   fillMinorBodyList();
