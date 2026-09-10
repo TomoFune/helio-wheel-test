@@ -2114,8 +2114,14 @@
   function updateControlAvailability() {
     const isBiwheel = displayMode === 'both';
     const refBtn = document.getElementById('menu-ref-btn');
-    refBtn.style.opacity = nType === 'normal' ? '1' : '0.4';
-    refBtn.style.pointerEvents = nType === 'normal' ? 'auto' : 'none';
+    // 経過図(T)も起点(恒星)を使えるようにした(2026-09-10、「経過図も、
+    // 恒星起点を使えるようにしてほしい」より) -- 以前はnTypeだけを見て
+    // いたため、Tを表示中でもボタン自体はなぜか押せるのに実際には何も
+    // 起きない(resolveTLongitudes()がcurrentRefを無視していた)という
+    // 食い違いがあった。判定自体をoriginPickerAvailable()に統一。
+    const refAvailable = originPickerAvailable();
+    refBtn.style.opacity = refAvailable ? '1' : '0.4';
+    refBtn.style.pointerEvents = refAvailable ? 'auto' : 'none';
     document.querySelectorAll('.conj-only-control').forEach(el => {
       el.style.opacity = isBiwheel ? '0.4' : '1';
       el.style.pointerEvents = isBiwheel ? 'none' : 'auto';
@@ -2746,6 +2752,12 @@
     alpheratz: { name: "アルフェラッツ", cat: "アンドロメダ座 α星", lon: 14.17551, kind: "star" },
   };
   function isNNormal() { return displayMode === 'N' && nType === 'normal'; }
+  // 起点(恒星)選択がその表示に実際に効くかどうか(2026-09-10) -- Nの
+  // 通常図に加え、経過図(T、日食/月食ジャンプ中・二重円のTリングも含む)
+  // でも使えるようにした。Nの日食図/月食図(ANCHOR_DATA.natal[eclipse...])
+  // は元々起点回転に対応していない(以前からボタン自体が無効になる対象)
+  // ため、今回もそこは対象外のまま。
+  function originPickerAvailable() { return displayMode === 'T' || isNNormal(); }
   function angularSep(a, b) {
     const d = Math.abs(a - b) % 360;
     return Math.min(d, 360 - d);
@@ -2792,7 +2804,11 @@
   }
   function effectiveStarLon(star) {
     const drift = (currentConjunctionEpochMs() - NATAL_EPOCH_MS) / MS_PER_YEAR * PRECESSION_DEG_PER_YEAR;
-    const refOffset = isNNormal() ? REF_TROPICAL_LON[currentRef] : 0;  // Tおよびnormal以外のNは起点セレクター非対応(常にトロピカル)なので回転なし
+    // 2026-09-10: Tも起点セレクターに対応したため、refOffsetの判定を
+    // isNNormal()単体からoriginPickerAvailable()へ拡張(下のresolveT
+    // Longitudes()と同じ判定を共有)。normal以外のN(日食図/月食図)は
+    // 引き続き非対応(常にトロピカル)。
+    const refOffset = originPickerAvailable() ? REF_TROPICAL_LON[currentRef] : 0;
     return ((star.lon + drift - refOffset) % 360 + 360) % 360;
   }
   // Every hit starts checked ("visible on the wheel") by default; toggling
@@ -3049,12 +3065,31 @@
   function resolveNLongitudes() {
     return nType === 'normal' ? REF_LONGITUDES[currentRef] : ANCHOR_DATA.natal[nType].lons;
   }
+  // Tは常にトロピカルで持っている値(transitLongitudesNow()の平均運動
+  // 近似、または日食/月食ジャンプ先の実計算値)を、選択中の起点ぶん
+  // 一律に回転させるだけ(2026-09-10、「経過図も、恒星起点を使える
+  // ようにしてほしい」より) -- Nの通常図のように起点ごとにPyodideで
+  // 個別計算(REF_LONGITUDES[key])はしない。Tはスクラブのたびに再描画
+  // されるため、そのたびにPyodide往復すると即応性が失われてしまう。
+  // 回転量REF_TROPICAL_LON[currentRef]は「その起点自身のトロピカル
+  // 黄経」(選択中の人物のnatal計算時にapplyPersonNatalData()が算出済み)
+  // で、全天体に同じ量を引くだけなので追加のPython呼び出しは不要。
+  // 歳差によるズレ(恒星の合と同じ理屈)は、数十年規模なら実用上問題
+  // ない、という既存の割り切りをそのまま踏襲している。
+  function rotateToOrigin(lons) {
+    if (currentRef === 'tropical') return lons;
+    const offset = REF_TROPICAL_LON[currentRef] || 0;
+    const out = {};
+    for (const key in lons) out[key] = ((lons[key] - offset) % 360 + 360) % 360;
+    return out;
+  }
   function resolveTLongitudes() {
     // While sitting exactly on a jumped-to special moment, use its real
     // precomputed longitudes (not the mean-motion approximation) -- once
     // scrubbed away, tSpecialMoment is null and we fall back to the
     // approximation for wherever the scrub landed.
-    return tSpecialMoment ? ANCHOR_DATA.transit[tSpecialMoment].lons : transitLongitudesNow();
+    const base = tSpecialMoment ? ANCHOR_DATA.transit[tSpecialMoment].lons : transitLongitudesNow();
+    return rotateToOrigin(base);
   }
   function currentPlanets() {
     const lons = displayMode === 'T' ? resolveTLongitudes() : resolveNLongitudes();
@@ -3850,7 +3885,10 @@
     // テキストが小さめでバッジ内に収まっているため、円上の表示にも
     // まだ意味がある、という判断)。
     if (!desktopMQ.matches) return;
-    if (!isNNormal() || currentRef === 'tropical') return;
+    // 2026-09-10: Tも起点回転に対応したため、isNNormal()単体ではなく
+    // originPickerAvailable()で判定(起点自身は回転後の座標系で常に
+    // 経度0度に来るため、Tでも同じ位置にラベルを出せる)。
+    if (!originPickerAvailable() || currentRef === 'tropical') return;
 
     const [mx, my] = polar(200, 200, STAR_R, 0);
     const marker = document.createElementNS("http://www.w3.org/2000/svg", "text");
