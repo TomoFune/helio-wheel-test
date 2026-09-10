@@ -116,6 +116,18 @@ sys.modules["timezonefinder"] = _stub
     pyodide.FS.writeFile("/home/pyodide/de440s.bsp", kernelBytes);
     log("天体暦データ読み込み完了 (" + Math.round(performance.now() - t1) + "ms)");
 
+    // 小惑星・準惑星の黄経テーブル(minor_bodies.bin、約3MB、初回のみ) --
+    // 2026-09-11「小惑星、準惑星、やってみましょう」より。JPL Horizonsの
+    // 小惑星用SPKはjplephemが読めない形式(Type 21)なので、de440s.bspと
+    // 同じ「バンドルしてオフライン参照」はできず、代わりに1日おきの黄経
+    // だけを焼き込んだ自前の軽量テーブル形式にした(bake_minor_bodies.py
+    // で1回だけ生成、詳細はminor_bodies.pyのdocstring参照)。
+    const t2 = performance.now();
+    const minorResp = await fetchAsset("web/assets/minor_bodies.bin");
+    const minorBytes = new Uint8Array(await minorResp.arrayBuffer());
+    pyodide.FS.writeFile("/home/pyodide/minor_bodies.bin", minorBytes);
+    log("小惑星・準惑星データ読み込み完了 (" + Math.round(performance.now() - t2) + "ms)");
+
     pyodide.FS.mkdirTree("/home/pyodide/data");
     pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, {}, "/home/pyodide/data");
     await syncIDBFS(true);
@@ -126,6 +138,7 @@ sys.path.insert(0, "/home/pyodide/pkg")
 
 from helio import config
 config.EPHEMERIS_KERNEL = "/home/pyodide/de440s.bsp"  # local file, not the "de440s" auto-download name
+config.MINOR_BODIES_TABLE_PATH = "/home/pyodide/minor_bodies.bin"
 `);
 
     log("計算エンジンの準備完了 (合計 " + Math.round(performance.now() - t0) + "ms)");
@@ -168,10 +181,12 @@ config.EPHEMERIS_KERNEL = "/home/pyodide/de440s.bsp"  # local file, not the "de4
 import json
 from helio.time_resolve import resolve_birth_time
 from helio.ephemeris import heliocentric_longitudes
+from helio.minor_bodies import minor_body_heliocentric_longitudes_fast
 from helio.reference_points import resolve_reference_longitude
 
 resolved = resolve_birth_time(_year, _month, _day, _hour, _minute, _second, tz_name=_tz_name)
 lons = heliocentric_longitudes(resolved.time)
+lons.update(minor_body_heliocentric_longitudes_fast(resolved.time))
 if _star_key:
     ref_lon = resolve_reference_longitude(_star_key, resolved.time)
     lons = {k: (v - ref_lon) % 360 for k, v in lons.items()}
@@ -195,11 +210,13 @@ import json
 from astropy.time import Time
 from helio.eclipses import find_previous_eclipse, find_next_eclipse
 from helio.ephemeris import heliocentric_longitudes
+from helio.minor_bodies import minor_body_heliocentric_longitudes_fast
 
 t0 = Time(_unix_s, format="unix", scale="utc")
 finder = find_previous_eclipse if _direction == "previous" else find_next_eclipse
 event = finder(t0, _kind)
 lons = heliocentric_longitudes(event.time)
+lons.update(minor_body_heliocentric_longitudes_fast(event.time))
 json.dumps({"lons": lons, "utcMs": event.time.unix * 1000, "moonLatitudeDeg": event.moon_latitude_deg})
 `);
     return JSON.parse(json);
@@ -219,11 +236,13 @@ import json
 from astropy.time import Time
 from helio.seasons import find_previous_season, find_next_season
 from helio.ephemeris import heliocentric_longitudes
+from helio.minor_bodies import minor_body_heliocentric_longitudes_fast
 
 t0 = Time(_unix_s, format="unix", scale="utc")
 finder = find_previous_season if _direction == "previous" else find_next_season
 event = finder(t0, _season)
 lons = heliocentric_longitudes(event.time)
+lons.update(minor_body_heliocentric_longitudes_fast(event.time))
 json.dumps({"lons": lons, "utcMs": event.time.unix * 1000})
 `);
     return JSON.parse(json);
@@ -295,10 +314,12 @@ import json
 from helio.time_resolve import resolve_birth_time
 from helio.eclipses import find_previous_eclipse
 from helio.ephemeris import heliocentric_longitudes
+from helio.minor_bodies import minor_body_heliocentric_longitudes_fast
 
 resolved = resolve_birth_time(_year, _month, _day, _hour, _minute, _second, tz_name=_tz_name)
 event = find_previous_eclipse(resolved.time, _kind)
 lons = heliocentric_longitudes(event.time)
+lons.update(minor_body_heliocentric_longitudes_fast(event.time))
 json.dumps({"lons": lons, "isoUtc": event.time.isot, "moonLatitudeDeg": event.moon_latitude_deg})
 `);
     return JSON.parse(json);

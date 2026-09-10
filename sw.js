@@ -46,9 +46,10 @@ const ASSET_CACHE = "helio-wheel-assets-" + CACHE_VERSION;
 // wheel_integration.js・src/helio/*.py)以外は、Pyodide本体もCDN経由の
 // 各種パッケージもフォントも全部「バージョン固定でほぼ不変」なので、
 // クロスオリジンかどうかだけで判定する。同一オリジンでも天体暦カーネル
-// (.bsp)だけは例外的にこちら(cache-first)に含める。
+// (.bsp)、小惑星・準惑星の黄経テーブル(.bin、2026-09-11追加)だけは
+// 例外的にこちら(cache-first)に含める。
 function isHeavyAsset(url) {
-  return url.pathname.endsWith(".bsp") || url.origin !== self.location.origin;
+  return url.pathname.endsWith(".bsp") || url.pathname.endsWith(".bin") || url.origin !== self.location.origin;
 }
 
 self.addEventListener("install", () => {

@@ -7,6 +7,7 @@ can't find the system CA store here) and pins the ephemeris kernel.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import certifi
 
@@ -19,6 +20,16 @@ os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 # Covers essentially any realistic birth date. If a birth date falls
 # outside that range, switch to "de440" (full range 1550-2650, ~114 MB).
 EPHEMERIS_KERNEL = "de440s"
+
+# Baked daily-longitude lookup table for asteroids/dwarf planets (see
+# minor_bodies.py) -- covers the same 1849-2150 range as de440s above,
+# generated once offline from JPL Horizons (no library auto-download
+# magic exists for this custom format, unlike EPHEMERIS_KERNEL, so this
+# always points at a real file). Default resolves to the copy bundled in
+# the repo (native/pytest use); engine.js overrides this to the
+# browser-fetched copy's path in Pyodide's virtual filesystem, same
+# pattern as EPHEMERIS_KERNEL above.
+MINOR_BODIES_TABLE_PATH = str(Path(__file__).resolve().parents[2] / "web" / "assets" / "minor_bodies.bin")
 
 # Bodies computed for the "ordinary heliocentric" chart, in display order.
 # The Sun is excluded (it is the origin, not a point in the chart).

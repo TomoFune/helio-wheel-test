@@ -1894,14 +1894,16 @@
     }
   }
   // 選択中の人物の本物の出生図データをPyodideで実際に計算し、REF_LONGITUDES
-  // (主要9天体、トロピカル+全GCS起点)とANCHOR_DATA.natal(通常/日食図/月食図)
-  // を丸ごと差し替える -- wheel_integration.js旧loadRealNatalData()を
-  // 「起動時に1回だけ・サンプル花子固定」から「人物選択のたびに・その人物の
-  // データで」実行できるよう一般化したもの。小惑星・準惑星(NATAL_MINOR)は
-  // JPL Horizonsへのネット接続が必要という既知の別課題のため今回も対象外
-  // (引き続きサンプル花子の値を暫定的に使い回す)。恒星・銀河との合は
+  // (主要9天体+小惑星・準惑星、トロピカル+全GCS起点)とANCHOR_DATA.natal
+  // (通常/日食図/月食図)を丸ごと差し替える -- wheel_integration.js旧
+  // loadRealNatalData()を「起動時に1回だけ・サンプル花子固定」から
+  // 「人物選択のたびに・その人物のデータで」実行できるよう一般化したもの。
+  // 小惑星・準惑星は2026-09-11、engine.js側のcomputeMainLongitudes等が
+  // 返すlonsに直接混ぜ込む形で一般化済み(以前はNATAL_MINORというサンプル
+  // 花子固定の別データだった、JPL Horizonsへのネット接続が必要という制約
+  // だったが、オフラインの黄経テーブル化で解消)。恒星・銀河との合は
   // 2026-09-10にrefreshConjunctionsAndUI()側で任意の人物・瞬間に一般化
-  // 済み(このコメントも同日更新)。
+  // 済み。
   async function applyPersonNatalData(person) {
     if (!engineAvailable) {
       // フォールバック中はREF_LONGITUDES/ANCHOR_DATA.natalの初期値
@@ -2662,24 +2664,27 @@
   // CLIで架空の日時・場所から再計算した値に総入れ替えしている
   // -- 表示ラベルだけ変えても、天体の位置自体から元の実出生時刻が
   // 逆算できてしまっては意味がないため。)
+  // 各起点ブロックに、主要9天体に加え小惑星・準惑星7つの黄経も混ぜて
+  // ある(2026-09-11、minor_body_heliocentric_longitudes_fast()で同じ
+  // サンプル花子の出生瞬間から実際に計算) -- エンジンが無い環境
+  // (Artifactフォールバック)でも小惑星チェックが空値にならないように。
   const REF_LONGITUDES = {
-    tropical:          { mercury: 357.99930398539857, venus: 353.9345847700036, earth: 263.6739254210988, mars: 326.0634725239268, jupiter: 109.99846386904794, saturn: 291.1127489423308, uranus: 277.4252629169288, neptune: 283.06073511831505, pluto: 226.6651071354895 },
-    sirius:            { mercury: 254.04922610145866, venus: 249.98450688606368, earth: 159.72384753715886, mars: 222.1133946399869, jupiter: 6.048385985108041, saturn: 187.1626710583909, uranus: 173.47518503298886, neptune: 179.11065723437514, pluto: 122.71502925154961 },
-    arcturus:          { mercury: 153.89895646691684, venus: 149.83423725152187, earth: 59.573577902617046, mars: 121.96312500544508, jupiter: 265.8981163505662, saturn: 87.0124014238491, uranus: 73.32491539844705, neptune: 78.96038759983333, pluto: 22.56475961700778 },
-    antares:           { mercury: 108.37033595991221, venus: 104.30561674451724, earth: 14.044957395612414, mars: 76.43450449844045, jupiter: 220.3694958435616, saturn: 41.483780916844466, uranus: 27.796294891442415, neptune: 33.43176709282869, pluto: 337.03613911000315 },
-    alcyone:           { mercury: 298.14027100451165, venus: 294.0755517891166, earth: 203.81489244021182, mars: 266.2044395430398, jupiter: 50.13943088816099, saturn: 231.25371596144387, uranus: 217.56622993604182, neptune: 223.2017021374281, pluto: 166.80607415460256 },
-    thuban:            { mercury: 200.67889178326809, venus: 196.6141725678731, earth: 106.35351321896829, mars: 168.74306032179632, jupiter: 312.67805166691744, saturn: 133.79233674020034, uranus: 120.10485071479829, neptune: 125.74032291618457, pluto: 69.34469493335902 },
-    orion_belt:        { mercury: 274.63033076383385, venus: 270.5656115484389, earth: 180.30495219953406, mars: 242.6944993023621, jupiter: 26.629490647483237, saturn: 207.7437757207661, uranus: 194.05628969536406, neptune: 199.69176189675034, pluto: 143.2961339139248 },
-    big_dipper:        { mercury: 204.20161027341632, venus: 200.13689105802135, earth: 109.87623170911652, mars: 172.26577881194456, jupiter: 316.2007701570657, saturn: 137.31505523034858, uranus: 123.62756920494652, neptune: 129.2630414063328, pluto: 72.86741342350726 },
-    andromeda_galaxy:  { mercury: 330.2828507847901, venus: 326.21813156939515, earth: 235.95747222049033, mars: 298.34701932331836, jupiter: 82.28201066843948, saturn: 263.3962957417224, uranus: 249.70880971632033, neptune: 255.3442819177066, pluto: 198.94865393488107 },
+    tropical:          { mercury: 357.99930398539857, venus: 353.9345847700036, earth: 263.6739254210988, mars: 326.0634725239268, jupiter: 109.99846386904794, saturn: 291.1127489423308, uranus: 277.4252629169288, neptune: 283.06073511831505, pluto: 226.6651071354895, ceres: 130.60219224297896, pallas: 71.40682458883335, juno: 232.61010328930809, vesta: 16.303247690239758, chiron: 108.04123528798857, eris: 16.9528409242631, lilith_asteroid: 295.2431608836158 },
+    sirius:            { mercury: 254.04922610145866, venus: 249.98450688606368, earth: 159.72384753715886, mars: 222.1133946399869, jupiter: 6.048385985108041, saturn: 187.1626710583909, uranus: 173.47518503298886, neptune: 179.11065723437514, pluto: 122.71502925154961, ceres: 26.652114358932536, pallas: 327.45674670478695, juno: 128.66002540526165, vesta: 272.35316980619336, chiron: 4.091157403942148, eris: 273.0027630402167, lilith_asteroid: 191.29308299956938 },
+    arcturus:          { mercury: 153.89895646691684, venus: 149.83423725152187, earth: 59.573577902617046, mars: 121.96312500544508, jupiter: 265.8981163505662, saturn: 87.0124014238491, uranus: 73.32491539844705, neptune: 78.96038759983333, pluto: 22.56475961700778, ceres: 286.5018447244993, pallas: 227.30647707035365, juno: 28.509755770828406, vesta: 172.20290017176006, chiron: 263.9408877695089, eris: 172.85249340578343, lilith_asteroid: 91.14281336513613 },
+    antares:           { mercury: 108.37033595991221, venus: 104.30561674451724, earth: 14.044957395612414, mars: 76.43450449844045, jupiter: 220.3694958435616, saturn: 41.483780916844466, uranus: 27.796294891442415, neptune: 33.43176709282869, pluto: 337.03613911000315, ceres: 240.97322421749362, pallas: 181.777856563348, juno: 342.98113526382275, vesta: 126.67427966475441, chiron: 218.41226726250324, eris: 127.32387289877778, lilith_asteroid: 45.61419285813048 },
+    alcyone:           { mercury: 298.14027100451165, venus: 294.0755517891166, earth: 203.81489244021182, mars: 266.2044395430398, jupiter: 50.13943088816099, saturn: 231.25371596144387, uranus: 217.56622993604182, neptune: 223.2017021374281, pluto: 166.80607415460256, ceres: 70.74315926209084, pallas: 11.547791607945236, juno: 172.75107030841997, vesta: 316.4442147093516, chiron: 48.18220230710046, eris: 317.093807943375, lilith_asteroid: 235.3841279027277 },
+    thuban:            { mercury: 200.67889178326809, venus: 196.6141725678731, earth: 106.35351321896829, mars: 168.74306032179632, jupiter: 312.67805166691744, saturn: 133.79233674020034, uranus: 120.10485071479829, neptune: 125.74032291618457, pluto: 69.34469493335902, ceres: 333.28178004084464, pallas: 274.086412386699, juno: 75.28969108717374, vesta: 218.98283548810542, chiron: 310.72082308585425, eris: 219.63242872212874, lilith_asteroid: 137.92274868148147 },
+    orion_belt:        { mercury: 274.63033076383385, venus: 270.5656115484389, earth: 180.30495219953406, mars: 242.6944993023621, jupiter: 26.629490647483237, saturn: 207.7437757207661, uranus: 194.05628969536406, neptune: 199.69176189675034, pluto: 143.2961339139248, ceres: 47.23321902141346, pallas: 348.0378513672679, juno: 149.24113006774257, vesta: 292.9342744686743, chiron: 24.672262066423073, eris: 293.5838677026976, lilith_asteroid: 211.8741876620503 },
+    big_dipper:        { mercury: 204.20161027341632, venus: 200.13689105802135, earth: 109.87623170911652, mars: 172.26577881194456, jupiter: 316.2007701570657, saturn: 137.31505523034858, uranus: 123.62756920494652, neptune: 129.2630414063328, pluto: 72.86741342350726, ceres: 336.804498530988, pallas: 277.60913087684236, juno: 78.81240957731711, vesta: 222.50555397824877, chiron: 314.2435415759976, eris: 223.15514721227214, lilith_asteroid: 141.44546717162484 },
+    andromeda_galaxy:  { mercury: 330.2828507847901, venus: 326.21813156939515, earth: 235.95747222049033, mars: 298.34701932331836, jupiter: 82.28201066843948, saturn: 263.3962957417224, uranus: 249.70880971632033, neptune: 255.3442819177066, pluto: 198.94865393488107, ceres: 102.8857390423705, pallas: 43.69037138822489, juno: 204.89365008869964, vesta: 348.5867944896313, chiron: 80.32478208738011, eris: 349.2363877236546, lilith_asteroid: 267.5267076830074 },
   };
-  // Minor bodies (real natal longitudes, same CLI/date as above --
-  // `--no-minor` omitted).
   // 小惑星リリスは表示リストから一旦除外(2026-09-01、「まぎらわしいから
-  // 外しておこうかな」より) -- 上のコメントにあった通り、これは黒い月
-  // (Black Moon Lilith, U+26B8)とは別の小惑星本体で、名前が同じで紛らわ
-  // しかった。NATAL_MINORの値自体は害がないので残してあるが、MINOR_META
-  // から外れているので選択リストにもチャートにも出てこない。
+  // 外しておこうかな」より) -- これは黒い月(Black Moon Lilith、U+26B8)
+  // とは別の小惑星本体で、名前が同じで紛らわしかった。lilith_asteroidの
+  // 黄経自体はminor_body_heliocentric_longitudes_fast()が引き続き計算
+  // するが(minor_bodies.bin/MINOR_BODIESに残っている)、MINOR_METAから
+  // 外れているので選択リストにもチャートにも出てこない。
   const MINOR_META = [
     { key: "ceres",           g: "⚳︎", name: "セレス" },
     { key: "pallas",          g: "⚴︎", name: "パラス" },
@@ -2699,10 +2704,15 @@
     // クロスプラットフォーム問題そのものからも解放される。
     { key: "eris",            g: "Er", name: "エリス" },
   ];
-  const NATAL_MINOR = {
-    ceres: 130.602188, pallas: 71.406816, juno: 232.6101, vesta: 16.30325,
-    chiron: 108.041235, eris: 16.952841, lilith_asteroid: 295.24316,
-  };
+  // MINOR_META(UIのチェックリスト)には無いlilith_asteroidも含む、
+  // engine.jsが返すlonsに載りうる小惑星・準惑星キーの全体集合
+  // (2026-09-11、minor_bodies.pyのMINOR_BODIESと一致させる) --
+  // currentDisplayLongitudes()が「チェックされていないキーを消す」際、
+  // MINOR_METAだけを基準にすると、それに載っていないlilith_asteroidが
+  // 常に(チェック状態に関係なく)lonsに残ってアスペクト計算に紛れ込んで
+  // しまう実バグがあった(このテーブル化以前はbase自体に小惑星キーが
+  // 無かったため起きなかった)。
+  const ALL_MINOR_BODY_KEYS = ['ceres', 'pallas', 'juno', 'vesta', 'chiron', 'eris', 'lilith_asteroid'];
   // 初期値はサンプル花子のCLI計算値(以前と同じ、人物一覧の読み込みが
   // 終わるまでの一時的なプレースホルダー)。2026-09-05(HANDOFF「①②」)
   // 以降、natal.normal/eclipseSolar/eclipseLunarはapplyPersonNatalData()
@@ -2719,14 +2729,14 @@
   const ANCHOR_DATA = {
     natal: {
       normal:       { lons: null /* uses REF_LONGITUDES[currentRef] instead */, date: "1990-06-15 09:30:00 (Asia/Tokyo)" },
-      eclipseSolar: { lons: { mercury: 193.25475, venus: 131.357304, earth: 126.586146, mars: 244.081642, jupiter: 98.363314, saturn: 286.900869, uranus: 275.825649, neptune: 282.232047, pluto: 225.683064 }, date: "1990-01-26 19:20:01 UTC" },
-      eclipseLunar: { lons: { mercury: 237.118579, venus: 154.107025, earth: 140.785237, mars: 251.559483, jupiter: 99.543447, saturn: 287.323901, uranus: 275.986655, neptune: 282.315355, pluto: 225.781845 }, date: "1990-02-09 19:15:44 UTC" },
+      eclipseSolar: { lons: { mercury: 193.25475, venus: 131.357304, earth: 126.586146, mars: 244.081642, jupiter: 98.363314, saturn: 286.900869, uranus: 275.825649, neptune: 282.232047, pluto: 225.683064, ceres: 97.00120283715799, pallas: 29.986905201912226, juno: 212.80222277621965, vesta: 339.4405405846028, chiron: 104.21966668517194, eris: 16.862892317308244, lilith_asteroid: 270.1677587713826 }, date: "1990-01-26 19:20:01 UTC" },
+      eclipseLunar: { lons: { mercury: 237.118579, venus: 154.107025, earth: 140.785237, mars: 251.559483, jupiter: 99.543447, saturn: 287.323901, uranus: 275.986655, neptune: 282.315355, pluto: 225.781845, ceres: 100.26925387916708, pallas: 33.272340287147536, juno: 214.83780245748332, vesta: 343.3329741414905, chiron: 104.59569053085265, eris: 16.87194457795897, lilith_asteroid: 272.53873502381293 }, date: "1990-02-09 19:15:44 UTC" },
       seasonal:     { lons: { mercury: 32.455244, venus: 4.470343, earth: 270.0, mars: 330.264878, jupiter: 110.546519, saturn: 291.313441, uranus: 277.501285, neptune: 283.100175, pluto: 226.711813 }, date: "1990-06-21 15:29:47 UTC", seasonLabel: "夏至" },
     },
     transit: {
-      normal:       { lons: { mercury: 158.25002, venus: 300.796195, earth: 335.214326, mars: 68.513164, jupiter: 128.82408, saturn: 10.031322, uranus: 62.642971, neptune: 2.817987, pluto: 304.426329 }, date: "2026-08-28 12:00:00 UTC" },
-      eclipseSolar: { lons: { mercury: 67.286092, venus: 275.864237, earth: 320.035801, mars: 60.085688, jupiter: 127.559573, saturn: 9.493279, uranus: 62.462263, neptune: 2.721922, pluto: 304.354085 }, date: "2026-08-12 17:36:45 UTC" },
-      eclipseLunar: { lons: { mercury: 156.734852, venus: 300.289567, earth: 334.904944, mars: 68.344143, jupiter: 128.798402, saturn: 10.020381, uranus: 62.639298, neptune: 2.816035, pluto: 304.424861 }, date: "2026-08-28 04:18:32 UTC" },
+      normal:       { lons: { mercury: 158.25002, venus: 300.796195, earth: 335.214326, mars: 68.513164, jupiter: 128.82408, saturn: 10.031322, uranus: 62.642971, neptune: 2.817987, pluto: 304.426329, ceres: 76.87554168701172, pallas: 7.079259634017944, juno: 310.43621826171875, vesta: 8.325212955474854, chiron: 27.986228942871094, eris: 25.36517906188965, lilith_asteroid: 80.73514938354492 }, date: "2026-08-28 12:00:00 UTC" },
+      eclipseSolar: { lons: { mercury: 67.286092, venus: 275.864237, earth: 320.035801, mars: 60.085688, jupiter: 127.559573, saturn: 9.493279, uranus: 62.462263, neptune: 2.721922, pluto: 304.354085, ceres: 73.41655050516806, pallas: 4.5932997328587835, juno: 307.1649014949862, vesta: 4.232153225946589, chiron: 27.827599741022105, eris: 25.355175730586073, lilith_asteroid: 75.48332666954444 }, date: "2026-08-12 17:36:45 UTC" },
+      eclipseLunar: { lons: { mercury: 156.734852, venus: 300.289567, earth: 334.904944, mars: 68.344143, jupiter: 128.798402, saturn: 10.020381, uranus: 62.639298, neptune: 2.816035, pluto: 304.424861, ceres: 76.80491230714873, pallas: 7.027889186566923, juno: 310.3688162005147, vesta: 8.24251627663006, chiron: 27.98300284668135, eris: 25.364976132004276, lilith_asteroid: 80.6289877142348 }, date: "2026-08-28 04:18:32 UTC" },
     },
   };
   // Mean daily motion (deg/day = 360/orbital period), a circular-orbit
@@ -2738,6 +2748,13 @@
     mercury: 360 / 87.969, venus: 360 / 224.701, earth: 360 / 365.256,
     mars: 360 / 686.980, jupiter: 360 / 4332.59, saturn: 360 / 10759.22,
     uranus: 360 / 30688.5, neptune: 360 / 60182, pluto: 360 / 90560,
+    // 小惑星・準惑星7つ(2026-09-11)。円軌道の周期換算ではなく、実際に
+    // 焼き込んだminor_bodies.bin(1849-2150年、1日おき)の連続差分の平均
+    // から直接測った値 -- エリスのように離心率が大きい天体は円軌道近似
+    // (真の周期での平均)よりも「このテーブル/現在の時代での実際の速さ」
+    // の方が、アンカー更新の合間の外挿(スクラブ)にはむしろ適切なため。
+    ceres: 0.21400108, pallas: 0.21354837, juno: 0.22599181, vesta: 0.27162032,
+    chiron: 0.01979994, eris: 0.00082200, lilith_asteroid: 0.22656001,
   };
   // 2026-09-06に発覚したバグの修正: 以前はTRANSIT_BASE_TIME(2026-08-28
   // 固定)を「今」の意味で使っており、「今」ボタン(resetTransitToNow())も
@@ -3154,10 +3171,13 @@
     return rotateToOrigin(base);
   }
   function currentPlanets() {
+    // lons already carries the minor-body keys too (2026-09-11) -- the
+    // engine merges them into the same dict it returns for the main 9,
+    // so no separate NATAL_MINOR lookup is needed anymore.
     const lons = displayMode === 'T' ? resolveTLongitudes() : resolveNLongitudes();
     let list = PLANET_META.map(p => ({ ...p, deg: lons[p.key], astro: formatAstro(lons[p.key]) }));
     const activeMinors = MINOR_META.filter(p => minorBodiesOn.has(p.key));
-    list = list.concat(activeMinors.map(p => ({ ...p, deg: NATAL_MINOR[p.key], astro: formatAstro(NATAL_MINOR[p.key]) })));
+    list = list.concat(activeMinors.map(p => ({ ...p, deg: lons[p.key], astro: formatAstro(lons[p.key]) })));
     return list;
   }
   // Same longitude map the wheel/legend are built from (main 9 + whichever
@@ -3165,9 +3185,13 @@
   // "counted for aspects" are always the same set -- see the note by
   // minorBodiesOn above for why there's no separate 3rd selection.
   function currentDisplayLongitudes() {
+    // base already has all 7 minor-body keys (see currentPlanets note
+    // above) -- drop whichever aren't checked rather than adding them.
+    // ALL_MINOR_BODY_KEYS, not MINOR_META, so lilith_asteroid (never in
+    // MINOR_META, never checkable) always gets dropped too.
     const base = displayMode === 'T' ? resolveTLongitudes() : resolveNLongitudes();
     const lons = { ...base };
-    MINOR_META.forEach(p => { if (minorBodiesOn.has(p.key)) lons[p.key] = NATAL_MINOR[p.key]; });
+    ALL_MINOR_BODY_KEYS.forEach(key => { if (!minorBodiesOn.has(key)) delete lons[key]; });
     return lons;
   }
 
