@@ -1402,19 +1402,27 @@
         </div>
 
         <span class="field-label">T(トランジット)を特別な瞬間へジャンプ</span>
+        <!-- 四季図(春分/夏至/秋分/冬至)も日食/月食と同じく実際に検索して
+             ジャンプできるようにした(2026-09-10、「四季図も、次の春分、
+             夏至、秋分、冬至...と選択できるとさらに最高」より) -- 以前は
+             T_SPECIAL_TIMESの固定日付(2026年6月の夏至1件のみ)しか
+             選べなかった。 -->
         <div class="segmented" id="t-jump-segmented" style="grid-template-columns:repeat(3,1fr);">
           <button class="seg-btn" onclick="jumpTTo('eclipseSolar', this)">日食</button>
           <button class="seg-btn" onclick="jumpTTo('eclipseLunar', this)">月食</button>
-          <button class="seg-btn" onclick="jumpTTo('seasonal', this)">四季(夏至)</button>
+          <button class="seg-btn" onclick="jumpTTo('springEquinox', this)">春分</button>
+          <button class="seg-btn" onclick="jumpTTo('summerSolstice', this)">夏至</button>
+          <button class="seg-btn" onclick="jumpTTo('autumnEquinox', this)">秋分</button>
+          <button class="seg-btn" onclick="jumpTTo('winterSolstice', this)">冬至</button>
         </div>
-        <!-- 日食/月食は実際に検索して求めた瞬間へジャンプする(2026-09-05、
-             「ちゃんと計算して実装できるようにしましょう」より、HANDOFF
-             「②」)。ジャンプ後はここでさらに前後の日食/月食へ移動できる。 -->
+        <!-- 日食/月食・四季図とも実際に検索して求めた瞬間へジャンプする
+             (2026-09-05のHANDOFF「②」、2026-09-10に四季図へ拡張)。
+             ジャンプ後はここでさらに同じ種類の前後へ移動できる。 -->
         <div id="t-eclipse-stepper" style="display:none; align-items:center; justify-content:center; gap:10px; margin-top:10px;">
-          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(-1)">‹ 前の日食/月食</button>
-          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(1)">次の日食/月食 ›</button>
+          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(-1)">‹ 前へ</button>
+          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(1)">次へ ›</button>
         </div>
-        <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので日食/月食の表示は消えます</p>
+        <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので表示は消えます</p>
       </div>
     </div>
 
@@ -2181,59 +2189,61 @@
     updateControlAvailability();
     if (displayMode !== 'T') { buildChart(); updateBadge(); }
   }
-  // 日食/月食は実際に検索して求める(2026-09-05、HANDOFF「②」)。四季図
-  // (夏至)は今回のスコープ外のため、引き続き固定のT_SPECIAL_TIMES.seasonal
-  // を使う(元々の「あとでやる」保留対象は日食/月食のみだったため)。
+  // 検索窓口を日食/月食(findTransitEclipse)・四季図(findTransitSeason)
+  // で分ける以外はjumpTTo/stepTEclipseとも共通の1本のコードで扱う
+  // (2026-09-10、四季図を春分/夏至/秋分/冬至の動的前後検索に拡張した際に
+  // 統合 -- 以前は日食/月食だけが実際に検索し、四季図は固定の夏至1件
+  // (T_SPECIAL_TIMES)だけだった)。
+  function searchTransitSpecial(kind, fromUtcMs, direction) {
+    return isEclipseKind(kind)
+      ? HelioEngine.findTransitEclipse(fromUtcMs, kind, direction)
+      : HelioEngine.findTransitSeason(fromUtcMs, kind, direction);
+  }
   async function jumpTTo(special, btn) {
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const stepper = document.getElementById('t-eclipse-stepper');
-    if (special === 'seasonal') {
+    btn.disabled = true;
+    try {
+      await ensureEngineReady();
+      const result = await searchTransitSpecial(special, transitTime, 'previous');
+      ANCHOR_DATA.transit[special] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
       tSpecialMoment = special;
-      transitTime = T_SPECIAL_TIMES[special];
-      stepper.style.display = 'none';
-    } else {
-      btn.disabled = true;
-      try {
-        await ensureEngineReady();
-        const result = await HelioEngine.findTransitEclipse(transitTime, special, 'previous');
-        ANCHOR_DATA.transit[special] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
-        tSpecialMoment = special;
-        transitTime = result.utcMs;
-        stepper.style.display = 'flex';
-      } catch (err) {
-        console.error('[engine] transit eclipse search failed', err);
-        showPeToast(err.message || '日食/月食の検索に失敗しました');
-        btn.disabled = false;
-        return;
-      }
+      transitTime = result.utcMs;
+      stepper.style.display = 'flex';
+    } catch (err) {
+      console.error('[engine] transit special-moment search failed', err);
+      showPeToast(err.message || '検索に失敗しました');
       btn.disabled = false;
+      return;
     }
+    btn.disabled = false;
     if (displayMode !== 'N') buildChart();
     updateBadge();
     updateConjunctionUI();
   }
-  // ‹/›: 今ジャンプしている日食/月食から、さらに前/次を検索する。ちょうど
-  // その瞬間そのものから1日ずらして探索を始める(浮動小数点誤差でその瞬間
-  // 自体を「次の交差」と誤検出しないための安全マージン、eclipses.pyの
-  // _find_syzygy自体はstrictly before/after保証だが念のため)。
+  // ‹/›: 今ジャンプしている瞬間(日食/月食/四季図)から、さらに前/次を検索
+  // する。ちょうどその瞬間そのものから1日ずらして探索を始める(浮動小数点
+  // 誤差でその瞬間自体を「次の交差」と誤検出しないための安全マージン、
+  // eclipses.py/seasons.pyの探索自体はstrictly before/after保証だが
+  // 念のため)。
   async function stepTEclipse(direction) {
-    if (!tSpecialMoment || tSpecialMoment === 'seasonal') return;
+    if (!tSpecialMoment) return;
     const kind = tSpecialMoment;
     const stepper = document.getElementById('t-eclipse-stepper');
     stepper.style.pointerEvents = 'none';
     try {
       await ensureEngineReady();
       const searchFrom = transitTime + direction * 86400000;
-      const result = await HelioEngine.findTransitEclipse(searchFrom, kind, direction > 0 ? 'next' : 'previous');
+      const result = await searchTransitSpecial(kind, searchFrom, direction > 0 ? 'next' : 'previous');
       ANCHOR_DATA.transit[kind] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
       transitTime = result.utcMs;
       if (displayMode !== 'N') buildChart();
       updateBadge();
       updateConjunctionUI();
     } catch (err) {
-      console.error('[engine] transit eclipse step failed', err);
-      showPeToast(err.message || '日食/月食の検索に失敗しました');
+      console.error('[engine] transit special-moment step failed', err);
+      showPeToast(err.message || '検索に失敗しました');
     } finally {
       stepper.style.pointerEvents = '';
     }
@@ -2243,10 +2253,13 @@
     const pad = n => String(n).padStart(2, '0');
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
   }
+  const SEASON_LABELS_JA = { springEquinox: '春分', summerSolstice: '夏至', autumnEquinox: '秋分', winterSolstice: '冬至' };
+  function isEclipseKind(kind) { return kind === 'eclipseSolar' || kind === 'eclipseLunar'; }
+  function isSeasonKind(kind) { return Object.prototype.hasOwnProperty.call(SEASON_LABELS_JA, kind); }
   function typeLabelJa(type, entry) {
     if (type === 'eclipseSolar') return '日食';
     if (type === 'eclipseLunar') return '月食';
-    if (type === 'seasonal') return `四季図(${entry.seasonLabel})`;
+    if (isSeasonKind(type)) return `四季図(${SEASON_LABELS_JA[type]})`;
     return null;
   }
   function updateBadge() {
@@ -2677,13 +2690,16 @@
   // 初期値はサンプル花子のCLI計算値(以前と同じ、人物一覧の読み込みが
   // 終わるまでの一時的なプレースホルダー)。2026-09-05(HANDOFF「①②」)
   // 以降、natal.normal/eclipseSolar/eclipseLunarはapplyPersonNatalData()
-  // が選択中の人物のデータで、transit.eclipseSolar/eclipseLunarはjumpTTo()/
-  // stepTEclipse()がその都度実際に検索した瞬間のデータで、それぞれ丸ごと
-  // 上書きする -- ここにある数値は「まだ誰も選ばれていない/まだジャンプ
-  // していない」間だけの初期値。natal.seasonalとtransit.seasonalは今回の
-  // スコープ外(四季図の動的検索は別課題として保留中)で、transit.seasonalの
-  // 数値のみ引き続き使う。星起点(REF_LONGITUDES)はnatal.normalのみ対応、
-  // それ以外のセルはトロピカルのみ(元々のスコープ限定、変更なし)。
+  // が選択中の人物のデータで、transit.eclipseSolar/eclipseLunar/(2026-09-10
+  // からは4つの四季図キーも)jumpTTo()/stepTEclipse()がその都度実際に
+  // 検索した瞬間のデータで、それぞれ丸ごと上書きする -- ここにある数値は
+  // 「まだ誰も選ばれていない/まだジャンプしていない」間だけの初期値。
+  // 4つの四季図キー(springEquinox等)はジャンプするまでtransitに存在
+  // しない(該当ボタンを押した時点でjumpTTo()が新規に追加する、eclipse
+  // 系と同じ扱い)。natal.seasonalはN(ネイタル)側が四季図タイプに対応
+  // していない(元からの設計、n-type-segmentedを参照)ため使われない
+  // データのまま残っている。星起点(REF_LONGITUDES)はnatal.normalのみ
+  // 対応、それ以外のセルはトロピカルのみ(元々のスコープ限定、変更なし)。
   const ANCHOR_DATA = {
     natal: {
       normal:       { lons: null /* uses REF_LONGITUDES[currentRef] instead */, date: "1990-06-15 09:30:00 (Asia/Tokyo)" },
@@ -2695,7 +2711,6 @@
       normal:       { lons: { mercury: 158.25002, venus: 300.796195, earth: 335.214326, mars: 68.513164, jupiter: 128.82408, saturn: 10.031322, uranus: 62.642971, neptune: 2.817987, pluto: 304.426329 }, date: "2026-08-28 12:00:00 UTC" },
       eclipseSolar: { lons: { mercury: 67.286092, venus: 275.864237, earth: 320.035801, mars: 60.085688, jupiter: 127.559573, saturn: 9.493279, uranus: 62.462263, neptune: 2.721922, pluto: 304.354085 }, date: "2026-08-12 17:36:45 UTC" },
       eclipseLunar: { lons: { mercury: 156.734852, venus: 300.289567, earth: 334.904944, mars: 68.344143, jupiter: 128.798402, saturn: 10.020381, uranus: 62.639298, neptune: 2.816035, pluto: 304.424861 }, date: "2026-08-28 04:18:32 UTC" },
-      seasonal:     { lons: { mercury: 229.593262, venus: 192.215699, earth: 270.0, mars: 30.402249, jupiter: 123.339672, saturn: 7.709393, uranus: 61.862153, neptune: 2.402716, pluto: 304.113748 }, date: "2026-06-21 08:19:19 UTC", seasonLabel: "夏至" },
     },
   };
   // Mean daily motion (deg/day = 360/orbital period), a circular-orbit
@@ -3035,12 +3050,9 @@
   // scrub away from it clears the label -- you can't be "at the eclipse"
   // and also somewhere else at the same time.
   let tSpecialMoment = null;
-  // 日食/月食は2026-09-05にjumpTTo()側で実際に検索するよう変更したため、
-  // ここには残さない(固定日付のまま放置すると紛らわしいため削除) --
-  // 四季図(夏至)だけ今回のスコープ外で、引き続きこの固定値を使う。
-  const T_SPECIAL_TIMES = {
-    seasonal: Date.UTC(2026, 5, 21, 8, 19, 19),
-  };
+  // 日食/月食は2026-09-05、四季図(春分/夏至/秋分/冬至)は2026-09-10に
+  // jumpTTo()側で実際に検索するよう変更したため、固定日付の定数は
+  // ここには残さない(T_SPECIAL_TIMESは廃止)。
 
   // サイン記号だけをNoto Sans Symbols 2固定のspanで包む -- 数字・°・'を
   // 同じフォント指定に巻き込むと、そのフォントが持つ数字グリフで描画

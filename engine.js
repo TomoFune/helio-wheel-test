@@ -16,7 +16,7 @@ const HelioEngine = (() => {
   const HELIO_MODULES = [
     "__init__.py", "config.py", "degrees.py", "ephemeris.py", "stars.py",
     "deep_sky.py", "reference_points.py", "conjunctions.py", "chart.py",
-    "eclipses.py", "time_resolve.py", "minor_bodies.py", "storage.py",
+    "eclipses.py", "seasons.py", "time_resolve.py", "minor_bodies.py", "storage.py",
   ];
 
   // (2026-09-07) src/helio/*.py と web/assets/de440s.bsp を、以前は
@@ -205,6 +205,30 @@ json.dumps({"lons": lons, "utcMs": event.time.unix * 1000, "moonLatitudeDeg": ev
     return JSON.parse(json);
   }
 
+  // 四季図(春分/夏至/秋分/冬至)の動的な前後検索(2026-09-10、「四季図も
+  // 次の春分、夏至、秋分、冬至...と選択できると」より) -- findTransitEclipse
+  // と全く同じ形。seasonは"springEquinox"/"summerSolstice"/"autumnEquinox"/
+  // "winterSolstice"のいずれか(helio.seasons.SEASON_TARGET_DEGのキーと一致)。
+  async function findTransitSeason(utcMs, season, direction) {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    pyodide.globals.set("_unix_s", utcMs / 1000);
+    pyodide.globals.set("_season", season);
+    pyodide.globals.set("_direction", direction); // "previous" | "next"
+    const json = await pyodide.runPythonAsync(`
+import json
+from astropy.time import Time
+from helio.seasons import find_previous_season, find_next_season
+from helio.ephemeris import heliocentric_longitudes
+
+t0 = Time(_unix_s, format="unix", scale="utc")
+finder = find_previous_season if _direction == "previous" else find_next_season
+event = finder(t0, _season)
+lons = heliocentric_longitudes(event.time)
+json.dumps({"lons": lons, "utcMs": event.time.unix * 1000})
+`);
+    return JSON.parse(json);
+  }
+
   // 出生図の日食図/月食図用(HANDOFF「①」、2026-09-05)。resolve_birth_time
   // (タイムゾーン込みの現地日時->UTC)からfind_previous_eclipseまでを
   // 1回のPython呼び出しで完結させる -- CLIの`--mode eclipse-solar`と同じ
@@ -304,7 +328,7 @@ with Storage() as store:
   }
 
   return {
-    boot, computeMainLongitudes, findTransitEclipse, computeNatalEclipseChart,
+    boot, computeMainLongitudes, findTransitEclipse, findTransitSeason, computeNatalEclipseChart,
     listPeople, savePerson, deletePerson,
   };
 })();
