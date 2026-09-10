@@ -1500,6 +1500,15 @@
             <span class="field-label" style="margin-bottom:0;">恒星・銀河との合(コンジャンクション)を表示</span>
             <div class="switch on" id="conj-switch" onclick="toggleSwitch(this); buildChart();"></div>
           </div>
+          <!-- 検索範囲の3分類(2026-09-10、「恒星リスト選択はGCS/主要な
+               恒星・銀河/その他の3分類」より) -- 「その他」はまだデータ
+               未整備(工事中)。 -->
+          <span class="field-label" style="margin-top:14px;">検索範囲</span>
+          <div class="segmented" id="conj-category-segmented" style="grid-template-columns:repeat(3,1fr);">
+            <button class="seg-btn" onclick="setConjunctionCategory(this,'gcs')">GCS</button>
+            <button class="seg-btn active" onclick="setConjunctionCategory(this,'major')">主要</button>
+            <button class="seg-btn" onclick="setConjunctionCategory(this,'other')">その他(工事中)</button>
+          </div>
           <div class="orb-slider-block" style="margin-top:12px;">
             <div class="orb-row">
               <span style="font-size: 0.86rem; color:var(--ink-dim);">オーブ</span>
@@ -1511,7 +1520,7 @@
           <div id="conj-groups"></div>
 
           <p style="font-size: 0.8rem; color:var(--ink-faint); line-height:1.6; margin-top:16px;">
-            チェックした星だけが図の外周にマーク表示されます。選択はすぐに反映されます。N・Tどちらでも計算できますが、恒星側の位置は出生時(1990年)のもので近似しています(歳差はごくわずかなので、数十年のずれなら実用上問題ありません)。
+            チェックした星だけが図の外周にマーク表示されます。選択はすぐに反映されます。出生図・経過図それぞれ、選択中の人物・瞬間の実際の位置で毎回計算しています。
           </p>
         </div>
       </div>
@@ -1888,11 +1897,11 @@
   // (主要9天体、トロピカル+全GCS起点)とANCHOR_DATA.natal(通常/日食図/月食図)
   // を丸ごと差し替える -- wheel_integration.js旧loadRealNatalData()を
   // 「起動時に1回だけ・サンプル花子固定」から「人物選択のたびに・その人物の
-  // データで」実行できるよう一般化したもの。小惑星・準惑星(NATAL_MINOR)と
-  // 恒星・銀河との合(CATALOG_STARS)は、既知の別課題(前者はJPL Horizonsへの
-  // ネット接続が必要、後者はまだ固定カタログのまま)のため今回は対象外 --
-  // 引き続きサンプル花子の値を暫定的に使い回す(以前からの制約であり、今回
-  // 新たに悪化したものではない)。
+  // データで」実行できるよう一般化したもの。小惑星・準惑星(NATAL_MINOR)は
+  // JPL Horizonsへのネット接続が必要という既知の別課題のため今回も対象外
+  // (引き続きサンプル花子の値を暫定的に使い回す)。恒星・銀河との合は
+  // 2026-09-10にrefreshConjunctionsAndUI()側で任意の人物・瞬間に一般化
+  // 済み(このコメントも同日更新)。
   async function applyPersonNatalData(person) {
     if (!engineAvailable) {
       // フォールバック中はREF_LONGITUDES/ANCHOR_DATA.natalの初期値
@@ -1907,6 +1916,13 @@
       hour = parts[0] || 0; minute = parts[1] || 0; second = parts[2] || 0;
     }
     const base = { year: y, month: m, day: d, hour, minute, second, tzName: person.timezone };
+    // 恒星の合の検索に使う「この人物のnatal瞬間」(2026-09-10、以前は
+    // 1990年固定のサンプル花子データだった) -- 恒星の歳差ドリフトは
+    // 年0.014度程度とごくわずかなので、タイムゾーンの分の誤差(最大24
+    // 時間程度)は無視できるほど小さく、UTCとして扱ってしまって問題ない
+    // (厳密なUTC変換はcomputeReferenceOrigins()側でPythonが行っている、
+    // ここはあくまで恒星側の位置計算用の近似基準時刻)。
+    N_TYPE_EPOCH_MS.normal = Date.UTC(y, m - 1, d, hour, minute, second);
 
     try {
       await computeReferenceOrigins(base);
@@ -2153,7 +2169,7 @@
     const conjMenuBtn = document.getElementById('menu-conj-btn');
     conjMenuBtn.style.opacity = isBiwheel ? '0.4' : '1';
     conjMenuBtn.style.pointerEvents = isBiwheel ? 'none' : 'auto';
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
 
     // T is always scrubbable now -- eclipse/seasonal are just a jump-to
     // shortcut on the same timeline, not a separate frozen mode.
@@ -2220,7 +2236,7 @@
     btn.disabled = false;
     if (displayMode !== 'N') buildChart();
     updateBadge();
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
   }
   // ‹/›: 今ジャンプしている瞬間(日食/月食/四季図)から、さらに前/次を検索
   // する。ちょうどその瞬間そのものから1日ずらして探索を始める(浮動小数点
@@ -2240,7 +2256,7 @@
       transitTime = result.utcMs;
       if (displayMode !== 'N') buildChart();
       updateBadge();
-      updateConjunctionUI();
+      refreshConjunctionsAndUI();
     } catch (err) {
       console.error('[engine] transit special-moment step failed', err);
       showPeToast(err.message || '検索に失敗しました');
@@ -2369,7 +2385,7 @@
     }
     if (displayMode !== 'N') buildChart();
     updateBadge();
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
   }
 
   // ---------- transit time-scrub ----------
@@ -2391,7 +2407,7 @@
     }
     if (displayMode !== 'N') buildChart();
     updateBadge();
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
   }
   // 実際にPyodideで「今」の瞬間の主要9天体を計算し、MEAN_MOTION近似の
   // アンカー(TRANSIT_BASE_TIME/ANCHOR_DATA.transit.normal)を最新化する
@@ -2421,7 +2437,7 @@
     document.getElementById('t-eclipse-stepper').style.display = 'none';
     if (displayMode !== 'N') buildChart();
     updateBadge();
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
     // アンカーを実際に計算し直す(数百ms程度) -- 完了時にまだ「今」を見て
     // いれば(スクラブ/ジャンプで離れていなければ)、より正確な値で再描画。
     await refreshTransitNowAnchor();
@@ -2429,7 +2445,7 @@
       transitTime = Date.now();
       buildChart();
       updateBadge();
-      updateConjunctionUI();
+      refreshConjunctionsAndUI();
     }
   }
 
@@ -2496,7 +2512,7 @@
     if (el.classList.contains('on')) minorBodiesOn.add(key); else minorBodiesOn.delete(key);
     saveSetting('minorBodiesOn', [...minorBodiesOn]);
     buildChart();
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
   }
   function fillMinorBodyList() {
     const container = document.getElementById('minor-body-list');
@@ -2515,7 +2531,7 @@
     document.getElementById('orb-value-2').textContent = conjOrb.toFixed(1) + '°';
     document.getElementById('orb-slider-panel').value = conjOrb;
     saveSetting('conjOrb', conjOrb);
-    updateConjunctionUI();
+    refreshConjunctionsAndUI();
   }
 
 
@@ -2750,52 +2766,28 @@
   let displayMode = 'N';
   let conjOrb = 1.5;
 
-  // Real fixed-star/deep-sky conjunction hits (helio-app CLI
-  // `--list-conjunctions --orb 3`), for N's normal (birth) longitudes
-  // only -- the full 90-star + 12-deep-sky catalog isn't embedded in
-  // this mockup, so this is the one moment conjunctions can be shown
-  // accurately for. Keys match PLANET_META/MINOR_META body keys.
-  // Real absolute heliocentric longitudes (helio-app CLI, at the natal
-  // epoch -- サンプル人物(架空)1990-06-15) for every catalog star/deep-sky
-  // object that showed up within a 3 deg orb of the natal chart. Storing
-  // each object's own longitude (not just "how far it was from body X")
-  // is what lets conjunctions be checked against *any* currently
-  // displayed body set -- N's, or T's (scrubbed or jumped) -- with the
-  // same simple angular-separation math, not just the fixed natal
-  // moment. A star's ecliptic longitude drifts only ~0.014 deg/year
-  // from precession, so reusing the 1990 value for T's "now"/scrubbed
-  // moments decades away is a deliberate, disclosed approximation, not
-  // an oversight -- the real app will recompute this properly once the
-  // Pyodide engine is wired in.
-  // `cat` (constellation + Bayer letter, e.g. "おおいぬ座 α星") matches
-  // the same secondary-caption format the origin-star picker (ref-panel)
-  // already uses -- constellation_ja/name_en(Bayer) pulled directly from
-  // stars.py for this list (2026-09-03、実データを架空データに総入れ替え
-  // した際、CLIの--list-conjunctions --orb 3で新しい合の星を再検索し、
-  // このテーブル自体も丸ごと差し替えた -- 星は全部αであることを
-  // name_en(alf X)で確認済み)。
-  const CATALOG_STARS = {
-    scl_principal: { name: "ちょうこくしつ座の主星", short: "ちょうこくしつ座", cat: "ちょうこくしつ座 α星", lon: 0.358497, kind: "star" },
-    markab: { name: "マルカブ", cat: "ペガスス座 α星", lon: 353.352561, kind: "star" },
-    ara_principal: { name: "さいだん座の主星", short: "さいだん座", cat: "さいだん座 α星", lon: 264.800961, kind: "star" },
-    rasalhague: { name: "ラスアルハゲ", cat: "へびつかい座 α星", lon: 262.314821, kind: "star" },
-    men_principal: { name: "テーブルさん座の主星", short: "テーブルさん座", cat: "テーブルさん座 α星", lon: 265.163326, kind: "star" },
-    atria: { name: "アトリア", cat: "みなみのさんかく座 α星", lon: 260.762492, kind: "star" },
-    castor: { name: "カストル", cat: "ふたご座 α星", lon: 110.107183, kind: "star" },
-    peacock: { name: "ピーコック", cat: "くじゃく座 α星", lon: 293.683714, kind: "star" },
-    sct_principal: { name: "たて座の主星", short: "たて座", cat: "たて座 α星", lon: 278.883318, kind: "star" },
-    tel_principal: { name: "ぼうえんきょう座の主星", short: "ぼうえんきょう座", cat: "ぼうえんきょう座 α星", lon: 274.94015, kind: "star" },
-    cra_principal: { name: "みなみのかんむり座の主星", short: "みなみのかんむり座", cat: "みなみのかんむり座 α星", lon: 284.001178, kind: "star" },
-    vega: { name: "ベガ", cat: "こと座 α星", lon: 285.182498, kind: "star" },
-    zubenelgenubi: { name: "ズベンエルゲヌビ", cat: "てんびん座 α星", lon: 224.949501, kind: "star" },
-    lyn_principal: { name: "やまねこ座の主星", short: "やまねこ座", cat: "やまねこ座 α星", lon: 131.70941, kind: "star" },
-    acubens: { name: "アクベンス", cat: "かに座 α星", lon: 133.508223, kind: "star" },
-    aldebaran: { name: "アルデバラン", cat: "おうし座 α星", lon: 69.65569, kind: "star" },
-    unukalhai: { name: "ウヌクアルハイ", cat: "へび座 α星", lon: 231.94111, kind: "star" },
-    lup_principal: { name: "おおかみ座の主星", short: "おおかみ座", cat: "おおかみ座 α星", lon: 233.370807, kind: "star" },
-    mus_principal: { name: "はえ座の主星", short: "はえ座", cat: "はえ座 α星", lon: 230.24193, kind: "star" },
-    alpheratz: { name: "アルフェラッツ", cat: "アンドロメダ座 α星", lon: 14.17551, kind: "star" },
-  };
+  // 恒星・銀河との合(コンジャンクション)を、選択中の人物・瞬間で毎回
+  // 実際に検索するようにした(2026-09-10、「恒星・銀河との合を任意の
+  // 人物へ一般化」より) -- 以前はサンプル花子の1990年固定データを
+  // 埋め込んだモックアップだった(CATALOG_STARS、廃止)。検索範囲は
+  // 3分類(GCS/主要な恒星・銀河/その他)から選べる -- 「その他」
+  // (polockさんの285星のうち太文字以外の約203星)はまだデータ未整備で
+  // 「工事中」表示のみ。
+  const GCS_CONJUNCTION_KEYS = ['sirius', 'arcturus', 'antares', 'alcyone', 'thuban', 'andromeda_galaxy'];
+  let majorReferenceKeys = [];  // HelioEngine.listMajorReferenceKeys()で起動時に取得(87件)
+  let conjunctionCategory = loadSetting('conjunctionCategory', 'major');  // 'gcs' | 'major' | 'other'
+  function currentConjunctionSearchKeys() {
+    if (conjunctionCategory === 'gcs') return GCS_CONJUNCTION_KEYS;
+    if (conjunctionCategory === 'other') return [];  // 工事中、意図的に空
+    return majorReferenceKeys;
+  }
+  function setConjunctionCategory(el, category) {
+    document.querySelectorAll('#conj-category-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    conjunctionCategory = category;
+    saveSetting('conjunctionCategory', category);
+    refreshConjunctionsAndUI();
+  }
   function isNNormal() { return displayMode === 'N' && nType === 'normal'; }
   // 起点(恒星)選択がその表示に実際に効くかどうか(2026-09-10) -- Nの
   // 通常図に加え、経過図(T、日食/月食ジャンプ中・二重円のTリングも含む)
@@ -2826,18 +2818,15 @@
     if (refKey === 'tropical') continue;
     REF_TROPICAL_LON[refKey] = ((REF_LONGITUDES.tropical.mercury - REF_LONGITUDES[refKey].mercury) % 360 + 360) % 360;
   }
-  // Bug 2: 「ネイタルはネイタルの年月日、トランジットはトランジットの
-  // 年月日で、恒星の位置も揃えてほしい」。CATALOG_STARSの黄経は出生時
-  // (1990-06-15)一点で固定していたため、トランジット(2026年、約36年後)
-  // を見ているときも1990年の恒星位置のまま比較していた。歳差により黄経
-  // は年に約0.014度(50.29秒/年)動くので、36年で約0.5度 -- オーブ設定
-  // (デフォルト1.5度)次第では合否が変わりうる差。見ている年月日に応じて
-  // 恒星側の黄経も動かす。
-  const NATAL_EPOCH_MS = Date.UTC(1990, 5, 15, 0, 30, 0);  // 1990-06-15 09:30 JST = 00:30 UTC、出生時=カタログの基準時刻そのもの(サンプル人物・架空)
-  const PRECESSION_DEG_PER_YEAR = 50.29 / 3600;
-  const MS_PER_YEAR = 365.25 * 86400000;
+  // 「ネイタルはネイタルの年月日、トランジットはトランジットの年月日で、
+  // 恒星の位置も揃えてほしい」-- 以前はCATALOG_STARSの黄経を出生時
+  // (1990-06-15)一点で固定していたため歳差ぶんの近似(drift)が必要
+  // だったが、2026-09-10からは選択中の瞬間でPythonが毎回実際に計算する
+  // ため、この近似は不要になった(削除: effectiveStarLon/NATAL_EPOCH_MS/
+  // PRECESSION_DEG_PER_YEAR/MS_PER_YEAR)。N_TYPE_EPOCH_MS.normalは
+  // 人物選択のたびにapplyPersonNatalData()が更新する(以前は1990年固定)。
   const N_TYPE_EPOCH_MS = {
-    normal: NATAL_EPOCH_MS,
+    normal: Date.UTC(1990, 5, 15, 0, 30, 0),  // 人物未選択時の初期値、選択後は上書きされる
     eclipseSolar: Date.UTC(1990, 0, 26, 19, 20, 1),
     eclipseLunar: Date.UTC(1990, 1, 9, 19, 15, 44),
     seasonal: Date.UTC(1990, 5, 21, 15, 29, 47),
@@ -2846,15 +2835,6 @@
     // T: 現在表示中の(スクラブ/ジャンプ後の)瞬間そのもの。N: 選択中の
     // 種別(通常/日食図/月食図/四季図)それぞれの実日時。
     return displayMode === 'T' ? transitTime : N_TYPE_EPOCH_MS[nType];
-  }
-  function effectiveStarLon(star) {
-    const drift = (currentConjunctionEpochMs() - NATAL_EPOCH_MS) / MS_PER_YEAR * PRECESSION_DEG_PER_YEAR;
-    // 2026-09-10: Tも起点セレクターに対応したため、refOffsetの判定を
-    // isNNormal()単体からoriginPickerAvailable()へ拡張(下のresolveT
-    // Longitudes()と同じ判定を共有)。normal以外のN(日食図/月食図)は
-    // 引き続き非対応(常にトロピカル)。
-    const refOffset = originPickerAvailable() ? REF_TROPICAL_LON[currentRef] : 0;
-    return ((star.lon + drift - refOffset) % 360 + 360) % 360;
   }
   // Every hit starts checked ("visible on the wheel") by default; toggling
   // a checkbox in the panel removes/adds it here rather than re-deriving
@@ -2875,30 +2855,60 @@
     if (displayMode === 'T') return resolveTLongitudes();
     return resolveNLongitudes();
   }
-  function conjunctionSummary(orbDeg) {
-    const lons = currentConjunctionLongitudes();
-    const allMeta = [...PLANET_META, ...MINOR_META];
-    const minorKeys = new Set(MINOR_META.map(m => m.key));
-    const out = [];
-    for (const bodyMeta of allMeta) {
-      if (minorKeys.has(bodyMeta.key) && !minorBodiesOn.has(bodyMeta.key)) continue;
-      const bodyLon = lons[bodyMeta.key];
-      if (bodyLon === undefined) continue;
-      const hits = [];
-      for (const [starKey, star] of Object.entries(CATALOG_STARS)) {
-        const sep = angularSep(bodyLon, effectiveStarLon(star));
-        if (sep > orbDeg) continue;
-        hits.push({ key: starKey, name: star.name, short: star.short, cat: star.cat, kind: star.kind, sep });
-        const hitId = bodyMeta.key + '|' + starKey;
-        if (!seenHitIds.has(hitId)) {
-          seenHitIds.add(hitId);
-          checkedHits.add(hitId);  // default: newly-seen hits start checked
-        }
-      }
-      hits.sort((a, b) => a.sep - b.sep);
-      if (hits.length) out.push({ key: bodyMeta.key, name: bodyMeta.name, glyph: bodyMeta.g, hits });
+  // Pyodideから返ってきた最新の検索結果をキャッシュしたもの -- 以前の
+  // conjunctionSummary(orbDeg)(同期・静的データ参照)と全く同じ形
+  // (配列 of {key, name, glyph, hits: [{key, name, cat, kind, sep}]})
+  // にしてあるので、updateConjunctionUI()/drawConjunctionMarkers()側は
+  // 「どこからデータが来るか」を意識せず、これまで通り同期的に描画
+  // できる(2026-09-10)。
+  let currentConjunctionSummary = [];
+  let conjunctionRefreshToken = 0;  // 連打・素早い切り替えで古い応答が新しい応答を上書きしないためのカウンタ
+  // rotateToOrigin()を掛ける前の素のトロピカル黄経 -- Python側の
+  // find_conjunctionsに渡す値(起点回転しても合の判定自体は変わらない
+  // 設計だが、渡す側で「回転していない」ことを保証しておく)。
+  function currentConjunctionTropicalLongitudes() {
+    if (displayMode === 'T') {
+      return tSpecialMoment ? ANCHOR_DATA.transit[tSpecialMoment].lons : transitLongitudesNow();
     }
-    return out;
+    return nType === 'normal' ? REF_LONGITUDES.tropical : ANCHOR_DATA.natal[nType].lons;
+  }
+  // 恒星・銀河との合を実際に検索し直し、結果をキャッシュしてから再描画
+  // する(2026-09-10) -- 人物・モード・瞬間・オーブ・検索範囲(GCS/主要
+  // /その他)のいずれかが変わるたびに呼ぶ。呼び出し元をawaitさせない
+  // (バックグラウンドで検索し、終わり次第再描画するだけ)ので、円や
+  // 惑星の表示自体はこれを待たずに即座に更新される。
+  async function refreshConjunctionsAndUI() {
+    if (!conjunctionsAvailable()) { updateConjunctionUI(); return; }
+    const token = ++conjunctionRefreshToken;
+    const searchKeys = currentConjunctionSearchKeys();
+    if (!engineAvailable || searchKeys.length === 0) {
+      currentConjunctionSummary = [];
+      updateConjunctionUI();
+      return;
+    }
+    try {
+      await ensureEngineReady();
+      const lons = currentConjunctionTropicalLongitudes();
+      const bodyLons = {};
+      PLANET_META.forEach(p => { if (lons[p.key] !== undefined) bodyLons[p.key] = lons[p.key]; });
+      const hitsByBody = await HelioEngine.findConjunctions(bodyLons, currentConjunctionEpochMs(), conjOrb, searchKeys);
+      if (token !== conjunctionRefreshToken) return;  // 追い越された、破棄
+      currentConjunctionSummary = PLANET_META
+        .filter(p => hitsByBody[p.key])
+        .map(p => {
+          const hits = hitsByBody[p.key].map(h => ({ key: h.refKey, name: h.labelJa, cat: h.constellationJa, kind: h.kind, sep: h.sep }));
+          hits.forEach(h => {
+            const hitId = p.key + '|' + h.key;
+            if (!seenHitIds.has(hitId)) { seenHitIds.add(hitId); checkedHits.add(hitId); }
+          });
+          return { key: p.key, name: p.name, glyph: p.g, hits };
+        });
+    } catch (err) {
+      if (token !== conjunctionRefreshToken) return;
+      console.error('[engine] conjunction search failed', err);
+      currentConjunctionSummary = [];
+    }
+    updateConjunctionUI();
   }
   function updateConjunctionUI() {
     const menuLabel = document.getElementById('menu-conj-label');
@@ -2909,27 +2919,37 @@
       return;
     }
     note.style.display = 'none';
-    const summary = conjunctionSummary(conjOrb);
+    const summary = currentConjunctionSummary;
     menuLabel.textContent = summary.length ? `恒星の合 (${summary.length})` : '恒星の合';
 
     const container = document.getElementById('conj-groups');
     container.innerHTML = '';
     if (summary.length === 0) {
-      container.innerHTML = `<p style="color:var(--ink-faint); font-size:0.85rem;">このオーブ内には見つかりません。オーブを広げてみてください。</p>`;
-      return;
+      let msg = 'このオーブ内には見つかりません。オーブを広げてみてください。';
+      if (conjunctionCategory === 'other') {
+        msg = 'この分類(その他)はまだ準備中です。GCSか主要な恒星・銀河をお試しください。';
+      } else if (!engineAvailable) {
+        msg = 'この機能はPyodide版(GitHub Pages/ローカル起動)でのみ利用できます。';
+      }
+      container.innerHTML = `<p style="color:var(--ink-faint); font-size:0.85rem;">${msg}</p>`;
+    } else {
+      summary.forEach(body => {
+        const group = document.createElement('div');
+        group.className = 'conj-body-group';
+        const hitsHtml = body.hits.map(h => {
+          const hitId = body.key + '|' + h.key;
+          const isOn = checkedHits.has(hitId);
+          const catHtml = h.cat ? `<span class="conj-hit-cat">${h.cat}</span>` : '';
+          return `<div class="conj-hit"><span class="mini-check${isOn ? ' on' : ''}" data-hit="${hitId}" onclick="toggleMini(this)">${isOn ? '✓' : ''}</span><span class="conj-hit-main"><span class="conj-hit-name">${h.name}</span>${catHtml}</span><span class="conj-hit-sep mono">${h.sep.toFixed(2)}°</span></div>`;
+        }).join('');
+        group.innerHTML = `<div class="conj-body-name"><span class="conj-body-glyph">${body.glyph}</span> ${body.name}</div>${hitsHtml}`;
+        container.appendChild(group);
+      });
     }
-    summary.forEach(body => {
-      const group = document.createElement('div');
-      group.className = 'conj-body-group';
-      const hitsHtml = body.hits.map(h => {
-        const hitId = body.key + '|' + h.key;
-        const isOn = checkedHits.has(hitId);
-        const catHtml = h.cat ? `<span class="conj-hit-cat">${h.cat}</span>` : '';
-        return `<div class="conj-hit"><span class="mini-check${isOn ? ' on' : ''}" data-hit="${hitId}" onclick="toggleMini(this)">${isOn ? '✓' : ''}</span><span class="conj-hit-main"><span class="conj-hit-name">${h.name}</span>${catHtml}</span><span class="conj-hit-sep mono">${h.sep.toFixed(2)}°</span></div>`;
-      }).join('');
-      group.innerHTML = `<div class="conj-body-name"><span class="conj-body-glyph">${body.glyph}</span> ${body.name}</div>${hitsHtml}`;
-      container.appendChild(group);
-    });
+    // summaryが空でも必ず呼ぶ(2026-09-10、以前はここで早期returnしており、
+    // 検索範囲の切り替え等で「合」がゼロ件になった時、円周上の古いマーカー
+    // が消えずに残るバグがあった -- 両関数とも自分でgroup.innerHTML=''して
+    // いるので、空でも呼んで問題ない)。
     drawConjunctionMarkers();
     drawReferenceStarLabel();  // see the note on toggleMini() -- orb changes can change which bodies are in the fan-out cluster too
   }
@@ -2948,7 +2968,7 @@
     // outside. Planet labels stayed inside; only the star/deep-sky
     // markers move out here, at the user's explicit request, so there's
     // no collision to reintroduce.
-    const summary = conjunctionSummary(conjOrb);
+    const summary = currentConjunctionSummary;
     // Two bodies that are themselves in conjunction with each other (so
     // nearly the same longitude) can both fall within orb of the same
     // star -- without this, that star's label would get drawn twice,
@@ -4167,6 +4187,13 @@
         item.classList.toggle('selected', !!isMatch);
       });
     }
+    // conjunctionCategory自体はスクリプト上部で既にloadSetting済み
+    // (デフォルト'major') -- ここではHTML側のボタンのactive表示を
+    // それに合わせるだけ。
+    document.querySelectorAll('#conj-category-segmented .seg-btn').forEach((btn) => {
+      const isMatch = btn.getAttribute('onclick')?.includes("'" + conjunctionCategory + "'");
+      btn.classList.toggle('active', !!isMatch);
+    });
   }
   restoreSettings();
   fillMinorBodyList();
@@ -4186,6 +4213,11 @@
   // 中...」表示のまま(wheel_integration.js側のshowBootStatusが進捗を書き
   // 込む)。
   async function onHelioEngineReadyHandler() {
+    try {
+      majorReferenceKeys = await HelioEngine.listMajorReferenceKeys();
+    } catch (err) {
+      console.warn('[engine] failed to load major reference key list', err);
+    }
     await refreshPeopleList();
     // 起動完了時点でも「今」のアンカーを一度実計算しておく(2026-09-06、
     // 「今」が今にならないバグの修正) -- ボタンを押さずTを見ただけでも
@@ -4196,7 +4228,7 @@
       transitTime = Date.now();
       buildChart();
       updateBadge();
-      updateConjunctionUI();
+      refreshConjunctionsAndUI();
     }
   }
   window.onHelioEngineReady = onHelioEngineReadyHandler;

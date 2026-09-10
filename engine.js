@@ -229,6 +229,53 @@ json.dumps({"lons": lons, "utcMs": event.time.unix * 1000})
     return JSON.parse(json);
   }
 
+  // 「主要な恒星・銀河」キー一覧をPython側(reference_points.py)から
+  // そのまま取得する(2026-09-10) -- GCS(8起点)は元々JS側で管理して
+  // いるものをそのまま使うため、ここでは「主要」だけを返す。
+  async function listMajorReferenceKeys() {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    const json = await pyodide.runPythonAsync(`
+import json
+from helio.reference_points import MAJOR_REFERENCE_KEYS
+
+json.dumps(sorted(MAJOR_REFERENCE_KEYS))
+`);
+    return JSON.parse(json);
+  }
+
+  // 恒星・銀河との合(コンジャンクション)をその都度実際に検索する
+  // (2026-09-10、「恒星・銀河との合を任意の人物へ一般化」より) -- 以前は
+  // サンプル花子の1990年のデータを固定で埋め込んでいたモックアップを
+  // 置き換える。bodyLonsは{惑星キー: トロピカル黄経}(起点回転をかける前
+  // の、いわゆる素の値 -- conjunctions.pyのfind_conjunctions自身が
+  // 「回転しても合の判定は変わらない」設計のため)。keysは検索対象の
+  // 参照点キー一覧(GCS/主要な恒星・銀河などのタブに対応)。
+  async function findConjunctions(bodyLons, utcMs, orbDeg, keys) {
+    if (!pyodide) throw new Error("HelioEngine.boot() がまだ完了していません");
+    pyodide.globals.set("_body_lons_json", JSON.stringify(bodyLons));
+    pyodide.globals.set("_unix_s", utcMs / 1000);
+    pyodide.globals.set("_orb_deg", orbDeg);
+    pyodide.globals.set("_keys_json", JSON.stringify(keys));
+    const json = await pyodide.runPythonAsync(`
+import json
+from astropy.time import Time
+from helio.conjunctions import find_conjunctions
+
+body_lons = json.loads(_body_lons_json)
+keys = json.loads(_keys_json)
+t = Time(_unix_s, format="unix", scale="utc")
+hits = find_conjunctions(body_lons, t, orb_deg=_orb_deg, keys=keys)
+json.dumps({
+    body_key: [
+        {"refKey": h.ref_key, "kind": h.ref_kind, "labelJa": h.label_ja, "constellationJa": h.constellation_ja, "lon": h.lon, "sep": h.separation_deg}
+        for h in hit_list
+    ]
+    for body_key, hit_list in hits.items()
+})
+`);
+    return JSON.parse(json);
+  }
+
   // 出生図の日食図/月食図用(HANDOFF「①」、2026-09-05)。resolve_birth_time
   // (タイムゾーン込みの現地日時->UTC)からfind_previous_eclipseまでを
   // 1回のPython呼び出しで完結させる -- CLIの`--mode eclipse-solar`と同じ
@@ -329,6 +376,6 @@ with Storage() as store:
 
   return {
     boot, computeMainLongitudes, findTransitEclipse, findTransitSeason, computeNatalEclipseChart,
-    listPeople, savePerson, deletePerson,
+    findConjunctions, listMajorReferenceKeys, listPeople, savePerson, deletePerson,
   };
 })();

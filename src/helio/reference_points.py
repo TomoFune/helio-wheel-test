@@ -21,6 +21,35 @@ def all_reference_keys() -> list[str]:
     return sorted(set(STARS) | set(STAR_GROUPS) | set(DEEP_SKY_OBJECTS))
 
 
+# 「恒星・銀河との合」の表示先を絞り込むための3分類のうち、GCS以外の2つ
+# (2026-09-10、「恒星リスト選択はGCS/主要な恒星・銀河/その他の3分類」
+# より) -- GCS(8つの起点候補)はJS側で既に別管理(GCS_STAR_KEYS)のため
+# ここでは定義しない。「主要」はユーザー提供の2つの一覧(horoscopeheart.com
+# のブレイディ恒星占星術64星、polock.s223.xrea.comの285星のうち太文字
+# 85星)を突き合わせ、既存カタログに無かった分を追加した上でのキー一覧。
+# 「その他」は元の一覧の残り約203星に相当するが、今回はスコープ外
+# (JS側で「工事中」表示のプレースホルダーのみ)。
+MAJOR_REFERENCE_KEYS: set[str] = {
+    # 恒星
+    "alderamin", "alpheratz", "alrescha", "mirach", "hamal", "schedar", "tsih",
+    "menkar", "algol", "alcyone", "mirfak", "aldebaran", "rigel", "bellatrix",
+    "capella", "phact", "mintaka", "elnath", "alnilam", "alnitak", "polaris",
+    "betelgeuse", "menkalinan", "mirzam", "alhena", "sirius", "canopus", "castor",
+    "pollux", "procyon", "acubens", "dubhe", "merak", "alphard", "regulus",
+    "phecda", "megrez", "sex_principal", "thuban", "zosma", "denebola", "alkes",
+    "diadem", "vindemiatrix", "gienah", "alchiba", "spica", "arcturus",
+    "miaplacidus", "gacrux", "acrux", "alphecca", "zubenelgenubi",
+    "zubeneschamali", "lup_principal", "hadar", "rigil_kentaurus", "antares",
+    "rasalgethi", "sabik", "rasalhague", "nunki", "vega", "rukbat", "peacock",
+    "albireo", "altair", "fawaris", "sualocin", "sadalsuud", "deneb_algedi",
+    "sadr", "sadalmelik", "fomalhaut", "deneb", "achernar", "ankaa", "markab",
+    "scheat", "quadrans",
+    # 銀河・星団
+    "andromeda_galaxy", "sunflower_galaxy", "galactic_center",
+    "aculeus", "acumen", "facies", "capulus",
+}
+
+
 def reference_info(key: str) -> dict:
     """The underlying dict for `key`, whichever namespace it's from --
     all three carry at least `label_ja`/`name_en`/`source`."""

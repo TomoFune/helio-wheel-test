@@ -126,6 +126,52 @@ DEEP_SKY_OBJECTS: dict[str, dict] = {
         "ra_deg": 201.69699999999997,
         "dec_deg": -47.47947222222223,
     },
+    "sunflower_galaxy": {
+        "label_ja": "ひまわり銀河(M63)",
+        "name_en": "M63 / Sunflower Galaxy",
+        "kind": "galaxy",
+        "source": "SIMBAD basic data (queried 2026-09-10), ICRS",
+        "ra_deg": 198.95530912246997,
+        "dec_deg": 42.02936891003,
+    },
+    # --- 2026-09-10、恒星占星術で使われる4つの星団(アキュレウス/アキュメン
+    # /ファシーズ/カプルス、polock.s223.xrea.comの恒星リストより)を追加。
+    # 個々の星ではなく星団そのものなので、既存のプレアデス星団等と同じ
+    # "cluster"扱いにした。
+    "aculeus": {
+        "label_ja": "アキュレウス(M6)",
+        "name_en": "M6 / Butterfly Cluster",
+        "kind": "cluster",
+        "source": "SIMBAD basic data (queried 2026-09-10), ICRS",
+        "ra_deg": 265.06916666666666,
+        "dec_deg": -32.24194444444445,
+    },
+    "acumen": {
+        "label_ja": "アキュメン(M7)",
+        "name_en": "M7 / Ptolemy Cluster",
+        "kind": "cluster",
+        "source": "SIMBAD basic data (queried 2026-09-10), ICRS",
+        "ra_deg": 268.44708333333335,
+        "dec_deg": -34.84111111111112,
+    },
+    "facies": {
+        "label_ja": "ファシーズ(M22)",
+        "name_en": "M22 / Sagittarius Cluster",
+        "kind": "cluster",
+        "source": "SIMBAD basic data (queried 2026-09-10), ICRS",
+        "ra_deg": 279.09975000000003,
+        "dec_deg": -23.90475,
+    },
+    "capulus": {
+        "label_ja": "カプルス(ペルセウス座二重星団)",
+        "name_en": "Capulus / h+chi Persei Double Cluster",
+        "kind": "cluster",
+        # NGC 869(h Per)とNGC 884(chi Per)の中間点 -- 二重星団全体を
+        # 1つの参照点として扱う(polockさんのリストでの扱いと同じ)。
+        "source": "SIMBAD basic data (queried 2026-09-10), ICRS, midpoint of NGC 869/NGC 884",
+        "ra_deg": 35.1625,
+        "dec_deg": 57.14138889,
+    },
 }
 
 
@@ -144,8 +190,21 @@ def deep_sky_heliocentric_longitude(key: str, t: Time) -> float:
 def deep_sky_heliocentric_longitudes(
     t: Time, keys: list[str] | None = None
 ) -> dict[str, float]:
+    """Vectorized (2026-09-10, same reasoning as stars.py's
+    `stars_heliocentric_longitudes` -- one batched SkyCoord/transform_to
+    call instead of one per object)."""
     objs = keys if keys is not None else list(DEEP_SKY_OBJECTS)
-    return {key: deep_sky_heliocentric_longitude(key, t) for key in objs}
+    if not objs:
+        return {}
+    coord = SkyCoord(
+        ra=[DEEP_SKY_OBJECTS[k]["ra_deg"] for k in objs] * u.deg,
+        dec=[DEEP_SKY_OBJECTS[k]["dec_deg"] for k in objs] * u.deg,
+        distance=_PLACEHOLDER_DISTANCE,
+        frame="icrs",
+    )
+    result = coord.transform_to(HeliocentricMeanEcliptic(equinox=t, obstime=t))
+    lons = (result.lon.to(u.deg).value % 360.0).tolist()
+    return dict(zip(objs, lons))
 
 
 def search_deep_sky(query: str) -> list[str]:

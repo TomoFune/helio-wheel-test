@@ -21,8 +21,8 @@ from dataclasses import dataclass
 
 from astropy.time import Time
 
-from .deep_sky import DEEP_SKY_OBJECTS, deep_sky_heliocentric_longitude
-from .stars import STARS, star_heliocentric_longitude
+from .deep_sky import DEEP_SKY_OBJECTS, deep_sky_heliocentric_longitudes
+from .stars import STARS, stars_heliocentric_longitudes
 
 DEFAULT_ORB_DEG = 1.0
 
@@ -38,6 +38,7 @@ class ConjunctionHit:
     ref_key: str
     ref_kind: str  # "star" or "deep_sky"
     label_ja: str
+    constellation_ja: str  # "" for deep-sky objects (no constellation field)
     lon: float  # ordinary (non-rotated) heliocentric longitude of the reference point
     separation_deg: float
 
@@ -49,24 +50,40 @@ def find_conjunctions(
     orb_deg: float = DEFAULT_ORB_DEG,
     include_stars: bool = True,
     include_deep_sky: bool = True,
+    keys: list[str] | None = None,
 ) -> dict[str, list[ConjunctionHit]]:
     """For each body, every star/deep-sky object within `orb_deg`,
-    closest first. Bodies with no hits are omitted from the result."""
-    references: list[tuple[str, str, float, str]] = []
-    if include_stars:
-        for key, star in STARS.items():
-            references.append((key, "star", star_heliocentric_longitude(key, t), star["label_ja"]))
-    if include_deep_sky:
-        for key, obj in DEEP_SKY_OBJECTS.items():
-            references.append(
-                (key, "deep_sky", deep_sky_heliocentric_longitude(key, t), obj["label_ja"])
-            )
+    closest first. Bodies with no hits are omitted from the result.
+
+    `keys`, if given, restricts the search to exactly that set of
+    STARS/DEEP_SKY_OBJECTS keys (e.g. a UI's "GCS only" or "主要な恒星
+    ・銀河" selection, 2026-09-10) -- `include_stars`/`include_deep_sky`
+    still apply on top of it (both default True, so passing `keys`
+    alone is enough for the common case).
+
+    Longitudes are computed in two batched calls (one for stars, one for
+    deep-sky objects) rather than one per reference point -- ~90 stars
+    one at a time measured ~800ms even natively (worse in the browser's
+    Pyodide/WASM); batched, well under 100ms (2026-09-10, same lesson as
+    today's eclipse-search speedup)."""
+    star_keys = [k for k in STARS if keys is None or k in keys] if include_stars else []
+    deep_sky_keys = [k for k in DEEP_SKY_OBJECTS if keys is None or k in keys] if include_deep_sky else []
+    star_lons = stars_heliocentric_longitudes(star_keys, t)
+    deep_sky_lons = deep_sky_heliocentric_longitudes(t, deep_sky_keys)
+
+    references: list[tuple[str, str, float, str, str]] = [
+        (key, "star", star_lons[key], STARS[key]["label_ja"], STARS[key]["constellation_ja"])
+        for key in star_keys
+    ] + [
+        (key, "deep_sky", deep_sky_lons[key], DEEP_SKY_OBJECTS[key]["label_ja"], "")
+        for key in deep_sky_keys
+    ]
 
     result: dict[str, list[ConjunctionHit]] = {}
     for body_key, body_lon in body_longitudes.items():
         hits = [
-            ConjunctionHit(ref_key, kind, label, ref_lon, sep)
-            for ref_key, kind, ref_lon, label in references
+            ConjunctionHit(ref_key, kind, label, const_ja, ref_lon, sep)
+            for ref_key, kind, ref_lon, label, const_ja in references
             if (sep := angular_separation(body_lon, ref_lon)) <= orb_deg
         ]
         if hits:
