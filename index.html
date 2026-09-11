@@ -1236,7 +1236,7 @@
                  自体は以前よりやや小さく見える)にして、恒星ラベルの
                  逃げ場を優先した。(サインリング自体はその後7.55で
                  150〜170に狭め、浮いた分を惑星グリフ・度数帯に回した。) -->
-            <svg viewBox="-50 -50 500 500">
+            <svg id="wheel-svg" viewBox="-50 -50 500 500">
               <defs>
                 <radialGradient id="skyfade" cx="50%" cy="50%" r="65%">
                   <stop offset="0%" stop-color="var(--accent-soft)"/>
@@ -3115,6 +3115,12 @@
     group.innerHTML = '';
     const showOn = document.getElementById('conj-switch')?.classList.contains('on');
     if (!conjunctionsAvailable() || !showOn) return;
+    // スマホ幅では円周上に★/◆マークもガイドラインも一切出さない
+    // (2026-09-12、「スマホのとき、恒星はリスト表示だけにしませんか。
+    // 円の外に表示すると、円が小さくなって見にくくなる」より) -- 件数は
+    // メニューバッジの「恒星の合(N)」、詳細一覧は既存の#conj-panelが
+    // 担うので、円周上の表示自体が丸ごと不要になる。PC幅はこれまで通り。
+    if (!desktopMQ.matches) return;
     const lons = currentConjunctionLongitudes();
     const svgNS = "http://www.w3.org/2000/svg";
     // Outside the sign ring (r > 178), not the inner degree band planets
@@ -4419,6 +4425,24 @@
   desktopMQ.addEventListener('change', layoutBadgeForWidth);
   layoutBadgeForWidth();
 
+  // スマホでは恒星の合を円周上に出さない(drawConjunctionMarkers()の
+  // desktopMQ分岐参照、2026-09-12「スマホのとき、恒星はリスト表示だけに
+  // しませんか。円の外に表示すると、円が小さくなって見にくくなる」より)
+  // ため、そのために確保していたviewBoxの外周余白(リングr=220→箱の縁
+  // 250まで)が丸ごと不要になる。viewBoxをスマホ幅だけ絞り、同じ
+  // .wheel-wrapのpxサイズの中でリングが占める割合を増やす(454幅なら
+  // 500/454≒1.10倍、約1割大きく見える計算)。外周ストローク(r=220、
+  // stroke-width=2なので実際の外縁は221)より6単位広い227を半幅にした
+  // (箱の縁でストロークが切れないための最小限の余白)。PCは恒星名表示に
+  // この外周余白を引き続き使うため-50 -50 500 500のまま変更しない。
+  function updateWheelViewBox() {
+    const svg = document.getElementById('wheel-svg');
+    if (!svg) return;
+    svg.setAttribute('viewBox', desktopMQ.matches ? '-50 -50 500 500' : '-27 -27 454 454');
+  }
+  desktopMQ.addEventListener('change', updateWheelViewBox);
+  updateWheelViewBox();
+
   // 恒星名トグルの初期値: スマホ幅ではオフ(★マークのみ)、PC幅ではオン
   // (フルネーム)。HTML側はデフォルトon(PC相当)なので、初回だけモバイル
   // 幅なら外す(2026-09-03、恒星名トグル新設時)。保存済みの値がある場合は
@@ -4612,6 +4636,7 @@
     setTimeout(() => n.remove(), 700);
   }, 4500);
 </script>
+
 
 
 
