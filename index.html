@@ -1255,7 +1255,13 @@
                    /隙間が多い」の主因だった未使用の外周余白を使い、円を
                    一回り大きく見せる)。太さも1.5->2(「線を全体的に太く」
                    より)。 -->
-              <circle cx="200" cy="200" r="196" fill="none" stroke="var(--ring-a)" stroke-width="2" opacity="0.75"/>
+              <!-- 196->210(2026-09-11、「サインの枠、ちいさいです。もう
+                   少し大きくして」より) -- viewBox(-50 -50 500 500)の外周
+                   余白(円のr=250まで)がまだ残っていたため、その余白を
+                   使って拡大。下のsign-ticks/degree-ticks/STAR_Rと連動。 -->
+              <!-- 210->220(2026-09-11、惑星記号・度数帯をサインリングの
+                   すぐ内側まで押し出すレイアウト変更に合わせて) -->
+              <circle cx="200" cy="200" r="220" fill="none" stroke="var(--ring-a)" stroke-width="2" opacity="0.75"/>
               <!-- r=140の装飾円は削除(2026-09-04、「サインの内側にある、
                    度数表示と被ってる円は、いらないのではないだろうか」
                    より) -- ちょうどDEGREE_R(度数の文字が並ぶ半径)と同じ
@@ -1285,7 +1291,7 @@
                    自体をもっと大きくする話は、次のレイアウト全体見直し
                    (帯の間隔を詰めて空いた分を文字サイズに回す)で改めて
                    対応する。 -->
-              <g id="sign-glyphs" font-size="15" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
+              <g id="sign-glyphs" font-size="19" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
               <!-- degree tick ring -->
               <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
                    -- 個々の線のstroke-width(0.4〜0.6と細い)に加えて、この
@@ -3187,7 +3193,7 @@
       // planet a stacked label belongs to readable even when two
       // planets' labels end up close together around the ring, and
       // reads as a visible little kink when a label's been swept.
-      const [gx1, gy1] = polar(200, 200, 198, lon);  // サインリング外側(196)のすぐ外(2026-09-04、7.78でリング拡大178->196に合わせて179->198)
+      const [gx1, gy1] = polar(200, 200, 222, lon);  // サインリング外側(220)のすぐ外(2026-09-11、リング拡大210->220に合わせて212->222)
       const [gx2, gy2] = polar(200, 200, pos.r - 7, pos.deg);
       const guide = document.createElementNS(svgNS, "line");
       guide.setAttribute("x1", gx1); guide.setAttribute("y1", gy1);
@@ -3582,10 +3588,12 @@
     // 7.78: サインリング帯を150〜178から165〜196へ拡大(円が使っていな
     // かった外周の余白を使う)。度数チップ(140帯)との間隔も150->165で
     // 24単位に広がり、「目盛りと度数が重なる」問題を解消。
+    // 165〜196 -> 168〜210 -> 185〜220(2026-09-11、後半の変更はレイアウト
+    // 反転(惑星記号・度数帯をこのすぐ内側まで押し出す)に合わせて外側へ)。
     for (let i = 0; i < 12; i++) {
       const deg = i * 30;
-      const [x1, y1] = polar(200, 200, 165, deg);
-      const [x2, y2] = polar(200, 200, 196, deg);
+      const [x1, y1] = polar(200, 200, 185, deg);
+      const [x2, y2] = polar(200, 200, 220, deg);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
       line.setAttribute("x2", x2); line.setAttribute("y2", y2);
@@ -3595,10 +3603,9 @@
       line.setAttribute("opacity", "0.65");
       ticks.appendChild(line);
 
-      // グリフの表示半径164->180(帯の中央、7.78で帯自体を165〜196に
-      // 拡大したのに合わせて)、font-size 13->15(「サインと惑星記号を
-      // 一回り大きくしてほしい」より)。
-      const [gx, gy] = polar(200, 200, 180, deg + 15);
+      // グリフの表示半径189->202(帯の中央、帯自体を185〜220に拡大した
+      // のに合わせて)、font-size 19のまま。
+      const [gx, gy] = polar(200, 200, 202, deg + 15);
       const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
       t.setAttribute("x", gx); t.setAttribute("y", gy);
       t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
@@ -3613,12 +3620,12 @@
     for (let d = 0; d < 360; d += 5) {
       if (d % 30 === 0) continue;  // サインの境目は上のループの太い線が既にある
       const isMajor = d % 10 === 0;
-      // 帯の内周(150->165)に付ける(2026-09-03の方針は維持) -- 惑星
-      // グリフ・度数表示は帯の内側にあるので、目盛りを内周に付けた方が
-      // 「どの目盛りの上に惑星があるか」を目で追いやすい。長さは据え置き
-      // (大6単位/小3単位)。
-      const [x1, y1] = polar(200, 200, 165, d);
-      const [x2, y2] = polar(200, 200, isMajor ? 171 : 168, d);
+      // 帯の内周(150->165->168->185)に付ける(2026-09-03の方針は維持) --
+      // 惑星グリフ・度数表示は帯の内側にあるので、目盛りを内周に付けた
+      // 方が「どの目盛りの上に惑星があるか」を目で追いやすい。長さは
+      // 据え置き(大6単位/小3単位)。
+      const [x1, y1] = polar(200, 200, 185, d);
+      const [x2, y2] = polar(200, 200, isMajor ? 191 : 188, d);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
       line.setAttribute("x2", x2); line.setAttribute("y2", y2);
@@ -3802,6 +3809,69 @@
       for (let i = 0; i < n; i++) order[i].deg = ((base + pos[i]) % 360 + 360) % 360;
     });
   }
+  // sweepSameTierLabels()は円全体を1本の帯として累積的に押し広げるため、
+  // 1箇所の密集が(直接は無関係な)離れた天体まで連鎖的に巻き込むことが
+  // あった(2026-09-11、「押しのけすぎて遠くまで飛ぶ」フィードバックを
+  // 受けて調査 -- 「天体ごとに自分の本当の位置からの距離だけを見て
+  // クランプする」案も試したが、密な塊の中の天体が個別に自分の位置へ
+  // 引き戻された結果、塊自体の間隔が潰れて重なるという副作用があり
+  // 撤回)。こちらはclusterByGap(staggerRadiiと同じクラスタ判定)で
+  // 天体を独立したクラスタに分け、クラスタごとに完全に独立して(他の
+  // クラスタの混雑具合に一切影響されずに)、そのクラスタ自身の"本当の
+  // 平均位置"を中心に間隔を空けて並べる。孤立した天体(クラスタ1件)は
+  // 一切動かさない。1クラスタが必要とする合計の間隔がmaxClusterSpanDeg
+  // を超える場合だけ、そのクラスタ内で間隔を詰める(多少の接近は許容)
+  // -- 圧縮の影響がそのクラスタ自身の中だけに閉じるので、他の天体は
+  // 一切巻き込まれない。
+  // compactChipW/compactThreshold(2026-09-11、「3天体以上が本当に密集
+  // した時だけ、文字を小さく」「分は省略する」より) -- 省スペース表記に
+  // 切り替えるかどうかは、実際の位置合わせに使うclusterGapDeg(8度、
+  // 「合」1件としてまとめる厳密な基準)とは別に、もっと広いcompactGapDeg
+  // (既定20度)で判定する。実機検証(2026-09-11)で判明した通り、現実の
+  // 空では「2体ずつの合が15〜20度おきに連なる」ような込み合った領域が
+  // 普通にあり、8度基準だと3体以上のクラスタには育たない(2体クラスタが
+  // 隣同士で衝突するだけ)ため、狭い基準のままではcompactが一切発動しな
+  // かった。広い基準で「込み合った近傍」を検出し、そこに属す天体全部を
+  // compact扱いにする一方、実際の間隔調整自体は従来通りclusterGapDeg
+  // (8度)のクラスタ単位で行う。
+  function sweepByCluster(items, chipW, clusterGapDeg = 8.0, maxClusterSpanDeg = Infinity, compactChipW = null, compactThreshold = 3, compactGapDeg = 20.0) {
+    if (items.length === 0) return;
+    const r = items[0].r;
+    const compactKeys = new Set();
+    if (compactChipW !== null) {
+      clusterByGap(items.map(it => ({ key: it.key, deg: it.deg })), compactGapDeg).forEach(({ members }) => {
+        if (members.length >= compactThreshold) members.forEach(m => compactKeys.add(m.key));
+      });
+    }
+    clusterByGap(items, clusterGapDeg).forEach(({ members, gapBefore, gapAfter }) => {
+      const n = members.length;
+      if (n < 2) return;  // 孤立: 本当の位置のまま動かさない
+      const isCompact = members.some(m => compactKeys.has(m.key));
+      members.forEach(m => { m.compact = isCompact; });
+      const effectiveChipW = isCompact ? compactChipW : chipW;
+      const minGapDeg = (effectiveChipW / r) * (180 / Math.PI) * 1.05;
+      members.sort((a, b) => a.deg - b.deg);
+      const anchor = members[0].deg;
+      let sumOffset = 0;
+      members.forEach(m => { sumOffset += ((m.deg - anchor + 540) % 360) - 180; });
+      const meanOffset = sumOffset / n;  // クラスタ自身の"本当の中心"(先頭メンバーからの相対値)
+      // 実機検証(2026-09-11)で判明: 現実の空では隣り合うクラスタ同士が
+      // 15〜20度ほどしか離れていないことが普通にあり、maxClusterSpanDeg
+      // だけで一律に決めると、たとえこのクラスタ単体は収まっても、隣の
+      // クラスタへはみ出して衝突することがあった。clusterByGap()が返す
+      // 前後の実際の隙間(gapBefore/gapAfter、staggerRadiiと同じ由来)を
+      // 使い、隣のクラスタの領分まで70%以上食い込まないよう追加で絞る。
+      const effectiveMaxSpan = Math.min(maxClusterSpanDeg, gapBefore * 0.7, gapAfter * 0.7);
+      let gap = minGapDeg;
+      if (Number.isFinite(effectiveMaxSpan) && (n - 1) * gap > effectiveMaxSpan) {
+        gap = effectiveMaxSpan / (n - 1);
+      }
+      for (let i = 0; i < n; i++) {
+        const posOffset = (i - (n - 1) / 2) * gap;  // 中心から対称に並べる
+        members[i].deg = ((anchor + meanOffset + posOffset) % 360 + 360) % 360;
+      }
+    });
+  }
   // 実際に他の表示(rect/text)と重なっていたら、縦方向に1段ずつずらして
   // 避ける(2026-09-03、起点ラベルの重なり対策(7.50)を汎用化したもの)
   // -- 「これはみにくいねぇ」の修正時は起点ラベル専用のインライン処理
@@ -3858,7 +3928,7 @@
   // 構造的に重ならなくなったため、下地を隠す目的の背景板はもう実質的に
   // 不要だった(アスペクト線も、両端がPLANET_R上にある弦である以上、
   // 弦が円の外側であるDEGREE_Rまで届くことはない)。
-  function drawDegreeChip(markers, dx, dy, deg, color, fontSize = 14) {
+  function drawDegreeChip(markers, dx, dy, deg, color, fontSize = 14, compact = false) {
     const [degStr, minStr] = formatDegMinParts(deg);
     const dtext = document.createElementNS("http://www.w3.org/2000/svg", "text");
     dtext.setAttribute("class", "wheel-degree-label");
@@ -3871,11 +3941,24 @@
     // PLANET_R/DEGREE_Rのコメント参照)より、文字だけの実サイズは元々
     // 小さいので、この程度の拡大では再度の重なりは生じない想定
     // (sweepSameTierLabelsのchipWも28->33へ比例して引き上げ済み)。
-    // 引数化(2026-09-11) -- 孤立天体(クラスタ化で個別配置)は17に底上げ
-    // (「文字が小さくて見にくい、老眼にきつい」より)、密集クラスタ側は
-    // drawDegreeCluster()が別に描く。既定14は呼び出し忘れ対策の後方互換。
+    // 引数化(2026-09-11) -- 全天体まとめて17に底上げ(「文字が小さくて
+    // 見にくい、老眼にきつい」より)。既定14は呼び出し忘れ対策の後方互換。
     dtext.setAttribute("font-size", String(fontSize));
     dtext.setAttribute("font-weight", "700");
+    if (compact) {
+      // 3天体以上が実際に密集した時だけ、1行・分(')省略の省スペース表記
+      // にする(2026-09-11、「(a)文字を少し小さくする」「(b)分は省略する」
+      // 案の両方をユーザーが選択) -- 度数(°)だけの1行なら、2段スタック
+      // より必要な場所がずっと少なくて済む。正確な分は「度数」タブに
+      // 常に出ているので、ここでは省略しても実害はない。
+      dtext.setAttribute("dominant-baseline", "middle");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      line.setAttribute("x", dx); line.setAttribute("y", dy);
+      line.textContent = degStr;
+      dtext.appendChild(line);
+      markers.appendChild(dtext);
+      return;
+    }
     // 2段の行間(dy-4/dy+6、差10)を(dy-7/dy+8、差15)に拡大(2026-09-08、
     // 「度数の、何度、と何分、がくっつきすぎていませんか」より) -- 実測
     // (getBoundingClientRect)したところ、font-size 14の1行の実高さは
@@ -3893,38 +3976,6 @@
     line2.textContent = minStr;
     dtext.appendChild(line1); dtext.appendChild(line2);
     markers.appendChild(dtext);
-  }
-  // 密集クラスタ(8度以内に2体以上)用: 1箇所に「グリフ + d°mm'」を
-  // メンバー数ぶん縦積みで描く(2026-09-11、恒星の合パネルの「タグ」と
-  // 同じ発想) -- 円周上の"横の場所"を取り合わないので、天体が増えても
-  // 縦に伸びるだけで文字サイズは保てる。
-  function drawDegreeCluster(markers, cx, cy, membersMeta, color) {
-    const fontSize = 14;
-    // 18->26(2026-09-11、実機計測で発覚した重なりの修正) -- グリフ部分
-    // (Noto Sans Symbols 2)の実際の縦幅は、度数文字と混在させると同じ
-    // font-size指定でも約25.2単位まで大きくレンダリングされる(既存の
-    // グリフ帯コメント参照)。18のままだと隣接行同士が実測で約5px重なって
-    // いた。CLUSTER_LINE_HEIGHTと同じ値に揃えてある(drawBodyRing側の
-    // 半径計算もこれに依存)。
-    const lineHeight = CLUSTER_LINE_HEIGHT;
-    const n = membersMeta.length;
-    membersMeta.forEach((m, i) => {
-      const y = cy - ((n - 1) / 2 - i) * lineHeight;
-      const [degStr, minStr] = formatDegMinParts(m.deg);
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", cx); t.setAttribute("y", y);
-      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-      t.setAttribute("font-size", String(fontSize));
-      t.setAttribute("font-weight", "700");
-      t.setAttribute("fill", color);
-      const glyphSpan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-      glyphSpan.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
-      glyphSpan.textContent = m.g + " ";
-      const degSpan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-      degSpan.textContent = degStr + minStr;
-      t.appendChild(glyphSpan); t.appendChild(degSpan);
-      markers.appendChild(t);
-    });
   }
   // 惑星の記号(グリフ)専用の帯(PLANET_R)と、度数表示専用の帯
   // (DEGREE_R)を、それぞれ固定の半径として分離する(2026-09-03、
@@ -3989,16 +4040,20 @@
   // 最大252px²を検出)。DEGREE_Rは目盛りとの分離条件で動かせないため、
   // PLANET_R側を117->104に下げて間隔を確保、ASPECT_Rも095->84へ連動
   // (PLANET_Rとの間隔20を維持)。
+  // 2026-09-11: レイアウトの考え方を反転(フィードバック「円を見ても、
+  // 惑星がどのサインの何度にあるかさっぱりわからない」「他のソフトは
+  // もっと直感的」より) -- 以前は惑星記号(PLANET_R=104)がサインリング
+  // (168〜)からかなり内側(中心寄り)に離れていたため、記号を見ても外側の
+  // サインリングとの位置関係が目で追いにくかった。惑星記号・度数の帯を
+  // サインリングのすぐ内側まで押し出し、代わりに中心付近(アスペクト線
+  // だけのエリア)を広く空けるレイアウトに変更。半径が大きいほど同じ
+  // 角度差でも実際の弧の長さ(横スペース)が長くなるため、合になった時の
+  // 混雑度はむしろ緩和される(sweepByCluster自体はそのまま使える)。
   const ASPECT_R = 84;
-  const PLANET_R = 104;
-  const DEGREE_R = 141;
-  const STAR_R = 206;
+  const PLANET_R = 130;  // 104->130
+  const DEGREE_R = 155;  // 141->155(度数チップの実測到達距離ぶん、サインリング内周185との間に30単位の余白を確保)
+  const STAR_R = 232;  // 220->232(サインリング拡大(185〜220)に合わせて外側へ)
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
-  // 度数の密集クラスタ(drawDegreeCluster/drawBodyRing両方が参照、
-  // 2026-09-11) -- 1行の実測縦幅(グリフ+度数混在、約25.2単位)に合わせた
-  // 値。drawBodyRing側の半径計算(PLANET_R帯と食い合わないための余白)も
-  // 同じ値を使う必要があるため、どちらか一方だけを変えないよう共通定数化。
-  const CLUSTER_LINE_HEIGHT = 26;
   function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, glyphColor = color, guides = true, showDegrees = true }) {
     if (!showDegrees) {
       // 二重円: 度数は出さないので、以前通りグリフだけを段違いスタッガー
@@ -4032,23 +4087,29 @@
     // 際、実測でグリフの高さが約21.2->25.2に増えていたのを見落として
     // いたため、6シナリオの自動チェックで重なりが83〜302px²まで悪化して
     // いるのを発見・修正)。
-    sweepSameTierLabels(glyphItems, 35);  // 22->26->31->35(2026-09-04、惑星グリフのfont-size 16->18に合わせてさらに引き上げ)
-    // 度数表示の作り直し(2026-09-11、フィードバック「本来の位置から
-    // かなりズレたところに惑星と度数が表示されている」「文字が小さくて
-    // 見にくい、老眼にきつい」より) -- 以前は全天体の度数をDEGREE_Rの
-    // 円周1本にsweepSameTierLabels()で押し広げていたため、天体が多い
-    // (小惑星・準惑星の追加で最大16体に)ほど、混み合った塊を遠くまで
-    // 押しのける必要が生じ、ガイド線が蜘蛛の巣状になっていた。文字も
-    // 小さめ(14)で、実測するとスマホ幅では10px未満まで縮んでいた。
-    // 恒星の合ラベル(drawConjunctionMarkers)が複数件を1本の縦積み
-    // タグにまとめているのと同じ発想で、8度以内の塊(clusterByGap、
-    // staggerRadiiと同じクラスタ判定)は1個の縦積みチップにまとめて
-    // 表示し、孤立した天体だけ個別の位置で大きめの文字を使う -- 円周上
-    // の"横の場所"を取り合うのはクラスタの個数ぶんだけで済み、天体が
-    // 増えてもクラスタ内は縦に伸びるだけなので、文字を大きくしても
-    // 破綻しない。
+    // sweepSameTierLabels -> sweepByCluster(2026-09-11、下のコメント参照)。
+    // maxClusterSpanDeg=70はクラスタ単体の上限(以前のmaxDeviationDeg=35
+    // とは意味が違う -- 今回はクラスタごとの独立した予算なので、他の
+    // 天体を巻き込まない)。
+    sweepByCluster(glyphItems, 35, 8.0, 50);  // 22->26->31->35(2026-09-04、惑星グリフのfont-size 16->18に合わせてさらに引き上げ)。maxClusterSpanDeg=50(下のsweepByCluster内のgapBefore/gapAfterのコメント参照)。
+    // 度数表示(2026-09-11、フィードバックを受けて2度作り直した経緯):
+    // 最初の問題は「本来の位置からかなりズレたところに度数が表示され、
+    // アスペクト線との位置関係が分かりにくい」「文字が小さくて老眼に
+    // きつい」-- これを受けて、混み合った天体を縦積みの別チップにまとめる
+    // 案を一度実装したが、「惑星を円の外・内側に追い出すのはダメ、
+    // アストロゴールド/アストロバイザーのように、合になった時も横並びで
+    // 線でまとめてほしい」と明確に差し戻された。度数はグリフのすぐそば、
+    // 円の中(DEGREE_R)から動かさない、というのが実際の要件だった。
+    // 結局、元々の「全天体を同じ帯でsweepSameTierLabelsする」方式に戻し、
+    // 文字だけ大きく(14->17)、かつsweepSameTierLabels自体にmaxDeviationDeg
+    // (天体ごとに、自分の本当の度数からどれだけ離れてよいかの上限。
+    // 最初は合計の押しのけ角度に一律の上限をかける案で実装したが、密集
+    // していない離れた場所の天体まで巻き込んで一緒に詰まってしまう実機
+    // バグが見つかり、天体ごとの個別クランプに直した)を持たせて、天体が
+    // 非常に多く密集した極端なケースだけ間隔を詰めて(多少の接近は許容
+    // して)上限内に収める
+    // ようにした -- 「近くで詰まる」方を「遠くまで飛ぶ」より優先する。
     const glyphByKey = new Map(glyphItems.map(it => [it.key, it]));
-    const planetByKey = new Map(planets.map(p => [p.key, p]));
     const radii = {};
     planets.forEach(p => {
       const gi = glyphByKey.get(p.key);
@@ -4063,82 +4124,32 @@
       t.textContent = p.g;
       markers.appendChild(t);
     });
-
-    const clusters = clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0);
-    // 孤立した天体(クラスタ1件)は、これまで通り個別に配置するが、
-    // 文字は少し大きく(14->17)した -- クラスタ化で「複数が押し合う」
-    // 状況自体が減ったぶん、1件ずつはより大きな文字でも重ならない。
-    const isolated = clusters.filter(c => c.members.length === 1).map(c => c.members[0]);
-    const isoItems = isolated.map(m => ({ key: m.key, deg: m.deg, origDeg: m.deg, r: DEGREE_R }));
-    sweepSameTierLabels(isoItems, 50);  // 44->50(度数文字14->17に合わせて比例で引き上げ)
-    const isoByKey = new Map(isoItems.map(it => [it.key, it]));
-    isolated.forEach(m => {
-      const di = isoByKey.get(m.key);
+    const degItems = planets.map(p => ({ key: p.key, deg: p.deg, origDeg: p.deg, r: DEGREE_R }));
+    // チップ幅28->33->38->44->50(2026-09-11)。maxClusterSpanDeg=30 --
+    // 実機検証(2026-09-11)で分かったこと: 現実の空では複数の合クラスタ
+    // 同士が15〜20度ほどしか離れていない場面が普通にあり(今日の実際の
+    // トランジットが好例)、1クラスタあたりの割り当てを広くしすぎる
+    // (チップ幅を2行の縦幅基準の68にする、maxClusterSpanDegを70にする、
+    // 等)と、逆に隣のクラスタへはみ出して衝突する。せまい予算(30)で、
+    // 極端に密集した場合は多少の接触を許容する方を選んだ -- 隣のクラスタ
+    // を巻き込まないことを、1クラスタ内の完全な非接触より優先する。
+    // compactChipW=45/compactThreshold=3(2026-09-11、「3天体以上が本当に
+    // 密集した時だけ、文字を小さく(17->14)+分は省略する」より) -- 3体
+    // 以上が同じクラスタに入った時だけ、1行・度数のみの省スペース表記に
+    // 切り替えて場所を稼ぐ。1〜2体の普通の合は、これまで通りフルサイズ
+    // (17、2段)のまま。
+    sweepByCluster(degItems, 50, 8.0, 50, 45, 3);
+    const degByKey = new Map(degItems.map(it => [it.key, it]));
+    planets.forEach(p => {
+      const di = degByKey.get(p.key);
       const [dx, dy] = polar(200, 200, di.r, di.deg);
-      drawDegreeChip(markers, dx, dy, m.deg, color, 17);
+      drawDegreeChip(markers, dx, dy, p.deg, color, di.compact ? 14 : 17, !!di.compact);
       // 常時表示->ズレた時だけ表示(2026-09-04、「度数とサインのメモリを
       // 指す線は...ただの直線にしてもらえますか」より)。
       if (guides && Math.abs(((di.deg - di.origDeg + 540) % 360) - 180) > 0.5) {
         drawGuideLine(markers, di.origDeg, ringInner, dx, dy);
       }
     });
-    // 2件以上のクラスタは、平均角度(円環をまたぐ塊でも安全な、先頭
-    // メンバーからの相対オフセット平均)に1個の縦積みチップを置き、
-    // 各メンバーの実際のグリフ位置からそこへ細いガイド線を引く --
-    // 恒星の合パネルの「タグ+ガイド線」と同じ考え方。
-    const multiClusters = clusters.filter(c => c.members.length >= 2);
-    if (multiClusters.length > 0) {
-      const clusterLineHeight = CLUSTER_LINE_HEIGHT;
-      // 全クラスタ共通の1本の半径にする(2026-09-11、実機検証で発覚した
-      // バグの修正) -- クラスタごとに人数で半径を変えていた版は、(1)一番
-      // 縦長のクラスタでもPLANET_R側のグリフ帯と食い合わないだけの余白を
-      // 計算し切れておらず実際に重なった、(2)違う半径のクラスタ同士は
-      // sweepSameTierLabels(同じ半径同士でないと角度の押し合いが効かない)
-      // の対象外になり、隣り合う2つのクラスタの縦積みチップ同士が重なる
-      // ケースがあった。この図の中で一番人数が多いクラスタが必要とする
-      // 高さから、共通の半径を1つだけ計算して全クラスタに使う。
-      const maxMembers = Math.max(...multiClusters.map(c => c.members.length));
-      // 孤立天体側のチップ(DEGREE_R中心、font-size 17の2段)の実測の外周
-      // (141 + 半分の高さ約24単位、2026-09-11実機計測)より確実に外側に
-      // 出す -- 単に「PLANET_R帯と食い合わない」だけでは、DEGREE_R帯に
-      // 元々いる孤立天体のチップとクラスタのチップ同士が重なるケースが
-      // 別に残っていた(隣り合う孤立天体とクラスタが8度ちょうど離れている
-      // 場合など)。
-      // clusterRからクラスタ半分の高さを引いた「内側の縁」がisoChip
-      // OuterEdgeより確実に外側になるよう、その差(12)を直接足し込む
-      // (最初mathmax(isoChipOuterEdge+12, ...)としていたが、それだと
-      // clusterR自体がisoChipOuterEdgeを超えるだけで、人数が多いクラスタ
-      // ほど内側の縁がisoChipOuterEdgeへ食い込む計算ミスだった)。
-      const isoChipOuterEdge = DEGREE_R + 24;
-      const clusterR = isoChipOuterEdge + 12 + maxMembers * clusterLineHeight / 2;
-      const clusterItems = multiClusters.map((c, idx) => {
-        const anchor = c.members[0].deg;
-        let sumOffset = 0;
-        c.members.forEach(m => { sumOffset += ((m.deg - anchor + 540) % 360) - 180; });
-        const clusterDeg = (anchor + sumOffset / c.members.length + 360) % 360;
-        return { key: 'cluster' + idx, deg: clusterDeg, origDeg: clusterDeg, r: clusterR };
-      });
-      // チップ幅は「このクラスタ群の中で一番長い1行」基準(安全側) --
-      // クラスタごとに違う幅を個別に渡せないsweepSameTierLabelsの仕様上、
-      // 一番幅が要る想定で統一する(結果、幅の要らないクラスタは少し
-      // 余分に間隔が空くだけで、重なりはしない)。
-      let maxLineW = 0;
-      multiClusters.forEach(c => c.members.forEach(m => {
-        const [d, mi] = formatDegMinParts(m.deg);
-        maxLineW = Math.max(maxLineW, estimateLabelWidth(m.g + ' ' + d + mi, 14));
-      }));
-      sweepSameTierLabels(clusterItems, maxLineW);
-      multiClusters.forEach((c, idx) => {
-        const item = clusterItems[idx];
-        const [cx, cy] = polar(200, 200, item.r, item.deg);
-        drawDegreeCluster(markers, cx, cy, c.members.map(m => planetByKey.get(m.key)), color);
-        if (guides) {
-          // m.deg(スイープ前の本当の度数、目盛りの実位置)を起点にする --
-          // 孤立天体のガイド線(di.origDeg)と同じ考え方。
-          c.members.forEach(m => drawGuideLine(markers, m.deg, ringInner, cx, cy));
-        }
-      });
-    }
     return radii;
   }
 
