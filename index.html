@@ -3957,10 +3957,18 @@
   // 深さの上限(床)も浅くした。
   const ASPECT_R = 84;
   const BODY_R = 145;            // 度数チップ、孤立時の半径(実測でリング内周185まで安全マージンを残せる値)
-  const BODY_CLUSTER_STEP = 6;   // 密集クラスタ内、隣の段とのごくわずかな半径の差(参考ソフトに合わせ大きく沈めない)
-  const BODY_CLUSTER_FLOOR = 121; // 段がどれだけ増えても、ここより内側へは踏み込まない
+  const BODY_CLUSTER_STEP = 14;  // 密集クラスタ内、隣の段との半径の差(6だと同じクラスタの隣同士でも実測で重なっていたため14に拡大)
+  const BODY_CLUSTER_FLOOR = 110; // 段がどれだけ増えても、ここより内側へは踏み込まない
   const BODY_CLUSTER_FONT = 14;  // 密集クラスタの複合チップのフォントサイズ(段が増えても変えない、参考ソフトも一定だった)
-  const GLYPH_GAP = 25;          // 孤立時のみ使用。グリフは度数チップよりこの分だけ内側(旧PLANET_R⇔DEGREE_Rの間隔と同じ発想)
+  const GLYPH_GAP = 25;          // 孤立(隣接なし)時のみ使用。グリフは度数チップよりこの分だけ内側(旧PLANET_R⇔DEGREE_Rの間隔と同じ発想)
+  // クラスタ判定(8度)とは別に、もっと広い基準(FORMAT_GAP_DEG)で「近くに
+  // 誰かいるか」を見て、表記の大小を決める(2026-09-14、実測で発見: 8度
+  // ぎりぎり外側の孤立天体が、大きい表記のまま隣のクラスタに実際に重なる
+  // バグがあった -- 土星(隣のクラスタと8.05度差、"孤立"判定)が、天王星・
+  // 海王星のクラスタと重なっていた実例)。位置(半径)は孤立のままBODY_R
+  // に留め、表記だけ小型(drawFusedChip)に切り替えることで、余計な場所を
+  // 取らないようにする。
+  const FORMAT_GAP_DEG = 12.0;
   function bodyClusterRadius(depth) {
     return Math.max(BODY_R - depth * BODY_CLUSTER_STEP, BODY_CLUSTER_FLOOR);
   }
@@ -3998,19 +4006,27 @@
     // 海王星が8度以内に密集する実例)。1行にまとめれば要素間の隙間という
     // 競合要因自体がなくなる。
     const planetByKey = new Map(planets.map(p => [p.key, p]));
+    const hasNearNeighbor = new Set();
+    clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), FORMAT_GAP_DEG).forEach(({ members }) => {
+      if (members.length >= 2) members.forEach(m => hasNearNeighbor.add(m.key));
+    });
     const radii = {};
     clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0).forEach(({ members }) => {
       members.forEach((m, depth) => {
         const p = planetByKey.get(m.key);
+        const isCrowded = members.length > 1 || hasNearNeighbor.has(p.key);
         let r, dx, dy;
-        if (members.length === 1) {
+        if (!isCrowded) {
           r = BODY_R;
           [dx, dy] = polar(200, 200, r, p.deg);
           const [gx, gy] = polar(200, 200, r - GLYPH_GAP, p.deg);
           drawGlyph(markers, gx, gy, p.g, glyphColor, 18);
           drawDegreeChip(markers, dx, dy, p.deg, color, 17);
         } else {
-          r = bodyClusterRadius(depth);
+          // クラスタの本メンバー(members.length>1)は段=depthで段積み。
+          // 8度クラスタでは孤立扱いだが12度以内に隣がいる天体は、位置は
+          // BODY_Rのまま(段積みしない)、表記だけ小型にする。
+          r = members.length > 1 ? bodyClusterRadius(depth) : BODY_R;
           [dx, dy] = polar(200, 200, r, p.deg);
           drawFusedChip(markers, dx, dy, p.deg, p.g, color, glyphColor, BODY_CLUSTER_FONT);
         }
