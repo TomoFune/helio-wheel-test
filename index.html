@@ -3943,20 +3943,26 @@
   // 押し広げる方式、「本来の位置から遠すぎる」の原因だった)は廃止し、
   // clusterByGap(staggerRadiiと同じクラスタ判定)で段=depthだけ決める
   // 方式に置き換えた。ガイド線は段が深い(リングから離れた)天体だけに出す。
+  //
+  // 2026-09-14(続き): 上の「段が深いほど中心へ大きく沈める」設計
+  // (BODY_DEPTH_STEPS=[22,19,16])は、2天体だけのありふれた合でも22単位
+  // 沈んでしまい「円の同じ高さにない」と実機で指摘された。ユーザーから
+  // アストロゴールド・スターガザー・別の2ソフト、計4本の実例(5〜6天体が
+  // 1つのサインに密集した極端なケース含む)を見せてもらったところ、
+  // どのソフトも密集時に中心へ段を掘る動きはしておらず、リングのすぐ
+  // 近くに全員を留めたまま、コンパクトな1行表記で詰めていた(数字同士が
+  // かなり接近・多少重なるのも許容している -- 正確な値は既存の「度数」
+  // パネル側で見られるため、円の上は「だいたいこの辺」で足りるという
+  // 割り切り)。この実例に合わせ、段の間隔を22→6へ大幅に縮小し、沈み込む
+  // 深さの上限(床)も浅くした。
   const ASPECT_R = 84;
-  const BODY_R = 145;        // 度数チップ、孤立時の半径(実測でリング内周185まで安全マージンを残せる値、fusedチップの幅も考慮して150から5詰めた)
-  const BODY_FLOOR_R = 95;   // 段積みがどれだけ深くなっても、ここより内側(ASPECT_Rの領分)へは踏み込まない
-  // 段(depth)が深いほど、間隔・文字サイズを少しずつ縮める(2026-09-14) --
-  // depth0〜2はこの配列の値、それ以降は配列の最後の値を使い回す(4体以上
-  // が1クラスタに密集するのは稀なケースなので、そこだけ多少の接近は
-  // 許容し、BODY_FLOOR_Rで下限を守る)。
-  const BODY_DEPTH_STEPS = [22, 19, 16];
-  const BODY_DEPTH_FONTS = [17, 15, 13];
-  const BODY_DEPTH_GAPS = [25];  // 孤立時のみ使用。グリフは度数チップよりこの分だけ内側(旧PLANET_R⇔DEGREE_Rの間隔と同じ発想)
-  function bodyDepthRadius(depth) {
-    let r = BODY_R;
-    for (let i = 0; i < depth; i++) r -= BODY_DEPTH_STEPS[Math.min(i, BODY_DEPTH_STEPS.length - 1)];
-    return Math.max(r, BODY_FLOOR_R);
+  const BODY_R = 145;            // 度数チップ、孤立時の半径(実測でリング内周185まで安全マージンを残せる値)
+  const BODY_CLUSTER_STEP = 6;   // 密集クラスタ内、隣の段とのごくわずかな半径の差(参考ソフトに合わせ大きく沈めない)
+  const BODY_CLUSTER_FLOOR = 121; // 段がどれだけ増えても、ここより内側へは踏み込まない
+  const BODY_CLUSTER_FONT = 14;  // 密集クラスタの複合チップのフォントサイズ(段が増えても変えない、参考ソフトも一定だった)
+  const GLYPH_GAP = 25;          // 孤立時のみ使用。グリフは度数チップよりこの分だけ内側(旧PLANET_R⇔DEGREE_Rの間隔と同じ発想)
+  function bodyClusterRadius(depth) {
+    return Math.max(BODY_R - depth * BODY_CLUSTER_STEP, BODY_CLUSTER_FLOOR);
   }
   const STAR_R = 232;  // 220->232(サインリング拡大(185〜220)に合わせて外側へ)
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
@@ -3996,18 +4002,19 @@
     clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0).forEach(({ members }) => {
       members.forEach((m, depth) => {
         const p = planetByKey.get(m.key);
-        const r = bodyDepthRadius(depth);
-        const fontSize = BODY_DEPTH_FONTS[Math.min(depth, BODY_DEPTH_FONTS.length - 1)];
-        radii[p.key] = r;  // アスペクト線のアンカーも実際に描いた(段積み後の)位置に合わせる
-        const [dx, dy] = polar(200, 200, r, p.deg);
+        let r, dx, dy;
         if (members.length === 1) {
-          const gap = BODY_DEPTH_GAPS[0];
-          const [gx, gy] = polar(200, 200, r - gap, p.deg);
-          drawGlyph(markers, gx, gy, p.g, glyphColor, fontSize + 1);
-          drawDegreeChip(markers, dx, dy, p.deg, color, fontSize);
+          r = BODY_R;
+          [dx, dy] = polar(200, 200, r, p.deg);
+          const [gx, gy] = polar(200, 200, r - GLYPH_GAP, p.deg);
+          drawGlyph(markers, gx, gy, p.g, glyphColor, 18);
+          drawDegreeChip(markers, dx, dy, p.deg, color, 17);
         } else {
-          drawFusedChip(markers, dx, dy, p.deg, p.g, color, glyphColor, fontSize);
+          r = bodyClusterRadius(depth);
+          [dx, dy] = polar(200, 200, r, p.deg);
+          drawFusedChip(markers, dx, dy, p.deg, p.g, color, glyphColor, BODY_CLUSTER_FONT);
         }
+        radii[p.key] = r;  // アスペクト線のアンカーも実際に描いた位置に合わせる
         // ガイド線は段が深い(=BODY_Rより内側へ押し込まれた)天体だけに出す
         // -- 角度は動かしていないので、リング上のその角度からまっすぐ内側
         // へ伸びる線になる(2026-09-04、「ただの直線にしてもらえますか」の
