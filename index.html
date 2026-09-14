@@ -3915,23 +3915,20 @@
     t.textContent = glyph;
     markers.appendChild(t);
   }
+  // 円の中は度数(°)だけにして、分(')は表示しない(2026-09-14) -- 正確な
+  // 分は「度数」タブのリストに常に出ているので、円の上は分を省く分だけ
+  // 場所を稼ぐ。以前は度数/分の2段組みだったが、1行になったことで孤立
+  // 天体の占有スペースがほぼ半分になった。
   function drawDegreeChip(markers, dx, dy, deg, color, fontSize) {
-    const [degStr, minStr] = formatDegMinParts(deg);
+    const [degStr] = formatDegMinParts(deg);
     const dtext = document.createElementNS("http://www.w3.org/2000/svg", "text");
     dtext.setAttribute("class", "wheel-degree-label");
-    dtext.setAttribute("x", dx);
-    dtext.setAttribute("text-anchor", "middle");
+    dtext.setAttribute("x", dx); dtext.setAttribute("y", dy);
+    dtext.setAttribute("text-anchor", "middle"); dtext.setAttribute("dominant-baseline", "middle");
     dtext.setAttribute("fill", color); dtext.setAttribute("opacity", "1");
     dtext.setAttribute("font-size", String(fontSize));
     dtext.setAttribute("font-weight", "700");
-    const lineScale = fontSize / 14;
-    const line1 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-    line1.setAttribute("x", dx); line1.setAttribute("y", dy - 7 * lineScale);
-    line1.textContent = degStr;
-    const line2 = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-    line2.setAttribute("x", dx); line2.setAttribute("y", dy + 8 * lineScale);
-    line2.textContent = minStr;
-    dtext.appendChild(line1); dtext.appendChild(line2);
+    dtext.textContent = degStr;
     markers.appendChild(dtext);
   }
   // グリフ+度数+分を1行に収めた小型版(密集クラスタの段積み用、2026-09-14
@@ -3943,7 +3940,7 @@
   // クラスタが2件以上のときだけ、要素を分けずに1つの行にまとめることで
   // 「要素間の隙間」という競合要因そのものをなくした。
   function drawFusedChip(markers, dx, dy, deg, glyph, numColor, glyphColor, fontSize) {
-    const [degStr, minStr] = formatDegMinParts(deg);
+    const [degStr] = formatDegMinParts(deg);  // 分は表示しない(上のdrawDegreeChipコメント参照)
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
     text.setAttribute("class", "wheel-degree-label");
     text.setAttribute("x", dx); text.setAttribute("y", dy);
@@ -3958,7 +3955,7 @@
       text.appendChild(t);
     }
     addTspan(glyph, glyphColor, fontSize + 1, "'Astronomicon', sans-serif");
-    addTspan(" " + degStr + minStr, numColor, fontSize);
+    addTspan(" " + degStr, numColor, fontSize);
     markers.appendChild(text);
   }
   // 全天体を1つの帯(BODY_R)に集約し、密集したクラスタは角度をズラさず
