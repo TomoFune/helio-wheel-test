@@ -461,7 +461,7 @@
      方式(.legend-glyphや.conj-body-glyphと同じやり方)に統一した。 */
   .legend-glyph {
     width: 20px; text-align: center; color: var(--accent); flex-shrink: 0;
-    font-family: "Noto Sans Symbols 2", sans-serif;
+    font-family: "Astronomicon", sans-serif;
   }
   .legend-name { flex: 1; color: var(--ink); }
   .legend-deg { color: var(--ink-dim); font-family: "Space Mono", "JetBrains Mono", monospace; }
@@ -542,7 +542,7 @@
   .aspect-grid th {
     color: var(--accent); font-size: 0.9rem; font-weight: 400;
     background: var(--bg-elevated); position: sticky; cursor: default;
-    font-family: "Noto Sans Symbols 2", sans-serif;  /* 2026-09-05、③(度数リスト・アスペクト表・凡例のフォント統一) */
+    font-family: "Astronomicon", sans-serif;  /* 2026-09-05、③(度数リスト・アスペクト表・凡例のフォント統一) */
   }
   .aspect-grid th:first-child { left: 0; z-index: 1; }
   .aspect-grid tr:first-child th { top: 0; z-index: 1; }
@@ -730,7 +730,7 @@
     width: 22px; height: 22px; border-radius: 50%;
     background: var(--accent-soft); color: var(--accent-strong);
     display: flex; align-items: center; justify-content: center; font-size: 0.86rem;
-    font-family: "Noto Sans Symbols 2", sans-serif;  /* 2026-09-05、③ */
+    font-family: "Astronomicon", sans-serif;  /* 2026-09-05、③ */
   }
   .conj-hit {
     display: flex; align-items: center; gap: 10px;
@@ -1096,6 +1096,25 @@
      既に付いているため、絵文字カラー表示への化けも防げる。 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Space+Mono:wght@400;700&family=Noto+Sans+Symbols+2&display=swap">
 
+<!-- Astronomicon(2026-09-14) -- サイン・惑星記号専用に作られたフォント
+     (SIL Open Font License、assets/Astronomicon-OFL-License.txt同梱)に
+     Noto Sans Symbols 2から乗り換え。Noto Sans Symbols 2は「何でも入りの
+     汎用記号フォント」で、実測するとグリフの当たり判定(バウンディング
+     ボックス)がfont-sizeの約1.7倍もあり、度数レイアウトの余白計算を
+     何度も裏切ってきた(HANDOFF 7.99〜7.101参照)。Astronomiconは実測で
+     どの記号も高さ=font-sizeぴったり(比率1.00)で、見積もりがそのまま
+     実測と一致する。ただしAstronomiconは、標準Unicodeの天文記号のうち
+     太陽・月・水金火土天海冥・セレス・キロンは対応しているが、木星と
+     サイン12個は独自の英字コード(A〜L、V)でしか呼び出せない(標準
+     Unicodeでは未収録、フォールバックして絵文字風の代替表示になる) --
+     SIGNS/PLANET_META側でその2種類だけ文字を差し替えている。 -->
+<style>
+  @font-face {
+    font-family: 'Astronomicon';
+    src: url('assets/Astronomicon.ttf') format('truetype');
+  }
+</style>
+
 <div class="app" id="app">
 
   <!-- ============ TOP BAR ============ -->
@@ -1291,7 +1310,7 @@
                    自体をもっと大きくする話は、次のレイアウト全体見直し
                    (帯の間隔を詰めて空いた分を文字サイズに回す)で改めて
                    対応する。 -->
-              <g id="sign-glyphs" font-size="19" fill="var(--ink)" font-family="'Noto Sans Symbols 2', sans-serif"></g>
+              <g id="sign-glyphs" font-size="19" fill="var(--ink)" font-family="'Astronomicon', sans-serif"></g>
               <!-- degree tick ring -->
               <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
                    -- 個々の線のstroke-width(0.4〜0.6と細い)に加えて、この
@@ -2577,7 +2596,7 @@
       const row = document.createElement('div');
       row.className = 'check-row';
       row.innerHTML = `<span class="mini-check${isOn ? ' on' : ''}" data-key="${m.key}" onclick="toggleMinorBody(this)">${isOn ? '✓' : ''}</span>` +
-        `<span>${m.g ? `<span style="font-family:'Noto Sans Symbols 2', sans-serif;">${m.g}</span> ` : ''}${m.name}</span>`;
+        `<span>${m.g ? `<span style="font-family:'Astronomicon', sans-serif;">${m.g}</span> ` : ''}${m.name}</span>`;
       container.appendChild(row);
     });
   }
@@ -2682,13 +2701,21 @@
   // Windows側のフォント優先順位・キャッシュ状態次第では絵文字用の
   // 代替フォントに倒れる余地が残っていた。VS15はfont-familyに関係なく
   // 効くため、根本的に再発を防げる。
-  const SIGNS = ["♈︎","♉︎","♊︎","♋︎","♌︎","♍︎","♎︎","♏︎","♐︎","♑︎","♒︎","♓︎"];
+  // サイン12個と木星は、標準Unicodeの天文記号(♈等)がAstronomiconフォント
+  // に収録されておらず(2026-09-14、実際にフォントを描画して実機確認)、
+  // フォールバックして絵文字風の代替表示になってしまう。この2種類だけ、
+  // Astronomicon独自の英字コード(A〜L、V)に差し替える -- 他の記号
+  // (太陽・月・水金火土天海冥・セレス・キロン・エリス)は標準Unicodeの
+  // ままAstronomiconで正しく描画されることを確認済みなので変更不要。
+  // 差し替えた文字は素のASCII英字なので、絵文字化のリスクが元々なく
+  // VS15(下のコメント参照)も不要。
+  const SIGNS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
   const PLANET_META = [
     { key: "mercury", g: "☿︎", name: "水星" },
     { key: "venus",   g: "♀︎", name: "金星" },
     { key: "earth",   g: "⊕︎", name: "地球" },
     { key: "mars",    g: "♂︎", name: "火星" },
-    { key: "jupiter", g: "♃︎", name: "木星" },
+    { key: "jupiter", g: "V", name: "木星" },  // 標準Unicode(♃)がAstronomiconに収録されていないため独自コード(上のSIGNSコメント参照)
     { key: "saturn",  g: "♄︎", name: "土星" },
     { key: "uranus",  g: "♅︎", name: "天王星" },
     { key: "neptune", g: "♆︎", name: "海王星" },
@@ -3240,7 +3267,7 @@
   // 同じフォント指定に巻き込むと、そのフォントが持つ数字グリフで描画
   // されてしまい見た目が変わる(2026-09-05、7.81で発覚)。
   function signGlyphSpan(g) {
-    return `<span style="font-family:'Noto Sans Symbols 2', sans-serif;">${g}</span>`;
+    return `<span style="font-family:'Astronomicon', sans-serif;">${g}</span>`;
   }
   function formatAstro(deg) {
     const norm = ((deg % 360) + 360) % 360;
@@ -3884,7 +3911,7 @@
     t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
     t.setAttribute("fill", glyphColor);
     t.setAttribute("font-size", String(fontSize));
-    t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
+    t.setAttribute("font-family", "'Astronomicon', sans-serif");
     t.textContent = glyph;
     markers.appendChild(t);
   }
@@ -3930,7 +3957,7 @@
       if (fontFamily) t.setAttribute("font-family", fontFamily);
       text.appendChild(t);
     }
-    addTspan(glyph, glyphColor, fontSize + 1, "'Noto Sans Symbols 2', sans-serif");
+    addTspan(glyph, glyphColor, fontSize + 1, "'Astronomicon', sans-serif");
     addTspan(" " + degStr + minStr, numColor, fontSize);
     markers.appendChild(text);
   }
@@ -3957,8 +3984,13 @@
   // 深さの上限(床)も浅くした。
   const ASPECT_R = 84;
   const BODY_R = 145;            // 度数チップ、孤立時の半径(実測でリング内周185まで安全マージンを残せる値)
-  const BODY_CLUSTER_STEP = 14;  // 密集クラスタ内、隣の段との半径の差(6だと同じクラスタの隣同士でも実測で重なっていたため14に拡大)
-  const BODY_CLUSTER_FLOOR = 110; // 段がどれだけ増えても、ここより内側へは踏み込まない
+  // 2026-09-14(続き): Astronomiconフォント導入後、fusedチップ(font-size14)
+  // の実測高さは22.1単位(以前Noto Sans Symbols 2で測っていた時よりずっと
+  // 小さい、当たり判定がfont-sizeとほぼ一致するようになったため)。段の
+  // 間隔がその半分(11)ずつ×2=22に満たないと隣の段と重なるので、14→24へ
+  // 拡大。床もfusedチップがASPECT_R(84)に近づきすぎない範囲で少し緩めた。
+  const BODY_CLUSTER_STEP = 24;
+  const BODY_CLUSTER_FLOOR = 100; // 段がどれだけ増えても、ここより内側へは踏み込まない
   const BODY_CLUSTER_FONT = 14;  // 密集クラスタの複合チップのフォントサイズ(段が増えても変えない、参考ソフトも一定だった)
   const GLYPH_GAP = 25;          // 孤立(隣接なし)時のみ使用。グリフは度数チップよりこの分だけ内側(旧PLANET_R⇔DEGREE_Rの間隔と同じ発想)
   // クラスタ判定(8度)とは別に、もっと広い基準(FORMAT_GAP_DEG)で「近くに
@@ -3986,7 +4018,7 @@
         t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
         t.setAttribute("fill", glyphColor);
         t.setAttribute("font-size", "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)
-        t.setAttribute("font-family", "'Noto Sans Symbols 2', sans-serif");
+        t.setAttribute("font-family", "'Astronomicon', sans-serif");
         t.textContent = p.g;
         markers.appendChild(t);
       });
@@ -4019,6 +4051,13 @@
         if (!isCrowded) {
           r = BODY_R;
           [dx, dy] = polar(200, 200, r, p.deg);
+          // グリフは度数チップより中心寄り(半径を-GLYPH_GAPする)に置く。
+          // 2026-09-14: 画面上で常に真上に固定する版も試したが、12時付近
+          // ではリング外へはみ出し、それを避けて縮めると今度は自分の
+          // 度数チップと重なる(実測severity 0.62)という板挟みになり撤回
+          // -- 半径方向のオフセットなら常に中心向き=リングから遠ざかる
+          // 向きなので安全性は確保できる。「円の上下左右で見え方が違う」
+          // という指摘への対応は別の切り口で再検討する(HANDOFF参照)。
           const [gx, gy] = polar(200, 200, r - GLYPH_GAP, p.deg);
           drawGlyph(markers, gx, gy, p.g, glyphColor, 18);
           drawDegreeChip(markers, dx, dy, p.deg, color, 17);
