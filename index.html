@@ -3551,7 +3551,15 @@
   // sorted-order sense, wrapping around for the first/last cluster), which
   // drawBodyRing uses to decide which side has more open room for a
   // cluster's label block.
-  function clusterByGap(items, gapDeg) {
+  // maxSpanDeg(既定Infinity、2026-09-14追加) -- 隣同士の間隔(gapDeg)だけで
+  // 判定すると、A-B間6.5度・B-C間7.8度のように「隣とはそれぞれ近い」鎖が
+  // 連なった時、A-C間は実際には14.3度も離れているのに1つのクラスタに
+  // まとめられてしまう実バグが見つかった(実機で「これ、そんなに度数
+  // 近くないよね」と指摘、地球・海王星・土星の実例で確認)。クラスタの
+  // 先頭からの累積距離がmaxSpanDegを超える手前で、隣接ギャップが基準内
+  // でも強制的に切る。既定Infinityなので、値を渡さない既存の呼び出し
+  // (staggerRadii等)の挙動は完全に無変更。
+  function clusterByGap(items, gapDeg, maxSpanDeg = Infinity) {
     const n = items.length;
     if (n === 0) return [];
     const sorted = [...items].sort((a, b) => a.deg - b.deg);
@@ -3564,10 +3572,14 @@
     const order = Array.from({ length: n }, (_, i) => sorted[(cutIdx + 1 + i) % n]);
     const orderGaps = Array.from({ length: n }, (_, i) => gaps[(cutIdx + 1 + i) % n]);  // gap AFTER order[i]
     const clusters = [];
+    let clusterStartPos = 0, pos = 0;
     order.forEach((item, i) => {
       const gapBefore = i === 0 ? gaps[cutIdx] : orderGaps[i - 1];
-      if (gapBefore >= gapDeg) {
+      if (i > 0) pos += gapBefore;
+      const wouldSpan = pos - clusterStartPos;
+      if (gapBefore >= gapDeg || (clusters.length > 0 && wouldSpan > maxSpanDeg)) {
         clusters.push({ members: [item], gapBefore });
+        clusterStartPos = pos;
       } else {
         clusters[clusters.length - 1].members.push(item);
       }
@@ -4040,7 +4052,11 @@
       if (members.length >= 2) members.forEach(m => hasNearNeighbor.add(m.key));
     });
     const radii = {};
-    clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0).forEach(({ members }) => {
+    // maxSpanDeg=10 -- 隣同士の鎖(例: 地球-海王星6.5度、海王星-土星7.8度)
+    // だけで繋がり、端から端(地球-土星14.3度)は全然近くないのに1クラスタ
+    // にまとめられる実バグへの対応(2026-09-19、実機で発覚。clusterByGap
+    // 側のコメント参照)。
+    clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0, 10.0).forEach(({ members }) => {
       members.forEach((m, depth) => {
         const p = planetByKey.get(m.key);
         const isCrowded = members.length > 1 || hasNearNeighbor.has(p.key);
