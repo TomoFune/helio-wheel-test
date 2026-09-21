@@ -1112,6 +1112,7 @@
   @font-face {
     font-family: 'Astronomicon';
     src: url('assets/Astronomicon.ttf') format('truetype');
+    font-display: block;
   }
 </style>
 
@@ -1287,7 +1288,7 @@
                    位置にあり、古い帯レイアウト時代の名残りの境界線が
                    度数の文字と重なって見えるだけの装飾になっていた。
                    150->165(7.78、下のsign-ticks/degree-ticksと連動)。 -->
-              <circle cx="200" cy="200" r="165" fill="none" stroke="var(--ring-a)" stroke-width="1.4" opacity="0.7"/>
+              <circle id="sign-band-inner-circle" cx="200" cy="200" r="185" fill="none" stroke="var(--ring-a)" stroke-width="1.4" opacity="0.7"/>
               <!-- 12 sign divisions -->
               <g id="sign-ticks"></g>
               <!-- class="mono"を外した(2026-09-03、「サインの背景の四角い
@@ -1310,6 +1311,9 @@
                    自体をもっと大きくする話は、次のレイアウト全体見直し
                    (帯の間隔を詰めて空いた分を文字サイズに回す)で改めて
                    対応する。 -->
+              <!-- 2026-09-21、サイン記号の色をリング本体・目盛りと同じ
+                   --accentから戻す(枠と同じ色だと見分けにくいとの指摘) --
+                   枠と別の色にするため--inkを使用。 -->
               <g id="sign-glyphs" font-size="19" fill="var(--ink)" font-family="'Astronomicon', sans-serif"></g>
               <!-- degree tick ring -->
               <!-- opacity 0.4 -> 0.75 (2026-09-01、「メモリがない」より
@@ -2782,7 +2786,7 @@
     // 通常のラテン文字"Er"にした -- 特殊なUnicode記号と違い、普通の
     // アルファベットはどのフォント・端末でも確実に表示されるため、
     // クロスプラットフォーム問題そのものからも解放される。
-    { key: "eris",            g: "Er", name: "エリス" },
+    { key: "eris",            g: "Ers", name: "エリス" },  // 2026-09-20、"Er"だと何の略か分かりにくいとのことで"Ers"に変更
   ];
   // MINOR_META(UIのチェックリスト)には無いlilith_asteroidも含む、
   // engine.jsが返すlonsに載りうる小惑星・準惑星キーの全体集合
@@ -3293,14 +3297,16 @@
   // Same as formatAstro but without the sign glyph -- used right on the
   // wheel next to each body's marker, where the ring position already
   // shows the sign.
-  // Split into two short strings for a stacked two-line label on the
-  // wheel (see drawBodyRing) instead of one wide "12°09'" line.
+  // 2段表示(度を上段、分を下段)用に、ゼロ埋め2桁・記号なしの2つの文字列
+  // に分ける(2026-09-20、スターゲイザーの実機録画で確認) -- 記号(°/')を
+  // 省き、常に2桁ゼロ埋めにすることで、チップの横幅が天体によらず一定になり、
+  // 密集回避に必要な角度もその分小さくなる。
   function formatDegMinParts(deg) {
     const norm = ((deg % 360) + 360) % 360;
     const inSign = norm % 30;
     const d = Math.floor(inSign);
     const m = Math.floor((inSign - d) * 60);
-    return [d + "°", String(m).padStart(2, "0") + "'"];
+    return [String(d).padStart(2, "0"), String(m).padStart(2, "0")];
   }
   function transitLongitudesNow() {
     // Scrubbed transit time = base real data + approximate mean-motion
@@ -3440,19 +3446,26 @@
     const lons = currentDisplayLongitudes();  // main 9 + whichever minor bodies are checked -- see the note by minorBodiesOn
     const aspects = computeAspects(lons);
     const svgNS = "http://www.w3.org/2000/svg";
-    // スポーク線(惑星グリフ⇔ASPECT_Rを結ぶ短い線)は廃止(2026-09-04、
-    // 「惑星とアスペクトの間に、それらを結ぶ線はいらないと思う」より)。
-    // 7.66でスポークを導入した理由(合に近いアスペクトの弦がPLANET_R
-    // 付近に張り付いて第3の天体のグリフに重なる)自体は、同日中に
-    // ASPECT_Rの間隔を66->86(PLANET_Rとの差40->20)に詰めても、
-    // ASPECT_RがPLANET_Rより十分小さい限り再発しないため、スポークが
-    // なくても実害はない。
+    // 端点を中心寄りの固定円(旧ASPECT_R=84、全天体共通の1つの円に圧縮)
+    // に圧縮するのをやめ、drawBodyRingが返すaspectAnchors(各天体の本当の
+    // 角度沿い、グリフより中心側の点)につなぐ(2026-09-19、NPT-Charts/
+    // スターゲイザーの実機録画で確認 -- 惑星とアスペクトが別世界のように
+    // 離れて見えていた原因そのものだった)。表示用にずらした位置ではなく
+    // 本当の角度を使うのは、合になった天体のアスペクトが見やすさのための
+    // ずらしに引っ張られて不正確な角度で描かれないようにするため。
+    // 以前はinsetLineEndpointsで両端を手前で止めていたが、1つの天体に
+    // 複数本のアスペクトが集まる場合、線ごとに別々の方向へ手前で止まる
+    // ため、本来1点に集まるはずの角(スクエア・トラインなど)がバラけて
+    // 閉じて見えないバグがあった(2026-09-20、実機で発覚)。アスペクトの
+    // 接続点は既にグリフから離れた専用の半径(ASPECT_ANCHOR_R)にあるため、
+    // グリフに刺さる心配はもうなく、insetをやめて接続点同士を直接結ぶ。
+    const anchors = window.__aspectAnchors || {};
     aspects.filter(a => aspectTypesOn.has(a.type)).forEach(a => {
-      const [x1, y1] = polar(200, 200, ASPECT_R, lons[a.a]);
-      const [x2, y2] = polar(200, 200, ASPECT_R, lons[a.b]);
+      const pa = anchors[a.a], pb = anchors[a.b];
+      if (!pa || !pb) return;
       const line = document.createElementNS(svgNS, "line");
-      line.setAttribute("x1", x1); line.setAttribute("y1", y1);
-      line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+      line.setAttribute("x1", pa.x); line.setAttribute("y1", pa.y);
+      line.setAttribute("x2", pb.x); line.setAttribute("y2", pb.y);
       line.setAttribute("stroke", a.color);
       // 太さ1/1.5->1.4/2、不透明度0.75->0.9(2026-09-03、「線とか文字が、
       // 見にくいのよね」「色？線の太さ？コントラストかな？」より)。
@@ -3599,22 +3612,6 @@
     return radii;
   }
 
-  // アスペクト線の両端を、天体グリフの中心手前でmarginぶん止める
-  // (2026-09-01、「アスペクト線と惑星がぶつかって惑星がつぶれている、
-  // 惑星そのものを中心にしないでほしい」より) -- 元は文字通りグリフの
-  // 中心座標同士を結んでいたため、天体が集まっている場所では何本もの線
-  // がグリフの真上で交差し、グリフ自体が線の重なりに埋もれて読みにくく
-  // なっていた。線の向きに沿って両端をmarginぶん内側へ引っ込めることで、
-  // グリフの周りに線の入らない余白ができる。2点が近すぎてmargin*2以上
-  // 離れていない場合(隣接スタッガー同士の合など)は縮めず元のまま返す
-  // -- 変に潰れて見えなくなるより、多少グリフに触れる方がまし。
-  function insetLineEndpoints(x1, y1, x2, y2, margin) {
-    const dx = x2 - x1, dy = y2 - y1;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < margin * 2 + 1) return [x1, y1, x2, y2];
-    const ux = dx / dist, uy = dy / dist;
-    return [x1 + ux * margin, y1 + uy * margin, x2 - ux * margin, y2 - uy * margin];
-  }
   function polar(cx, cy, r, deg) {
     // Same rotation as the real app's chart.py `_xy()`: theta=(270-lon)%360,
     // x=r*sin(theta), y=r*cos(theta) in a y-up frame -- negate the cos term
@@ -3629,6 +3626,12 @@
     const glyphs = document.getElementById('sign-glyphs');
     const dticks = document.getElementById('degree-ticks');
     ticks.innerHTML = ""; glyphs.innerHTML = ""; dticks.innerHTML = "";
+    // 静的なSVGに置いてある内周円を、この関数が使っているのと同じ
+    // SIGN_BAND_INNERへ毎回同期する(2026-09-19) -- 帯を広げるたびにこの
+    // 円だけ更新し忘れて目盛りが浮くバグがあったため、値のズレそのものが
+    // 起きないようにした。
+    const innerCircle = document.getElementById('sign-band-inner-circle');
+    if (innerCircle) innerCircle.setAttribute('r', SIGN_BAND_INNER);
 
     // 7.78: サインリング帯を150〜178から165〜196へ拡大(円が使っていな
     // かった外周の余白を使う)。度数チップ(140帯)との間隔も150->165で
@@ -3637,7 +3640,7 @@
     // 反転(惑星記号・度数帯をこのすぐ内側まで押し出す)に合わせて外側へ)。
     for (let i = 0; i < 12; i++) {
       const deg = i * 30;
-      const [x1, y1] = polar(200, 200, 185, deg);
+      const [x1, y1] = polar(200, 200, SIGN_BAND_INNER, deg);
       const [x2, y2] = polar(200, 200, 220, deg);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
@@ -3669,7 +3672,7 @@
       // 惑星グリフ・度数表示は帯の内側にあるので、目盛りを内周に付けた
       // 方が「どの目盛りの上に惑星があるか」を目で追いやすい。長さは
       // 据え置き(大6単位/小3単位)。
-      const [x1, y1] = polar(200, 200, 185, d);
+      const [x1, y1] = polar(200, 200, SIGN_BAND_INNER, d);
       const [x2, y2] = polar(200, 200, isMajor ? 191 : 188, d);
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", x1); line.setAttribute("y1", y1);
@@ -3854,6 +3857,77 @@
       for (let i = 0; i < n; i++) order[i].deg = ((base + pos[i]) % 360 + 360) % 360;
     });
   }
+  // 惑星リング専用のスイープ(2026-09-20)。経緯:
+  // (1) 最初はsweepSameTierLabelsを素直に一般化した「一番大きな隙間で輪を
+  //     切り、以後は前から順に必要なぶんだけ押す」片方向の押し出しだった。
+  //     しかしこの方式は、押した量がそのままずっと後ろまで積み重なり
+  //     (隣同士の間隔さえ足りていれば、十分離れた次の天体との間隔が
+  //     もともと余裕であっても、積み重なった押し出し量に押し流されて
+  //     しまう)、5天体が31度にひしめく実例で、密集の端にいた天体が本当の
+  //     角度から16度も離れ、隣のサイン(牡羊座→牡牛座)まではみ出す実害が
+  //     実測で見つかった。
+  // (2) 次に「隙間が足りない天体同士の一続き(クラスタ)」ごとに区切り、
+  //     各クラスタを自分自身の中心を軸に左右対称に広げる方式に直したが、
+  //     今度はクラスタ同士の"境界"(クラスタ判定の時点では十分離れていた
+  //     はずの隙間)が、両クラスタが外向きに広がった結果お互いに侵食し
+  //     合い、別の天体同士が新たに重なる実害が実測で見つかった。
+  // (3) 最終的に、隣接するブロック(最初は天体1つぶん)同士が必要な間隔を
+  //     満たせない場合はその場で1つに合体し、合体後のブロックでまた次の
+  //     隣と判定し直す、というスタック方式(PAVA、pool-adjacent-violators
+  //     algorithmと同じ考え方)にした。これなら、判定と配置が同時に確定
+  //     するので、(2)のような「後から境界が壊れる」余地がない。各ブロック
+  //     の中はそのブロック自身の中心を軸に均等配置する。
+  function sweepBodyAngles(items) {
+    const n = items.length;
+    if (n < 2) return;
+    const sorted = [...items].sort((a, b) => a.deg - b.deg);
+    const gaps = sorted.map((it, i) => {
+      const next = sorted[(i + 1) % n];
+      return ((next.deg - it.deg) % 360 + 360) % 360;
+    });
+    let cut = 0;
+    for (let i = 1; i < n; i++) if (gaps[i] > gaps[cut]) cut = i;
+    const order = Array.from({ length: n }, (_, i) => sorted[(cut + 1 + i) % n]);
+    const base = order[0].deg;
+    // truePos[i] = 本当の角度に基づく、order[0]からの相対位置(輪をほどいた
+    // 直線上の値)。ブロックの中心・必要な間隔の計算に使う、動かさない
+    // 基準値。
+    const truePos = [0];
+    for (let i = 1; i < n; i++) {
+      const d = ((order[i].deg - order[i - 1].deg) % 360 + 360) % 360;
+      truePos.push(truePos[i - 1] + d);
+    }
+    const pairGap = (k) => order[k].halfGapDeg + order[k + 1].halfGapDeg;
+    const stack = [];
+    for (let i = 0; i < n; i++) {
+      let block = { s: i, e: i, span: 0, center: truePos[i] };
+      while (stack.length) {
+        const prev = stack[stack.length - 1];
+        const need = pairGap(prev.e);
+        const gapNow = (block.center - block.span / 2) - (prev.center + prev.span / 2);
+        if (gapNow >= need) break;
+        block = {
+          s: prev.s, e: block.e,
+          span: prev.span + need + block.span,
+          center: (truePos[prev.s] + truePos[block.e]) / 2,
+        };
+        stack.pop();
+      }
+      stack.push(block);
+    }
+    stack.forEach(block => {
+      if (block.s === block.e) {
+        order[block.s].deg = ((base + block.center) % 360 + 360) % 360;
+        return;
+      }
+      let cursor = block.center - block.span / 2;
+      order[block.s].deg = ((base + cursor) % 360 + 360) % 360;
+      for (let k = block.s; k < block.e; k++) {
+        cursor += pairGap(k);
+        order[k + 1].deg = ((base + cursor) % 360 + 360) % 360;
+      }
+    });
+  }
   // 実際に他の表示(rect/text)と重なっていたら、縦方向に1段ずつずらして
   // 避ける(2026-09-03、起点ラベルの重なり対策(7.50)を汎用化したもの)
   // -- 「これはみにくいねぇ」の修正時は起点ラベル専用のインライン処理
@@ -3926,93 +4000,81 @@
     t.setAttribute("font-family", "'Astronomicon', sans-serif");
     t.textContent = glyph;
     markers.appendChild(t);
+    return t;
   }
-  // 円の中は度数(°)だけにして、分(')は表示しない(2026-09-14) -- 正確な
-  // 分は「度数」タブのリストに常に出ているので、円の上は分を省く分だけ
-  // 場所を稼ぐ。以前は度数/分の2段組みだったが、1行になったことで孤立
-  // 天体の占有スペースがほぼ半分になった。
+  // 度数を上段(度)・下段(分)の2段表示にする(2026-09-20、スターゲイザーの
+  // 実機録画で確認) -- 横1行(旧"27°14'")より幅が半分近くになり、密集回避
+  // に必要な角度スプレッドが小さくなる。1つの<g>にまとめて返す(getBBox()
+  // で2行ぶんの矩形をまとめて測れるようにするため)。
   function drawDegreeChip(markers, dx, dy, deg, color, fontSize) {
-    const [degStr] = formatDegMinParts(deg);
-    const dtext = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    dtext.setAttribute("class", "wheel-degree-label");
-    dtext.setAttribute("x", dx); dtext.setAttribute("y", dy);
-    dtext.setAttribute("text-anchor", "middle"); dtext.setAttribute("dominant-baseline", "middle");
-    dtext.setAttribute("fill", color); dtext.setAttribute("opacity", "1");
-    dtext.setAttribute("font-size", String(fontSize));
-    dtext.setAttribute("font-weight", "700");
-    dtext.textContent = degStr;
-    markers.appendChild(dtext);
+    const [degStr, minStr] = formatDegMinParts(deg);
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.setAttribute("class", "wheel-degree-label");
+    const lineGap = fontSize * 0.95;  // 上下2行の中心間距離(実測して調整)
+    [[degStr, dy - lineGap / 2], [minStr, dy + lineGap / 2]].forEach(([txt, y]) => {
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", dx); t.setAttribute("y", y);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+      t.setAttribute("fill", color); t.setAttribute("opacity", "1");
+      t.setAttribute("font-size", String(fontSize));
+      t.setAttribute("font-weight", "700");
+      t.textContent = txt;
+      group.appendChild(t);
+    });
+    markers.appendChild(group);
+    return group;
   }
-  // グリフ+度数+分を1行に収めた小型版(密集クラスタの段積み用、2026-09-14
-  // 新設) -- drawGlyph+drawDegreeChipを別要素のまま段積みすると、グリフを
-  // 自分の度数チップから離す分だけ次の段の度数チップに近づいてしまい、
-  // 実測でグリフが別の天体の度数チップに完全に重なる(severity 1.0)実
-  // バグが見つかった(3体が8度以内に密集する実例で発覚)。孤立した天体
-  // (クラスタ1件)は間隔に余裕があるのでdrawGlyph+drawDegreeChipのまま、
-  // クラスタが2件以上のときだけ、要素を分けずに1つの行にまとめることで
-  // 「要素間の隙間」という競合要因そのものをなくした。
-  function drawFusedChip(markers, dx, dy, deg, glyph, numColor, glyphColor, fontSize) {
-    const [degStr] = formatDegMinParts(deg);  // 分は表示しない(上のdrawDegreeChipコメント参照)
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.setAttribute("class", "wheel-degree-label");
-    text.setAttribute("x", dx); text.setAttribute("y", dy);
-    text.setAttribute("text-anchor", "middle"); text.setAttribute("dominant-baseline", "middle");
-    text.setAttribute("font-weight", "700");
-    function addTspan(str, fill, size, fontFamily) {
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-      t.textContent = str;
-      t.setAttribute("fill", fill);
-      t.setAttribute("font-size", String(size));
-      if (fontFamily) t.setAttribute("font-family", fontFamily);
-      text.appendChild(t);
-    }
-    addTspan(glyph, glyphColor, fontSize + 1, "'Astronomicon', sans-serif");
-    addTspan(" " + degStr, numColor, fontSize);
-    markers.appendChild(text);
-  }
-  // 全天体を1つの帯(BODY_R)に集約し、密集したクラスタは角度をズラさず
-  // 内側へ段積みする(2026-09-14、HANDOFF 7.99「他のソフトはどうやって
-  // 直感的に読めているのか」の実機解析より) -- アストロゴールドの動画を
-  // 実際に拡大したところ、密集天体を角度方向に散らしてはおらず、本当の
-  // 角度のまま内側へ1行ずつ段を重ねていた(牡羊座に4天体が集まった実例
-  // で確認)。角度を一切動かさないので、以前のsweepByCluster(角度方向に
-  // 押し広げる方式、「本来の位置から遠すぎる」の原因だった)は廃止し、
-  // clusterByGap(staggerRadiiと同じクラスタ判定)で段=depthだけ決める
-  // 方式に置き換えた。ガイド線は段が深い(リングから離れた)天体だけに出す。
+  // グリフ・度数チップは、孤立・密集を問わず必ずこの2要素・同じ角度・
+  // 「度数は外側・グリフは内側」というルールで描く(2026-09-19)。
+  // 密集(合)した天体も、グリフ・度数チップとも全天体共通の1つの半径
+  // (孤立・密集を問わず段を作らない)。混雑時は半径を変えず、リングに
+  // 沿って角度方向にだけ少しずらして避ける(下のsweepBodyAngles)。
   //
-  // 2026-09-14(続き): 上の「段が深いほど中心へ大きく沈める」設計
-  // (BODY_DEPTH_STEPS=[22,19,16])は、2天体だけのありふれた合でも22単位
-  // 沈んでしまい「円の同じ高さにない」と実機で指摘された。ユーザーから
-  // アストロゴールド・スターガザー・別の2ソフト、計4本の実例(5〜6天体が
-  // 1つのサインに密集した極端なケース含む)を見せてもらったところ、
-  // どのソフトも密集時に中心へ段を掘る動きはしておらず、リングのすぐ
-  // 近くに全員を留めたまま、コンパクトな1行表記で詰めていた(数字同士が
-  // かなり接近・多少重なるのも許容している -- 正確な値は既存の「度数」
-  // パネル側で見られるため、円の上は「だいたいこの辺」で足りるという
-  // 割り切り)。この実例に合わせ、段の間隔を22→6へ大幅に縮小し、沈み込む
-  // 深さの上限(床)も浅くした。
-  const ASPECT_R = 84;
-  const BODY_R = 145;            // 度数チップ、孤立時の半径(実測でリング内周185まで安全マージンを残せる値)
-  // 2026-09-14(続き): Astronomiconフォント導入後、fusedチップ(font-size14)
-  // の実測高さは22.1単位(以前Noto Sans Symbols 2で測っていた時よりずっと
-  // 小さい、当たり判定がfont-sizeとほぼ一致するようになったため)。段の
-  // 間隔がその半分(11)ずつ×2=22に満たないと隣の段と重なるので、14→24へ
-  // 拡大。床もfusedチップがASPECT_R(84)に近づきすぎない範囲で少し緩めた。
-  const BODY_CLUSTER_STEP = 24;
-  const BODY_CLUSTER_FLOOR = 100; // 段がどれだけ増えても、ここより内側へは踏み込まない
-  const BODY_CLUSTER_FONT = 14;  // 密集クラスタの複合チップのフォントサイズ(段が増えても変えない、参考ソフトも一定だった)
-  const GLYPH_GAP = 25;          // 孤立(隣接なし)時のみ使用。グリフは度数チップよりこの分だけ内側(旧PLANET_R⇔DEGREE_Rの間隔と同じ発想)
-  // クラスタ判定(8度)とは別に、もっと広い基準(FORMAT_GAP_DEG)で「近くに
-  // 誰かいるか」を見て、表記の大小を決める(2026-09-14、実測で発見: 8度
-  // ぎりぎり外側の孤立天体が、大きい表記のまま隣のクラスタに実際に重なる
-  // バグがあった -- 土星(隣のクラスタと8.05度差、"孤立"判定)が、天王星・
-  // 海王星のクラスタと重なっていた実例)。位置(半径)は孤立のままBODY_R
-  // に留め、表記だけ小型(drawFusedChip)に切り替えることで、余計な場所を
-  // 取らないようにする。
-  const FORMAT_GAP_DEG = 12.0;
-  function bodyClusterRadius(depth) {
-    return Math.max(BODY_R - depth * BODY_CLUSTER_STEP, BODY_CLUSTER_FLOOR);
-  }
+  // 経緯: 2026-09-14(HANDOFF 7.99〜101)には「同じ半径のまま角度だけで
+  // 散らし、収まらなければ縮小する」方式にしていたが、2026-09-19〜20に
+  // スターゲイザーの録画を複数見比べた結果、ヘリオセントリック画面では
+  // 深さで段積みしているように見えたため、一時的に半径を変える段積み方式
+  // に切り替えた。しかし2026-09-20、実際にサンプルデータで実装したところ
+  // (1)固定の角度しきい値では、しきい値の外側にいる天体同士の衝突を
+  // 見落とす(1枚のチャートで20件以上の重なりを実測で確認)、(2)ユーザー
+  // 本人が日常的に操作しているスターゲイザーの直接確認により、実際には
+  // 段積みはされておらず全天体が同一半径である、との指摘を受けた。動画の
+  // 静止画コマからの解釈が誤りだったと判断し、同一半径+角度スプレッド方式
+  // に最終的に戻した。
+  const BODY_R = 170;            // 度数チップの半径(孤立・密集を問わず全天体共通)。2026-09-20、2段表示化に伴いリング(185)にもっと近づけた(実測して微調整予定)
+  // サインリング帯の内側境界。目盛り(drawSignRing)・静的な内周円・
+  // ガイド線の起点(ringInner)は全部ここを参照する(2026-09-19、この値が
+  // 3箇所に別々に書かれていて少しずつズレ、目盛りが浮いて見えるバグが
+  // あったため一本化した)。
+  const SIGN_BAND_INNER = 185;
+  const ISOLATED_GLYPH_FONT = 24;  // 全天体共通のグリフの大きさ(2026-09-19、18->24。「小さくて見えない」より、スターゲイザー程度の大きさへ) -- 密集時も含め縮小しない
+  // グリフは度数チップよりこの分だけ中心寄り(孤立・密集を問わず共通)。
+  // 2026-09-20、getBBox()実測により、グリフ・度数チップ(2段)とも「幅より
+  // 高さの方が大きい」ことが判明(グリフ: 幅13〜25/高さ34.6、度数チップ:
+  // 幅16〜19/高さ40)。12時・6時付近では半径方向=高さ方向になるため、
+  // 高さを基準に間隔を決める必要がある。半分ずつ(17.3+20=37.3)より
+  // 少し余裕を持たせた値。
+  const GLYPH_GAP = 40;
+  const DEGREE_FONT = 14;        // 全天体共通の度数チップの大きさ(2026-09-20、17->14。「惑星より大きい必要はない」より一回り縮小)
+  // グリフの半径。度数チップ(BODY_R)と同じ角度・全天体共通のこの半径を
+  // 常に使う(2026-09-20、段積み撤回に伴い固定値に単純化)。
+  const GLYPH_R = BODY_R - GLYPH_GAP;
+  // 密集回避スイープ(sweepBodyAngles)用、実測に基づく「安全な footprint」
+  // (2026-09-20訂正) -- 当初は横幅だけで見積もっていたが、グリフ・度数
+  // チップ(2段)ともgetBBox()実測で高さの方が大きいと判明したため、高さを
+  // 基準にする(3時・9時では実際より余裕を持たせることになるが、12時・
+  // 6時で不足するよりは安全)。度数チップは常に2桁×2段の固定レイアウト
+  // なので、文字数によらず高さは一定(fontSizeの約2.35倍、実測40/17）。
+  // グリフの高さはfontSizeの約1.44倍(実測34.6/24)。
+  const DEGREE_CHIP_FOOTPRINT = DEGREE_FONT * 2.35;
+  const GLYPH_FOOTPRINT = ISOLATED_GLYPH_FONT * 1.44;
+  // アスペクト線の接続点(2026-09-19に導入、2026-09-20単純化・拡大) --
+  // 表示用にずらした位置ではなく、各天体の「本当の角度」に沿って、
+  // グリフ(GLYPH_R)のすぐ内側の、全天体共通の1つの固定半径につなぐ。
+  // スターゲイザーの実機録画で、アスペクトの合流点がグリフのすぐ近くに
+  // あり、中心近くまで圧縮されてはいないことを確認した上で、以前の60から
+  // 拡大した(実測して微調整予定)。
+  const ASPECT_ANCHOR_R = 100;
   const STAR_R = 232;  // 220->232(サインリング拡大(185〜220)に合わせて外側へ)
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
   function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, glyphColor = color, guides = true, showDegrees = true }) {
@@ -4033,70 +4095,53 @@
       });
       return radii;
     }
-    // 単一円: 全天体を1つの帯(BODY_R、度数チップの半径)に描く。角度
-    // (p.deg)は一切動かさず、密集クラスタだけ内側へ段積みする(段=depth、
-    // clusterByGapは既存のクラスタ判定を流用)。孤立している天体は常に
-    // BODY_R・本当の角度のまま。
-    // 孤立(クラスタ1件)はグリフ・度数チップを別要素(drawGlyph+
-    // drawDegreeChip、両方とも同じ(半径,本当の角度)から算出するので
-    // ズレる余地がない)のまま、大きく読みやすく描く。クラスタが2件
-    // 以上のときは、drawFusedChip(1行にまとめた小型版)に切り替える --
-    // 別要素のまま段積みすると、グリフを自分の度数チップから離す分だけ
-    // 次の段の度数チップに近づいてしまい、グリフが別の天体の度数チップに
-    // 完全に重なる実バグが実測で見つかったため(2026-09-14、水星・キロン・
-    // 海王星が8度以内に密集する実例)。1行にまとめれば要素間の隙間という
-    // 競合要因自体がなくなる。
-    const planetByKey = new Map(planets.map(p => [p.key, p]));
-    const hasNearNeighbor = new Set();
-    clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), FORMAT_GAP_DEG).forEach(({ members }) => {
-      if (members.length >= 2) members.forEach(m => hasNearNeighbor.add(m.key));
-    });
+    // 単一円: 全天体のグリフ(GLYPH_R)・度数チップ(BODY_R)は、孤立・密集
+    // を問わず全天体共通の同じ半径・同じ表示角度(displayDeg)を使う(段は
+    // 作らない、2026-09-20)。表示角度は、まず各天体の必要な角度幅(実測に
+    // 基づく概算)を求め、1回のスイープ(sweepBodyAngles)でリング一周ぶん
+    // 重ならないよう振り分ける -- 「何度以内なら合か」という角度しきい値
+    // による事前のクラスタ判定はしない(しきい値の外側にいる天体同士の
+    // 衝突を見落としていたため、2026-09-20に撤回)。度数チップの文字列
+    // (drawDegreeChip)には常にp.deg(本当の角度)を渡すので、表示位置が
+    // ずれても数値が曖昧になることはない。
     const radii = {};
-    // maxSpanDeg=10 -- 隣同士の鎖(例: 地球-海王星6.5度、海王星-土星7.8度)
-    // だけで繋がり、端から端(地球-土星14.3度)は全然近くないのに1クラスタ
-    // にまとめられる実バグへの対応(2026-09-19、実機で発覚。clusterByGap
-    // 側のコメント参照)。
-    clusterByGap(planets.map(p => ({ key: p.key, deg: p.deg })), 8.0, 10.0).forEach(({ members }) => {
-      members.forEach((m, depth) => {
-        const p = planetByKey.get(m.key);
-        const isCrowded = members.length > 1 || hasNearNeighbor.has(p.key);
-        let r, dx, dy;
-        if (!isCrowded) {
-          r = BODY_R;
-          [dx, dy] = polar(200, 200, r, p.deg);
-          // グリフは度数チップの真上(画面上で常に同じ向き)に固定する
-          // (2026-09-14、再挑戦) -- 半径方向のオフセット(r-GLYPH_GAP)だと
-          // 12時付近では見た目「上下」、3時/9時付近では見た目「左右」の
-          // ズレになり、「惑星が度数の外になったり内になったりする」と
-          // 実機で指摘された(円の上のどの位置にあるかで、グリフが度数の
-          // 前に来るか後に来るかが入れ替わって見えていた)。以前この
-          // 画面上固定オフセットを試した時はリング突破/自己重複の板挟みに
-          // なったが、当時は度数チップが2段組み(度数+分)で縦に大きかった
-          // ため。今は分を省いて1行になり(実測h=25.6、旧の約49から半減)、
-          // グリフ(実測h=18.3)を単純に真上へ積んでも収まる計算になった
-          // ため再挑戦し、実測で確認した。
-          const [gx, gy] = [dx, dy - GLYPH_GAP];
-          drawGlyph(markers, gx, gy, p.g, glyphColor, 18);
-          drawDegreeChip(markers, dx, dy, p.deg, color, 17);
-        } else {
-          // クラスタの本メンバー(members.length>1)は段=depthで段積み。
-          // 8度クラスタでは孤立扱いだが12度以内に隣がいる天体は、位置は
-          // BODY_Rのまま(段積みしない)、表記だけ小型にする。
-          r = members.length > 1 ? bodyClusterRadius(depth) : BODY_R;
-          [dx, dy] = polar(200, 200, r, p.deg);
-          drawFusedChip(markers, dx, dy, p.deg, p.g, color, glyphColor, BODY_CLUSTER_FONT);
-        }
-        radii[p.key] = r;  // アスペクト線のアンカーも実際に描いた位置に合わせる
-        // ガイド線は段が深い(=BODY_Rより内側へ押し込まれた)天体だけに出す
-        // -- 角度は動かしていないので、リング上のその角度からまっすぐ内側
-        // へ伸びる線になる(2026-09-04、「ただの直線にしてもらえますか」の
-        // 方針を継続)。
-        if (guides && r < BODY_R - 0.5) {
-          drawGuideLine(markers, p.deg, ringInner, dx, dy);
-        }
-      });
+    const aspectAnchors = {};
+    // 度数チップ・グリフとも、文字内容によらず常に同じfootprint(2段固定
+    // レイアウト・1文字グリフ)なので、天体ごとに計算し直す必要はない
+    // (2026-09-20訂正、以前は文字幅ベースで天体ごとに計算していた)。
+    const chipHalfDeg = (DEGREE_CHIP_FOOTPRINT / 2) / BODY_R * (180 / Math.PI);
+    const glyphHalfDeg = (GLYPH_FOOTPRINT / 2) / GLYPH_R * (180 / Math.PI);
+    // *1.05(重なりを完全にゼロにする安全マージン)だと、5天体が31度に
+    // ひしめくような超密集ケースで必要な合計角度が実際の範囲を超え、
+    // 隣のサインまではみ出すことが判明(2026-09-20)。スターゲイザーの
+    // 実機画像で「火星と冥王星のグリフがこの程度軽く触れるのは許容範囲」
+    // と確認できたため、ここは重なりゼロを狙わず、多少の接触を許容する
+    // 側へ倒す(0.8 = 実測footprintの8割まで間隔を詰める)。
+    const halfGapDeg = Math.max(chipHalfDeg, glyphHalfDeg) * 0.8;
+    const items = planets.map(p => ({ key: p.key, deg: p.deg, halfGapDeg }));
+    sweepBodyAngles(items);
+    const displayDegByKey = new Map(items.map(it => [it.key, it.deg]));
+    planets.forEach(p => {
+      const displayDeg = displayDegByKey.get(p.key);
+      const [dx, dy] = polar(200, 200, BODY_R, displayDeg);
+      const [gx, gy] = polar(200, 200, GLYPH_R, displayDeg);
+      drawGlyph(markers, gx, gy, p.g, glyphColor, ISOLATED_GLYPH_FONT);
+      drawDegreeChip(markers, dx, dy, p.deg, color, DEGREE_FONT);
+      radii[p.key] = BODY_R;
+      // アスペクト線は、密集回避でずらした表示角度ではなく、本当の角度
+      // (p.deg)に沿った、全天体共通の固定半径(ASPECT_ANCHOR_R)の点に
+      // つなぐ(2026-09-19の決定を継続) -- NPT-Chartsの実機録画で確認した
+      // 通り、合になった天体同士のアスペクトが密集回避のズレに引っ張られて
+      // 不正確な角度で描かれないようにするため。
+      const [ax, ay] = polar(200, 200, ASPECT_ANCHOR_R, p.deg);
+      aspectAnchors[p.key] = { x: ax, y: ay };
+      // ガイド線は全天体に常時出す(2026-09-19、スターゲイザーは孤立した
+      // 天体にも同じ仕組みで目盛り線を引いていることを実機録画で確認した
+      // 上での変更) -- リング上の本当の角度から、実際に描画された(角度が
+      // ずれた)位置まで結ぶ。
+      if (guides) drawGuideLine(markers, p.deg, ringInner, dx, dy);
     });
-    return radii;
+    return { radii, aspectAnchors };
   }
 
   function fillLegend(el, planets) {
@@ -4260,14 +4305,15 @@
     // 無視される(2026-09-03、円の外側から恒星/サイン/度数/惑星/
     // アスペクトの帯レイアウトに作り直した際に、単一円のグリフ・度数の
     // 半径をbaseRadius由来から固定定数に変更したため)。
-    const markerRadii = drawBodyRing(planets, markers, {
+    const { radii: markerRadii, aspectAnchors } = drawBodyRing(planets, markers, {
       // color: 度数の数字用(--ink)。glyphColor: 惑星記号だけ別の見やすい
       // 色にする(2026-09-08、「惑星記号の色もライトもダークも、見やすい
       // 色にしてほしい」より) -- 度数の数字・サインの記号と同じ色だと
       // 密集した場所で見分けがつきにくかったため。
-      ringInner: 183, color: "var(--ink)", glyphColor: "var(--planet-glyph)",  // 165->183(2026-09-14、段積み方式に伴いサインリング内周185のすぐ内側から線を引くよう更新)
+      ringInner: SIGN_BAND_INNER, color: "var(--ink)", glyphColor: "var(--planet-glyph)",
     });
-    window.__markerRadii = markerRadii;  // aspect lines anchor to the same (possibly fanned-out) marker position
+    window.__markerRadii = markerRadii;
+    window.__aspectAnchors = aspectAnchors;  // アスペクト線は各天体の本当の角度のこの点につなぐ
 
     fillLegend(document.getElementById('legend-grid'), planets);
     fillSabianList(planets);
