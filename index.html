@@ -415,7 +415,10 @@
     text-align: center; transition: background 0.15s, color 0.15s;
   }
   .pane-tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg-sunken); }
-  .pane-tab-btn:hover:not(.active) { border-color: var(--accent); color: var(--ink); }
+  .pane-tab-btn:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--ink); }
+  /* 二重円ではアスペクト・サビアンを表示しないので、押せないことが見て
+     分かるようにする(2026-09-26) -- メニューの「恒星の合」と同じopacity。 */
+  .pane-tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .data-panel-tabs { display: none; }  /* desktop-only, see media query */
 
   .chart-columns { width: 100%; display: flex; flex-direction: column; align-items: center; }
@@ -1990,7 +1993,11 @@
     const timeLabel = person.time_unknown
       ? '時刻不明(正午で近似)'
       : `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
-    ANCHOR_DATA.natal.normal.date = `${person.birth_date} ${timeLabel} (${person.timezone})`;
+    // 場所は日付の後ろの"(Asia/Tokyo)"ではなく、経過図の「トランジット
+    // (東京)」と同じく名前側に日本語の地名で出す(2026-09-26、「日輪の下の
+    // バーが、出生図だけ違う」より) -- updateBadge()参照。
+    ANCHOR_DATA.natal.normal.date = `${person.birth_date} ${timeLabel}`;
+    ANCHOR_DATA.natal.normal.place = person.place_name || person.timezone;
 
     for (const kind of ['eclipseSolar', 'eclipseLunar']) {
       try {
@@ -2225,6 +2232,25 @@
     const conjMenuBtn = document.getElementById('menu-conj-btn');
     conjMenuBtn.style.opacity = isBiwheel ? '0.4' : '1';
     conjMenuBtn.style.pointerEvents = isBiwheel ? 'none' : 'auto';
+    // アスペクト・サビアンのタブも同様に、二重円では押せなくする
+    // (2026-09-26、「表示できないなら、ボタンを押せないようにしてほしい
+    // し、押せないことが分かるようにしてほしい」より) -- 以前は押すと
+    // 「二重円では表示しません」という一文が出るだけだった。disabledの
+    // ボタンはhoverのtitleも出ないブラウザがあるため、理由は親のtitleに
+    // 付けず、ボタン自身のtitleに入れておく(出るブラウザでは出る)。
+    document.querySelectorAll('.pane-tab-btn[data-pane="aspects"], .pane-tab-btn[data-pane="sabian"]').forEach(b => {
+      b.disabled = isBiwheel;
+      b.title = isBiwheel ? '二重円では表示しません' : '';
+    });
+    if (isBiwheel) {
+      const onDisabledPane = ['aspects', 'sabian'].some(p => document.getElementById('pane-' + p).classList.contains('mobile-active') || document.getElementById('pane-' + p).classList.contains('data-active'));
+      if (onDisabledPane) {
+        // PCの右パネル(data-active)は度数へ。スマホで円を見ていたなら円のまま。
+        const wasOnWheel = document.getElementById('pane-wheel').classList.contains('mobile-active');
+        setPane('degrees');
+        if (wasOnWheel) setPane('wheel');
+      }
+    }
     refreshConjunctionsAndUI();
 
     // T is always scrubbable now -- eclipse/seasonal are just a jump-to
@@ -2376,11 +2402,16 @@
     }
     // displayMode === 'N' -- birth data is a fixed fact about the person
     // (edited via person management, not here), so this stays plain text.
-    line1.textContent = currentPersonName;
+    // 並びは経過図の「トランジット(東京)　日時」にそろえる(2026-09-26、
+    // 「日輪の下のバーが、出生図だけ違う」より) -- 名前+種別(+出生地)を
+    // 太字の1段目、日時だけを2段目に置く。出生データはここでは動かさない
+    // ので、‹ › 今 のボタンは出さない(updateControlAvailability参照)。
+    // 日食/月食図の日時はUTCの瞬間なので、出生地は通常の出生図だけに付ける。
     const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
     const nLabel = typeLabelJa(nType, nEntry);
-    const nDate = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : nEntry.date;
-    line2.textContent = nLabel ? `${nLabel}　${nDate}` : `出生図　${nDate}`;
+    const nPlace = nType === 'normal' ? ANCHOR_DATA.natal.normal.place : null;
+    line1.textContent = `${currentPersonName}　${nLabel || '出生図'}${nPlace ? '(' + nPlace + ')' : ''}`;
+    line2.textContent = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : nEntry.date;
   }
 
   // ---------- badge time editor (T/biwheel only) ----------
@@ -2812,7 +2843,7 @@
   // 対応、それ以外のセルはトロピカルのみ(元々のスコープ限定、変更なし)。
   const ANCHOR_DATA = {
     natal: {
-      normal:       { lons: null /* uses REF_LONGITUDES[currentRef] instead */, date: "1990-06-15 09:30:00 (Asia/Tokyo)" },
+      normal:       { lons: null /* uses REF_LONGITUDES[currentRef] instead */, date: "1990-06-15 09:30:00", place: "東京都" },
       eclipseSolar: { lons: { mercury: 193.25475, venus: 131.357304, earth: 126.586146, mars: 244.081642, jupiter: 98.363314, saturn: 286.900869, uranus: 275.825649, neptune: 282.232047, pluto: 225.683064, ceres: 97.00120283715799, pallas: 29.986905201912226, juno: 212.80222277621965, vesta: 339.4405405846028, chiron: 104.21966668517194, eris: 16.862892317308244, lilith_asteroid: 270.1677587713826 }, date: "1990-01-26 19:20:01 UTC" },
       eclipseLunar: { lons: { mercury: 237.118579, venus: 154.107025, earth: 140.785237, mars: 251.559483, jupiter: 99.543447, saturn: 287.323901, uranus: 275.986655, neptune: 282.315355, pluto: 225.781845, ceres: 100.26925387916708, pallas: 33.272340287147536, juno: 214.83780245748332, vesta: 343.3329741414905, chiron: 104.59569053085265, eris: 16.87194457795897, lilith_asteroid: 272.53873502381293 }, date: "1990-02-09 19:15:44 UTC" },
       seasonal:     { lons: { mercury: 32.455244, venus: 4.470343, earth: 270.0, mars: 330.264878, jupiter: 110.546519, saturn: 291.313441, uranus: 277.501285, neptune: 283.100175, pluto: 226.711813 }, date: "1990-06-21 15:29:47 UTC", seasonLabel: "夏至" },
@@ -4153,21 +4184,29 @@
   const ASPECT_ANCHOR_R = 100;
   const STAR_R = 232;  // 220->232(サインリング拡大(185〜220)に合わせて外側へ)
   const STAR_ROW_STEP = 18;  // 1天体に複数の恒星が合になっているときの、2件目・3件目の半径ステップ
+  // 二重円のリング配置(2026-09-26) -- サインリング内側(185)までを外側の
+  // T帯と内側のN帯に分け、それぞれの帯の中ほどにグリフを置く。
+  const BIWHEEL_TRANSIT_R = 162;
+  const BIWHEEL_DIVIDER_R = 136;
+  const BIWHEEL_NATAL_R = 110;
   function drawBodyRing(planets, markers, { baseRadius, step, ringInner, color, glyphColor = color, guides = true, showDegrees = true }) {
     if (!showDegrees) {
-      // 二重円: 度数は出さないので、以前通りグリフだけを段違いスタッガー
-      // で描く(帯レイアウトは単一円のときだけ)。
-      const radii = staggerRadii(planets.map(p => ({ key: p.key, deg: p.deg })), baseRadius, step);
+      // 二重円: 度数は出さない(2026-09-01の決定、2026-09-26に再確認)。
+      // グリフは単一円と同じ大きさ(ISOLATED_GLYPH_FONT)で、各リングの
+      // 半径baseRadiusに1段で並べ、単一円と同じsweepBodyAnglesで角度方向に
+      // 押し広げる(2026-09-26、「二重円だけ表示形式が違う、ほかに合わせて
+      // ほしい」より -- 以前は18の小さいグリフを中心寄りに段違いで積んで
+      // いた)。本当の角度は、リング外側(ringInner)からのガイド線で示す。
+      const radii = {};
+      const halfGapDeg = (GLYPH_FOOTPRINT / 2) / baseRadius * (180 / Math.PI) * 0.8;
+      const items = planets.map(p => ({ key: p.key, deg: p.deg, halfGapDeg }));
+      sweepBodyAngles(items);
+      const displayDegByKey = new Map(items.map(it => [it.key, it.deg]));
       planets.forEach(p => {
-        const [x, y] = polar(200, 200, radii[p.key], p.deg);
-        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        t.setAttribute("x", x); t.setAttribute("y", y);
-        t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
-        t.setAttribute("fill", glyphColor);
-        t.setAttribute("font-size", isPlainTextGlyph(p.g) ? "13" : "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)。英字表記(Ers)は13
-        t.setAttribute("font-family", glyphFontFamily(p.g));
-        t.textContent = p.g;
-        markers.appendChild(t);
+        const [gx, gy] = polar(200, 200, baseRadius, displayDegByKey.get(p.key));
+        drawGlyph(markers, gx, gy, p.g, glyphColor, ISOLATED_GLYPH_FONT);
+        radii[p.key] = baseRadius;
+        if (guides) drawGuideLine(markers, p.deg, ringInner, gx, gy);
       });
       return radii;
     }
@@ -4409,7 +4448,7 @@
 
     // dashed divider between the natal (inner) and transit (outer) rings
     const divider = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    divider.setAttribute("cx", 200); divider.setAttribute("cy", 200); divider.setAttribute("r", 108);
+    divider.setAttribute("cx", 200); divider.setAttribute("cy", 200); divider.setAttribute("r", BIWHEEL_DIVIDER_R);
     divider.setAttribute("fill", "none"); divider.setAttribute("stroke", "var(--line-strong)");
     divider.setAttribute("stroke-width", "1"); divider.setAttribute("stroke-dasharray", "4,4");
     markers.appendChild(divider);
@@ -4421,14 +4460,20 @@
     // N's eclipse/lunar types stay tropical regardless of currentRef.
     const nLons = resolveNLongitudes();
     const tLons = resolveTLongitudes();
-    const natalPlanets = PLANET_META.map(p => ({ ...p, deg: nLons[p.key], astro: formatAstro(nLons[p.key]) }));
-    const transitPlanets = PLANET_META.map(p => ({ ...p, deg: tLons[p.key], astro: formatAstro(tLons[p.key]) }));
+    // 小天体(セレス・キロン・エリスなど、チェック中のもの)も単一円と
+    // 同じく含める(2026-09-26、以前は二重円だけ主要9天体のみだった)。
+    const activeMinors = MINOR_META.filter(p => minorBodiesOn.has(p.key));
+    const toPlanets = lons => PLANET_META.concat(activeMinors).map(p => ({ ...p, deg: lons[p.key], astro: formatAstro(lons[p.key]) }));
+    const natalPlanets = toPlanets(nLons);
+    const transitPlanets = toPlanets(tLons);
 
     // showDegrees: false (2026-09-01、「二重円のときは度数表示自体が
-    // いらない」より) -- 内・外2つのリングで最大24個の度数ラベルが出る
-    // と、二重円ではかえって見にくいだけだった。天体グリフ自体は出す。
-    drawBodyRing(natalPlanets, markers, { baseRadius: 86, step: 10, ringInner: 108, color: "var(--planet-glyph)", showDegrees: false });
-    drawBodyRing(transitPlanets, markers, { baseRadius: 122, step: 9, ringInner: 132, color: "var(--aspect-soft)", showDegrees: false });
+    // いらない」より、2026-09-26に再確認) -- 内・外2つのリングで最大24個
+    // 以上の度数ラベルが出ると、二重円ではかえって見にくいだけだった。
+    // 外側(T)はサインリングからのガイド線、内側(N)は区切りの点線からの
+    // ガイド線で、それぞれ本当の角度を示す。
+    drawBodyRing(natalPlanets, markers, { baseRadius: BIWHEEL_NATAL_R, ringInner: BIWHEEL_DIVIDER_R, color: "var(--planet-glyph)", showDegrees: false });
+    drawBodyRing(transitPlanets, markers, { baseRadius: BIWHEEL_TRANSIT_R, ringInner: SIGN_BAND_INNER, color: "var(--aspect-soft)", showDegrees: false });
 
     // N/T二重で1天体2つずつサビアンが並ぶのは見づらいだけなので、アス
     // ペクト表と同様に二重円では非表示にする。
