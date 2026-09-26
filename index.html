@@ -329,7 +329,11 @@
     min-width: 0; flex: 1;
     display: flex; flex-direction: column; gap: 2px;
   }
-  .badge-top-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+  /* min-heightはスクラブボタン(.badge-scrub-btn)の高さと同じ(2026-09-26、
+     「出生図だけ、日輪の下の区切り線の高さが高い」より) -- 出生図では
+     ‹ › 今 を出さないため行がボタン分(6px)低くなり、トップバーの区切り線
+     と円の位置が他の図より上にずれていた。 */
+  .badge-top-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; min-height: 30px; }
   #badge-line1 {
     font-size: 0.84rem; font-weight: 700; color: var(--ink);
     flex-shrink: 0;
@@ -888,6 +892,7 @@
     .icon-btn { width: 28px; height: 28px; font-size: 0.85rem; }
     .person-badge { top: 8px; }
     .badge-scrub-btn { width: 24px; height: 24px; font-size: 1.1rem; }
+    .badge-top-row { min-height: 24px; }  /* ボタンの高さに合わせる(上の.badge-top-rowのコメント参照) */
 
     /* 人物バッジ(名前・日時・トランジットのスクラブボタン)をトップ
        バーへ物理移動(2026-09-03、「バッジ行を...トップバーに統合」より)
