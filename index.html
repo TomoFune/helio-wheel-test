@@ -2600,7 +2600,7 @@
       const row = document.createElement('div');
       row.className = 'check-row';
       row.innerHTML = `<span class="mini-check${isOn ? ' on' : ''}" data-key="${m.key}" onclick="toggleMinorBody(this)">${isOn ? '✓' : ''}</span>` +
-        `<span>${m.g ? `<span style="font-family:'Astronomicon', sans-serif;">${m.g}</span> ` : ''}${m.name}</span>`;
+        `<span>${m.g ? `<span style="font-family:'Astronomicon', sans-serif;">${glyphHtml(m.g)}</span> ` : ''}${m.name}</span>`;
       container.appendChild(row);
     });
   }
@@ -3129,7 +3129,7 @@
           const catHtml = h.cat ? `<span class="conj-hit-cat">${h.cat}</span>` : '';
           return `<div class="conj-hit"><span class="mini-check${isOn ? ' on' : ''}" data-hit="${hitId}" onclick="toggleMini(this)">${isOn ? '✓' : ''}</span><span class="conj-hit-main"><span class="conj-hit-name">${h.name}</span>${catHtml}</span><span class="conj-hit-sep mono">${h.sep.toFixed(2)}°</span></div>`;
         }).join('');
-        group.innerHTML = `<div class="conj-body-name"><span class="conj-body-glyph">${body.glyph}</span> ${body.name}</div>${hitsHtml}`;
+        group.innerHTML = `<div class="conj-body-name"><span class="conj-body-glyph">${glyphHtml(body.glyph)}</span> ${body.name}</div>${hitsHtml}`;
         container.appendChild(group);
       });
     }
@@ -3209,17 +3209,78 @@
       });
     });
     const labelFontSize = 10.5;
-    // スロット番号(0,1,2)ごとに束ねてsweepする -- 同じ天体の2件目・3件目
-    // 同士はradiusが違うので元々ぶつからないが、違う天体の1件目同士が
-    // ぶつかることは普通にあるため。
-    const bySlot = new Map();
-    slots.forEach(s => { if (!bySlot.has(s.i)) bySlot.set(s.i, []); bySlot.get(s.i).push(s); });
-    bySlot.forEach((group2, i) => {
-      const maxW = Math.max(...group2.map(s => estimateLabelWidth(s.labelText, labelFontSize)));
-      const r = STAR_R + i * STAR_ROW_STEP;
-      const items = group2.map(s => ({ key: s.body.key + '|' + s.h.key, deg: lons[s.body.key], r }));
-      sweepSameTierLabels(items, maxW);
-      items.forEach((it, idx) => { group2[idx]._pos = it; });
+    // ラベルを実際の四角(文字幅×行の高さ)として1つずつ置いていく
+    // (2026-09-26、「PCでは、ぶつからないように見れたらうれしい」より) --
+    // 以前はスロット(1件目・2件目・3件目)ごとに別々の半径でsweepして
+    // いたため、(1)違うスロット同士(例: 金星の★アケルナルと★アンカア)は
+    // 互いを見ておらず、円の左右では外向きに伸びる横書きの文字同士が
+    // 重なり、(2)2件目・3件目は半径が外へ積み上がるので、円の真下では
+    // viewBoxの下端(y=450)を越えて画面の外に出ていた。ここでは全ラベルを
+    // 角度順に、候補位置(本当の角度から少しずつずらす×半径を少し内外に
+    // 振る)をコストの小さい順に試し、「既に置いたラベルと重ならない・
+    // サインリングに食い込まない・表示範囲(左右は実際のウィンドウ余白
+    // まで)に収まる」最初の位置を採用する。どこにも収まらない極端な
+    // 場合だけ名前を1文字ずつ省略(…)して再挑戦する(ホバー説明と
+    // 「恒星の合」パネルには常に正式名が出ているので情報は失われない)。
+    const labelH = labelFontSize + 3;
+    const extraMargin = availableEdgeMarginSvgUnits();
+    const bounds = { x0: -50 - extraMargin + 4, x1: 450 + extraMargin - 4, y0: -50 + 2, y1: 450 - 2 };
+    const RING_CLEAR = 223;  // サインリング外周(220)+少し -- ラベルの四角がこれより中心に近づいたらリングに食い込む
+    function labelBox(r, deg, w) {
+      const [x, y] = polar(200, 200, r, deg);
+      const anchor = safeTextAnchor(x);
+      const x0 = anchor === 'end' ? x - w : (anchor === 'start' ? x : x - w / 2);
+      return { x0, x1: x0 + w, y0: y - labelH / 2, y1: y + labelH / 2 };
+    }
+    function boxClearOfRing(b) {
+      // 中心(200,200)から四角までの最短距離
+      const dx = Math.max(b.x0 - 200, 0, 200 - b.x1);
+      const dy = Math.max(b.y0 - 200, 0, 200 - b.y1);
+      return Math.hypot(dx, dy) >= RING_CLEAR;
+    }
+    const boxesOverlap = (a, b) => a.x0 < b.x1 + 3 && b.x0 < a.x1 + 3 && a.y0 < b.y1 + 1 && b.y0 < a.y1 + 1;
+    // 候補: 角度は本当の位置から±1度刻みで最大±24度、半径はSTAR_Rを基準に
+    // 少し内側(左右の端で余白が足りないとき用)から外側へ数段。本当の
+    // 位置に近いほどコストが小さい(半径方向のずれは角度より目立たない
+    // ので軽めに数える)。
+    const candidates = [];
+    [STAR_R, STAR_R - 6, STAR_R + STAR_ROW_STEP, STAR_R + 2 * STAR_ROW_STEP, STAR_R + 3 * STAR_ROW_STEP].forEach(r => {
+      for (let k = -24; k <= 24; k++) candidates.push({ r, dDeg: k, cost: Math.abs(k) + Math.abs(r - STAR_R) / 4 });
+    });
+    candidates.sort((a, b) => a.cost - b.cost);
+    const placedBoxes = [];
+    function tryPlace(text, lon) {
+      const w = estimateLabelWidth(text, labelFontSize);
+      for (const c of candidates) {
+        const deg = ((lon + c.dDeg) % 360 + 360) % 360;
+        const b = labelBox(c.r, deg, w);
+        if (b.x0 < bounds.x0 || b.x1 > bounds.x1 || b.y0 < bounds.y0 || b.y1 > bounds.y1) continue;
+        if (!boxClearOfRing(b)) continue;
+        if (placedBoxes.some(p => boxesOverlap(p, b))) continue;
+        return { r: c.r, deg, box: b };
+      }
+      return null;
+    }
+    // 角度順・同じ天体内はスロット順に置く(隣り合うラベル同士が、
+    // 輪の上で順番を入れ替えずに並びやすい)。
+    slots.sort((a, b) => (lons[a.body.key] - lons[b.body.key]) || (a.i - b.i));
+    slots.forEach(s => {
+      const lon = lons[s.body.key];
+      let text = s.labelText;
+      let spot = tryPlace(text, lon);
+      // 省略は「★」+2文字+「…」まで
+      while (!spot && text.length > 3) {
+        text = text.replace(/…$/, '').slice(0, -1);
+        spot = tryPlace(text + '…', lon);
+        if (spot) text = text + '…';
+      }
+      if (!spot) {
+        // それでも置けない(ラベルが極端に多い)ときは、重なりを許して本来の位置に置く
+        spot = { r: STAR_R, deg: lon, box: labelBox(STAR_R, lon, estimateLabelWidth(text, labelFontSize)) };
+      }
+      placedBoxes.push(spot.box);
+      s.labelText = text;
+      s._pos = { r: spot.r, deg: spot.deg };
     });
     slots.forEach(s => {
       const { body, h, labelText, color } = s;
@@ -3231,7 +3292,7 @@
       // planets' labels end up close together around the ring, and
       // reads as a visible little kink when a label's been swept.
       const [gx1, gy1] = polar(200, 200, 222, lon);  // サインリング外側(220)のすぐ外(2026-09-11、リング拡大210->220に合わせて212->222)
-      const [gx2, gy2] = polar(200, 200, pos.r - 7, pos.deg);
+      const [gx2, gy2] = polar(200, 200, Math.max(pos.r - 7, 224), pos.deg);
       const guide = document.createElementNS(svgNS, "line");
       guide.setAttribute("x1", gx1); guide.setAttribute("y1", gy1);
       guide.setAttribute("x2", gx2); guide.setAttribute("y2", gy2);
@@ -3272,6 +3333,20 @@
   // されてしまい見た目が変わる(2026-09-05、7.81で発覚)。
   function signGlyphSpan(g) {
     return `<span style="font-family:'Astronomicon', sans-serif;">${g}</span>`;
+  }
+  // エリスの"Ers"のように、記号ではなく英字そのものを見せたい表記
+  // (2026-09-26、「エリスの記号の近くのものはなんでしょうか」より) --
+  // Astronomiconは英字A〜Zをすべて占星術記号に置き換えるフォントなので
+  // (E=獅子座など)、そのまま当てると"Ers"が3つの別の記号に化けていた。
+  // 2文字以上の英字だけでできた表記は、通常のフォントで描く。
+  function isPlainTextGlyph(g) {
+    return /^[A-Za-z]{2,}$/.test(g || '');
+  }
+  function glyphFontFamily(g) {
+    return isPlainTextGlyph(g) ? "sans-serif" : "'Astronomicon', sans-serif";
+  }
+  function glyphHtml(g) {
+    return isPlainTextGlyph(g) ? `<span style="font-family:sans-serif;">${g}</span>` : g;
   }
   function formatAstro(deg) {
     const norm = ((deg % 360) + 360) % 360;
@@ -3521,7 +3596,7 @@
     headRow.appendChild(document.createElement('th'));
     for (let j = 1; j < bodies.length; j++) {
       const th = document.createElement('th');
-      th.textContent = bodies[j].g;
+      th.textContent = bodies[j].g; th.style.fontFamily = glyphFontFamily(bodies[j].g);
       th.title = bodies[j].name;
       headRow.appendChild(th);
     }
@@ -3530,7 +3605,7 @@
     for (let i = 0; i < bodies.length - 1; i++) {
       const tr = document.createElement('tr');
       const rowTh = document.createElement('th');
-      rowTh.textContent = bodies[i].g;
+      rowTh.textContent = bodies[i].g; rowTh.style.fontFamily = glyphFontFamily(bodies[i].g);
       rowTh.title = bodies[i].name;
       tr.appendChild(rowTh);
       for (let j = 1; j < bodies.length; j++) {
@@ -3996,8 +4071,9 @@
     t.setAttribute("x", dx); t.setAttribute("y", dy);
     t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
     t.setAttribute("fill", glyphColor);
-    t.setAttribute("font-size", String(fontSize));
-    t.setAttribute("font-family", "'Astronomicon', sans-serif");
+    // 英字表記(Ers)は同じ文字サイズだと記号より一回り大きく太く見えるので縮める
+    t.setAttribute("font-size", String(isPlainTextGlyph(glyph) ? Math.round(fontSize * 0.7) : fontSize));
+    t.setAttribute("font-family", glyphFontFamily(glyph));
     t.textContent = glyph;
     markers.appendChild(t);
     return t;
@@ -4088,8 +4164,8 @@
         t.setAttribute("x", x); t.setAttribute("y", y);
         t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
         t.setAttribute("fill", glyphColor);
-        t.setAttribute("font-size", "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)
-        t.setAttribute("font-family", "'Astronomicon', sans-serif");
+        t.setAttribute("font-size", isPlainTextGlyph(p.g) ? "13" : "18");  // 15->16->18(2026-09-04、「サインと惑星記号を一回り大きくしてほしい」より)。英字表記(Ers)は13
+        t.setAttribute("font-family", glyphFontFamily(p.g));
         t.textContent = p.g;
         markers.appendChild(t);
       });
@@ -4149,7 +4225,7 @@
     planets.forEach(p => {
       const item = document.createElement('div');
       item.className = 'legend-item';
-      item.innerHTML = `<span class="legend-glyph">${p.g}</span><span class="legend-name">${p.name}</span><span class="legend-deg mono">${p.astro}</span>`;
+      item.innerHTML = `<span class="legend-glyph">${glyphHtml(p.g)}</span><span class="legend-name">${p.name}</span><span class="legend-deg mono">${p.astro}</span>`;
       el.appendChild(item);
     });
   }
@@ -4181,7 +4257,7 @@
       // 以前のJS側での文字数指定(14文字)切り詰めは、実際のカラム幅では
       // それでも2行に折り返すことがあり(2026-09-01に発覚)、CSSに任せる
       // 方が確実。title属性はPCでのホバー全文表示用。
-      row.innerHTML = `<span class="legend-glyph">${p.g}</span><span class="legend-name">${p.name}</span>` +
+      row.innerHTML = `<span class="legend-glyph">${glyphHtml(p.g)}</span><span class="legend-name">${p.name}</span>` +
         `<span class="legend-deg mono">${formatSabianDegree(p.deg)}</span>` +
         `<span class="sabian-text" title="${full}">${full}</span>`;
       // Click/tap toggles full (wrapped, multi-line) display inline (works
@@ -4369,9 +4445,9 @@
     const transitCol = document.createElement('div');
     transitCol.innerHTML = `<div class="legend-col-head" style="color:var(--aspect-soft);">${tColLabel}</div>`;
     natalPlanets.forEach((p, i) => {
-      natalCol.innerHTML += `<div class="legend-item"><span class="legend-glyph">${p.g}</span><span class="legend-name">${p.name}</span><span class="legend-deg mono">${p.astro}</span></div>`;
+      natalCol.innerHTML += `<div class="legend-item"><span class="legend-glyph">${glyphHtml(p.g)}</span><span class="legend-name">${p.name}</span><span class="legend-deg mono">${p.astro}</span></div>`;
       const tp = transitPlanets[i];
-      transitCol.innerHTML += `<div class="legend-item"><span class="legend-glyph" style="color:var(--aspect-soft);">${tp.g}</span><span class="legend-name">${tp.name}</span><span class="legend-deg mono">${tp.astro}</span></div>`;
+      transitCol.innerHTML += `<div class="legend-item"><span class="legend-glyph" style="color:var(--aspect-soft);">${glyphHtml(tp.g)}</span><span class="legend-name">${tp.name}</span><span class="legend-deg mono">${tp.astro}</span></div>`;
     });
     legend.appendChild(natalCol);
     legend.appendChild(transitCol);
