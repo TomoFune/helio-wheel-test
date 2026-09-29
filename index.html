@@ -369,6 +369,10 @@
        #badge-line2をブロック化しても実機で見た目の崩れは無いことを確認
        済み。 */
   }
+  /* 日食/月食/四季図を表示中だけ出す1行(種類+年月日時分秒の全体)。円の上の
+     日時欄は幅が狭く、種類の文字を付けると日時のほうが「…」で省略される
+     ため、種類と日時はこちらに出す。 */
+  #badge-special-line { font-size: 0.74rem; color: var(--accent-strong); font-weight: 700; line-height: 1.4; }
   #current-state-line {
     /* 7.69: 旧#settings-menuの図/起点/恒星の合ボタン(値を見せる役目
        だった3つ)の現在値だけを、メニュー一本化後もバッジ直下に残す
@@ -1257,6 +1261,7 @@
               <button class="badge-scrub-btn badge-now-btn" id="badge-now-btn" style="display:none;" title="現在時刻に戻す" onclick="resetTransitToNow()">今</button>
             </div>
           </div>
+          <div id="badge-special-line" style="display:none;"></div>
           <div id="current-state-line">図: <span id="menu-mode-label">出生図</span>　起点: <span id="menu-ref-label">トロピカル</span>　<span id="menu-conj-label">恒星の合</span></div>
         </div>
       </div>
@@ -2433,6 +2438,25 @@
         `今: ${typeLabelJa(tSpecialMoment, entry)}(${t[0]}-${t[1]}-${t[2]} ${t[3]}:${t[4]}:${t[5]} ${transitTzLabel})`;
     }
   }
+  // 日食/月食/四季図の種類と日時を1行で出す(該当なしなら行ごと隠す)。
+  // 出生側(生前日食など)はUTC表記、経過図側は選んだ場所の時計。
+  function specialDateText(entryDate) { return String(entryDate).replace(/\.\d+/, ''); }
+  function updateSpecialLine() {
+    const box = document.getElementById('badge-special-line');
+    const parts = [];
+    if (displayMode !== 'T' && nType !== 'normal') {
+      const nEntry = ANCHOR_DATA.natal[nType];
+      if (nEntry) parts.push(`${displayMode === 'both' ? '出生図' : ''}${natalTypeLabelJa(nType, nEntry)}　${specialDateText(nEntry.date)}`);
+    }
+    if (displayMode !== 'N' && tSpecialMoment && ANCHOR_DATA.transit[tSpecialMoment]) {
+      const d = zonedDateFor(transitTime, transitTzName);
+      const t = ['year', 'month', 'day', 'hour', 'minute', 'second'].map(u => timeSegText(u, timeSegValue(u, d)));
+      parts.push(`${displayMode === 'both' ? '経過図' : ''}${typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment])}　${t[0]}-${t[1]}-${t[2]} ${t[3]}:${t[4]}:${t[5]} ${transitTzLabel}`);
+    }
+    box.style.display = parts.length ? '' : 'none';
+    box.innerHTML = '';
+    parts.forEach(text => { const row = document.createElement('div'); row.textContent = text; box.appendChild(row); });
+  }
   function updateBadge() {
     updateJumpStatus();
     const line1 = document.getElementById('badge-line1');
@@ -2444,11 +2468,9 @@
       // if N itself is an eclipse chart, that has to say so, or there's
       // no way to tell "this person's natal" from "this person's eclipse"
       // apart at a glance.
-      const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
-      const nLabel = natalTypeLabelJa(nType, nEntry);
-      line1.textContent = nLabel ? `${currentPersonName}　${nLabel}　${nEntry.date}` : currentPersonName;
-      const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
-      renderEditableTime(line2, tLabel ? `経過図　${tLabel}　` : '経過図　');
+      line1.textContent = currentPersonName;
+      renderEditableTime(line2, '経過図　');
+      updateSpecialLine();
       return;
     }
     if (displayMode === 'T') {
@@ -2464,8 +2486,10 @@
       place.title = '押すと場所を変更';
       place.addEventListener('click', openTransitPlacePanel);
       line1.append(place, ')');
-      const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
-      renderEditableTime(line2, tLabel ? `${tLabel}　` : '');
+      // 日食/春分などの種別は名前の側(1段目)に置く。日時の前に付けると
+      // 幅の狭い画面で日時のほうが「…」で省略されてしまうため。
+      renderEditableTime(line2, '');
+      updateSpecialLine();
       return;
     }
     // displayMode === 'N' -- birth data is a fixed fact about the person
@@ -2479,7 +2503,8 @@
     const nLabel = natalTypeLabelJa(nType, nEntry);
     const nPlace = nType === 'normal' ? ANCHOR_DATA.natal.normal.place : null;
     line1.textContent = `${currentPersonName}　${nLabel || '出生図'}${nPlace ? '(' + nPlace + ')' : ''}`;
-    line2.textContent = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : nEntry.date;
+    line2.textContent = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : specialDateText(nEntry.date);
+    updateSpecialLine();
   }
 
   // ---------- badge time editor (T/biwheel only) ----------
