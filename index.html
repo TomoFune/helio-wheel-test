@@ -2424,7 +2424,14 @@
     if (!box) return;
     const entry = tSpecialMoment && ANCHOR_DATA.transit[tSpecialMoment];
     box.style.display = entry ? 'flex' : 'none';
-    if (entry) document.getElementById('t-jump-status-text').textContent = `今: ${typeLabelJa(tSpecialMoment, entry)}(${entry.date})`;
+    if (entry) {
+      // 日時は経過図で選んである場所の時計で出す(バッジと同じ読み。
+      // entry.dateはUTC表記なので使わない)。場所は「経過図の場所」で各自が選ぶ。
+      const d = zonedDateFor(transitTime, transitTzName);
+      const t = ['year', 'month', 'day', 'hour', 'minute', 'second'].map(u => timeSegText(u, timeSegValue(u, d)));
+      document.getElementById('t-jump-status-text').textContent =
+        `今: ${typeLabelJa(tSpecialMoment, entry)}(${t[0]}-${t[1]}-${t[2]} ${t[3]}:${t[4]}:${t[5]} ${transitTzLabel})`;
+    }
   }
   function updateBadge() {
     updateJumpStatus();
