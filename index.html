@@ -578,6 +578,8 @@
     cursor: pointer;
     text-align: center;
   }
+  .seg-btn.jump-btn { border-style: dashed; }
+  .seg-btn.jump-btn:hover { border-style: solid; color: var(--ink); }
   .seg-btn.active {
     background: var(--accent);
     border-color: var(--accent);
@@ -1466,35 +1468,43 @@
           <button class="seg-btn display-mode-btn" data-display="both" onclick="setDisplayMode(this,'both');">二重円</button>
         </div>
 
-        <span class="field-label">N(ネイタル)の種類 — 常に保持されます</span>
+        <div id="n-type-section">
+        <span class="field-label" id="n-type-label">出生図の種類</span>
         <div class="segmented" id="n-type-segmented" style="grid-template-columns:repeat(3,1fr); margin-bottom:22px;">
           <button class="seg-btn active" data-type="normal" onclick="setNType(this,'normal')">通常</button>
-          <button class="seg-btn" data-type="eclipseSolar" onclick="setNType(this,'eclipseSolar')">日食図</button>
-          <button class="seg-btn" data-type="eclipseLunar" onclick="setNType(this,'eclipseLunar')">月食図</button>
+          <button class="seg-btn" data-type="eclipseSolar" onclick="setNType(this,'eclipseSolar')">生前日食</button>
+          <button class="seg-btn" data-type="eclipseLunar" onclick="setNType(this,'eclipseLunar')">生前月食</button>
+        </div>
         </div>
 
-        <span class="field-label">T(トランジット)を特別な瞬間へジャンプ</span>
+        <div id="t-jump-section">
+        <span class="field-label" id="t-jump-label">経過図の日時を移動</span>
         <!-- 四季図(春分/夏至/秋分/冬至)も日食/月食と同じく実際に検索して
              ジャンプできるようにした(2026-09-10、「四季図も、次の春分、
              夏至、秋分、冬至...と選択できるとさらに最高」より) -- 以前は
              T_SPECIAL_TIMESの固定日付(2026年6月の夏至1件のみ)しか
              選べなかった。 -->
         <div class="segmented" id="t-jump-segmented" style="grid-template-columns:repeat(3,1fr);">
-          <button class="seg-btn" onclick="jumpTTo('eclipseSolar', this)">日食</button>
-          <button class="seg-btn" onclick="jumpTTo('eclipseLunar', this)">月食</button>
-          <button class="seg-btn" onclick="jumpTTo('springEquinox', this)">春分</button>
-          <button class="seg-btn" onclick="jumpTTo('summerSolstice', this)">夏至</button>
-          <button class="seg-btn" onclick="jumpTTo('autumnEquinox', this)">秋分</button>
-          <button class="seg-btn" onclick="jumpTTo('winterSolstice', this)">冬至</button>
+          <button class="seg-btn jump-btn" onclick="jumpTTo('eclipseSolar', this)">← 日食</button>
+          <button class="seg-btn jump-btn" onclick="jumpTTo('eclipseLunar', this)">← 月食</button>
+          <button class="seg-btn jump-btn" onclick="jumpTTo('springEquinox', this)">← 春分</button>
+          <button class="seg-btn jump-btn" onclick="jumpTTo('summerSolstice', this)">← 夏至</button>
+          <button class="seg-btn jump-btn" onclick="jumpTTo('autumnEquinox', this)">← 秋分</button>
+          <button class="seg-btn jump-btn" onclick="jumpTTo('winterSolstice', this)">← 冬至</button>
         </div>
         <!-- 日食/月食・四季図とも実際に検索して求めた瞬間へジャンプする
              (2026-09-05のHANDOFF「②」、2026-09-10に四季図へ拡張)。
              ジャンプ後はここでさらに同じ種類の前後へ移動できる。 -->
         <div id="t-eclipse-stepper" style="display:none; align-items:center; justify-content:center; gap:10px; margin-top:10px;">
-          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(-1)">‹ 前へ</button>
-          <button class="seg-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(1)">次へ ›</button>
+          <button class="seg-btn jump-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(-1)">‹ 前へ</button>
+          <button class="seg-btn jump-btn" style="flex:none; padding:6px 14px;" onclick="stepTEclipse(1)">次へ ›</button>
         </div>
-        <p class="scrub-note">ジャンプした後にぐるぐる操作すると、その瞬間から離れるので表示は消えます</p>
+        <div id="t-jump-status" style="display:none; margin-top:12px; align-items:center; justify-content:space-between; gap:10px;">
+          <span id="t-jump-status-text" style="font-size:0.84rem; color:var(--accent-strong); font-weight:700;"></span>
+          <button class="seg-btn" style="flex:none; padding:6px 12px;" onclick="resetTransitToNow()">今の日時に戻る</button>
+        </div>
+        <p class="scrub-note">表示中の日時から見て、直前の日食・春分などへ移動します。移動したあとは、「‹ 前へ」「次へ ›」で前後の日食などへ進めます。時刻を動かすと、日食などの表示は消えます。</p>
+        </div>
       </div>
     </div>
 
@@ -2231,6 +2241,12 @@
   // ☰(設定)内の該当row-btnへ付け直して解消。
   function updateControlAvailability() {
     const isBiwheel = displayMode === 'both';
+    // 選んだ図に関係する項目だけ出す: 出生図=出生図の種類、経過図=日時の
+    // 移動、二重円=両方(内側=出生図、外側=経過図の見出し付き)。
+    document.getElementById('n-type-section').style.display = displayMode === 'T' ? 'none' : '';
+    document.getElementById('t-jump-section').style.display = displayMode === 'N' ? 'none' : '';
+    document.getElementById('n-type-label').textContent = isBiwheel ? '内側(出生図)の種類' : '出生図の種類';
+    document.getElementById('t-jump-label').textContent = isBiwheel ? '外側(経過図)の日時を移動' : '経過図の日時を移動';
     const refBtn = document.getElementById('menu-ref-btn');
     // 経過図(T)も起点(恒星)を使えるようにした(2026-09-10、「経過図も、
     // 恒星起点を使えるようにしてほしい」より) -- 以前はnTypeだけを見て
@@ -2396,7 +2412,22 @@
     if (isSeasonKind(type)) return `四季図(${SEASON_LABELS_JA[type]})`;
     return null;
   }
+  // 出生図側の日食/月食は「生前日食/生前月食」(パネルのボタンと同じ言葉)。
+  // 経過図側は今の日時から見た日食なので typeLabelJa のまま。
+  function natalTypeLabelJa(type, entry) {
+    if (type === 'eclipseSolar') return '生前日食';
+    if (type === 'eclipseLunar') return '生前月食';
+    return typeLabelJa(type, entry);
+  }
+  function updateJumpStatus() {
+    const box = document.getElementById('t-jump-status');
+    if (!box) return;
+    const entry = tSpecialMoment && ANCHOR_DATA.transit[tSpecialMoment];
+    box.style.display = entry ? 'flex' : 'none';
+    if (entry) document.getElementById('t-jump-status-text').textContent = `今: ${typeLabelJa(tSpecialMoment, entry)}(${entry.date})`;
+  }
   function updateBadge() {
+    updateJumpStatus();
     const line1 = document.getElementById('badge-line1');
     const line2 = document.getElementById('badge-line2');
 
@@ -2407,10 +2438,10 @@
       // no way to tell "this person's natal" from "this person's eclipse"
       // apart at a glance.
       const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
-      const nLabel = typeLabelJa(nType, nEntry);
+      const nLabel = natalTypeLabelJa(nType, nEntry);
       line1.textContent = nLabel ? `${currentPersonName}　${nLabel}　${nEntry.date}` : currentPersonName;
       const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
-      renderEditableTime(line2, tLabel ? `トランジット　${tLabel}　` : 'トランジット　');
+      renderEditableTime(line2, tLabel ? `経過図　${tLabel}　` : '経過図　');
       return;
     }
     if (displayMode === 'T') {
@@ -2419,7 +2450,7 @@
       // ようにしておく(「海外の場所だと日が一日ずれる」の混乱対策)。
       // 地名の部分だけ押せるようにし、押すと場所パネルを直接開く
       // (2026-09-29) -- 残りの部分は従来どおり人物選択へ。
-      line1.textContent = 'トランジット(';
+      line1.textContent = '経過図(';
       const place = document.createElement('span');
       place.className = 'badge-place';
       place.textContent = transitTzLabel;
@@ -2438,7 +2469,7 @@
     // ので、‹ › 今 のボタンは出さない(updateControlAvailability参照)。
     // 日食/月食図の日時はUTCの瞬間なので、出生地は通常の出生図だけに付ける。
     const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
-    const nLabel = typeLabelJa(nType, nEntry);
+    const nLabel = natalTypeLabelJa(nType, nEntry);
     const nPlace = nType === 'normal' ? ANCHOR_DATA.natal.normal.place : null;
     line1.textContent = `${currentPersonName}　${nLabel || '出生図'}${nPlace ? '(' + nPlace + ')' : ''}`;
     line2.textContent = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : nEntry.date;
