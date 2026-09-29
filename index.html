@@ -563,6 +563,10 @@
   .aspect-grid td.hit { font-weight: 700; cursor: default; }
   #planet-markers.hide-wheel-degrees .wheel-degree-label { display: none; }
 
+  .about-body h3 { font-size: 0.95rem; margin: 18px 0 6px; color: var(--accent-strong); }
+  .about-body h3:first-child { margin-top: 0; }
+  .about-body p, .about-body li { font-size: 0.84rem; line-height: 1.7; color: var(--ink-dim); }
+  .about-body ul { margin: 0; padding-left: 1.2em; }
   .field-label {
     font-size: 0.8rem; color: var(--ink-faint); letter-spacing: 0.06em;
     margin-bottom: 8px; display: block;
@@ -1427,11 +1431,56 @@
              Menuに入れてもいいのではないだろうか」より)。他のトグル
              (度数表示・恒星名表示・アスペクト線)と見た目を揃えるため、
              row-btn一覧の中でもここだけtoggle-row(スイッチ)にした。 -->
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('about-panel');"><span>このアプリについて・ご利用にあたって</span><span class="chevron">›</span></button>
         <div class="row-btn" style="cursor:default;">
           <div class="toggle-row" style="width:100%;">
             <span>ダークモード</span>
             <div class="switch on" id="theme-switch" onclick="toggleThemeSwitch(this)"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- side panel: このアプリについて(配布用の案内、2026-09-30) ----
+         内容は実際の作り(HANDOFF/engine.js)に合わせて書いてある。
+         支援リンク・問い合わせ先は下のABOUT_LINKSに入れたときだけ表示する
+         (空のままなら行ごと出さない)。 -->
+    <div class="side-panel" id="about-panel">
+      <div class="panel-head">
+        <h2>このアプリについて</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body about-body">
+        <h3>日輪 Helio Wheel</h3>
+        <p>太陽を中心にした(ヘリオセントリック)天体の配置を、円の図で見るための無料のツールです。出生図・経過図・二重円、日食・月食・四季図、恒星や銀河との合を見ることができます。</p>
+
+        <h3>ご利用にあたって</h3>
+        <ul>
+          <li>占星術の学習・娯楽のためのものです。医療・法律・お金などの判断の根拠にはしないでください。</li>
+          <li>計算は、NASA/JPL の天体暦(DE440s)にもとづきます。対応期間は 1849〜2150 年です。</li>
+          <li>出生時刻が不明な場合は、正午(12:00)で近似します。</li>
+          <li>不具合や誤りがあるかもしれません。ご了承ください。</li>
+        </ul>
+
+        <h3>入力したデータの扱い</h3>
+        <ul>
+          <li>保存した人物(名前・出生日時・場所)と設定は、<b>お使いの端末のブラウザの中にだけ</b>保存されます。作者のサーバーには送りません(データを受け取る仕組みがありません)。</li>
+          <li>ブラウザのデータを消すと、保存した人物も消えます。大切なデータは、別にメモしておいてください。</li>
+          <li>画面の表示に必要なプログラムやフォントは、Google Fonts・jsDelivr・PyPI などから読み込みます。このため、それらの配信元には、アクセスの記録(IP アドレスなど)が残ることがあります。出生データは含まれません。</li>
+        </ul>
+
+        <h3>使っているデータ・ソフトウェア</h3>
+        <ul>
+          <li>天体暦: NASA/JPL DE440s、JPL Horizons(小惑星・準惑星)</li>
+          <li>恒星の位置: Hipparcos 新還元(van Leeuwen 2007、VizieR I/311)</li>
+          <li>深宇宙天体などの位置: SIMBAD データベース(CDS、ストラスブール)を利用しています。</li>
+          <li>ソフトウェア: Pyodide(MPL-2.0)、NumPy・Astropy(BSD)、jplephem(MIT)、tz-lookup(CC0)</li>
+          <li>記号フォント: Astronomicon(Roberto Corona、SIL Open Font License 1.1)。ほかに Google Fonts(Shippori Mincho・Cormorant Garamond・Zen Kaku Gothic New・Space Mono・Noto Sans Symbols 2、いずれも SIL OFL)</li>
+        </ul>
+
+        <div id="about-links" style="display:none; margin-top:16px; display:none; flex-direction:column; gap:8px;">
+          <a class="row-btn" id="about-support-link" target="_blank" rel="noopener" style="display:none; text-decoration:none;"><span>このアプリを応援する(お気持ち制)</span><span class="chevron">›</span></a>
+          <a class="row-btn" id="about-contact-link" target="_blank" rel="noopener" style="display:none; text-decoration:none;"><span>不具合・ご意見のご連絡</span><span class="chevron">›</span></a>
         </div>
       </div>
     </div>
@@ -2756,6 +2805,19 @@
     openPanel('chart-type-panel');
     setActiveIconBtn('icon-btn-chart-type');
   }
+  // 「このアプリについて」の支援・連絡リンク。空のままなら表示しない。
+  // 配布用のURL(Ko-fi等の支援ページ、問い合わせフォームや連絡先)が
+  // 決まったらここに入れる。
+  const ABOUT_LINKS = { support: '', contact: '' };
+  (function initAboutLinks() {
+    const box = document.getElementById('about-links');
+    let any = false;
+    [['support', 'about-support-link'], ['contact', 'about-contact-link']].forEach(([key, id]) => {
+      const el = document.getElementById(id);
+      if (ABOUT_LINKS[key]) { el.href = ABOUT_LINKS[key]; el.style.display = 'flex'; any = true; }
+    });
+    box.style.display = any ? 'flex' : 'none';
+  })();
   function toggleSpecialMenu(ev) {
     const pop = document.getElementById('special-popover');
     if (pop.style.display !== 'none') { closeSpecialMenu(); return; }
