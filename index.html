@@ -341,6 +341,8 @@
        日付が全部ここに入ることがあり、1行に収まりきらない場合の保険。 */
     overflow-wrap: break-word;
   }
+  .badge-place { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .badge-place:hover { color: var(--accent); }
   .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
   #badge-line2 {
     /* --ink-dim -> --ink(2026-09-04、「出生図　1990-06-15 09:30:00
@@ -1394,7 +1396,7 @@
         <button class="row-btn" id="menu-conj-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
         <!-- 2026-09-11: 「経過図(今)を見る」の日付表示に使う場所(タイム
              ゾーン)。天体位置の計算自体には影響しない、表示専用。 -->
-        <button class="row-btn" id="menu-tz-btn" onclick="closeAllPanels(); openPanel('tz-panel');"><span>経過図の場所(<span id="menu-tz-label">東京</span>)</span><span class="chevron">›</span></button>
+        <button class="row-btn" id="menu-tz-btn" onclick="openTransitPlacePanel();"><span>経過図の場所(<span id="menu-tz-label">東京</span>)</span><span class="chevron">›</span></button>
         <!-- 7.71: トップバーの◐(テーマ切替)をここへ移動(2026-09-04、
              「三本線のメニューの右にあるダークモード選択のアイコンは
              Menuに入れてもいいのではないだろうか」より)。他のトグル
@@ -1542,7 +1544,10 @@
         <button class="icon-btn" onclick="closeAllPanels()">✕</button>
       </div>
       <div class="panel-body">
-        <p class="scrub-note" style="margin-top:0;">「経過図(今)を見る」で表示する日付・時刻を、選んだ場所のカレンダー・時計で読み替えます。天体の位置自体はこの選択に関係なく同じです — 同じ瞬間なら、どこで見ても同じヘリオ図になります。</p>
+        <p class="scrub-note" style="margin-top:0;">経過図の日付・時刻を、選んだ場所の時計で表示します。「今」の天体の位置は、どの場所を選んでも同じです。日時を手で入力したときは、選んだ場所の時刻として読みます。</p>
+        <label class="field-label" for="tz-country-select">国</label>
+        <select id="tz-country-select" class="pe-input" onchange="applyTransitCountrySelection()"></select>
+        <label class="field-label" for="tz-select" style="margin-top:14px;">都市</label>
         <select id="tz-select" class="pe-input" onchange="applyTransitTimezoneSelection()"></select>
       </div>
     </div>
@@ -2043,19 +2048,11 @@
   // ---------- 経過図(今)を見る: 起動画面から人物選択なしで直接T表示 ----------
   // (2026-09-07)経過図(トランジット)はハウスを使わないため天体の度数
   // 計算自体は現在地に依存しない(refreshTransitNowAnchor()もUTC時刻の
-  // みで計算している)。現在地はここでは案内表示のためだけに取得し、
-  // 取得できない/拒否された場合は東京にフォールバックする。
-  const TRANSIT_NOW_FALLBACK_LOCATION = { lat: 35.6895, lon: 139.6917, label: '東京都(位置情報が使えないため既定値)' };
-  function getCurrentLocationForTransit() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) { resolve(TRANSIT_NOW_FALLBACK_LOCATION); return; }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: '現在地(位置情報から取得)' }),
-        () => resolve(TRANSIT_NOW_FALLBACK_LOCATION),
-        { timeout: 5000, maximumAge: 300000 }
-      );
-    });
-  }
+  // みで計算している)。以前はここで現在地(位置情報)を取得して通知に
+  // 出していたが、計算にも表示にも使っておらず、許可ダイアログや最大5秒の
+  // 待ちが出るだけだったため廃止(2026-09-29、「いちいち現在位置確認しに
+  // 行くのめんどいし、タイムラグが気持ち悪い」より)。場所は常に
+  // 「経過図の場所」で選んである都市(既定は東京)。
   async function startTransitNow() {
     currentPersonId = null;
     currentPersonName = '';
@@ -2073,8 +2070,6 @@
     if (engineAvailable) await refreshTransitNowAnchor();
     buildChart();
     updateBadge();
-    const loc = await getCurrentLocationForTransit();
-    showPeToast(loc.label);
   }
 
   // ---------- person add/edit/delete ----------
@@ -2400,7 +2395,15 @@
       // 場所ラベルを添える(2026-09-11) -- 天体の位置計算自体には影響
       // しないが、表示中の日付がどのタイムゾームの読みかを常に見える
       // ようにしておく(「海外の場所だと日が一日ずれる」の混乱対策)。
-      line1.textContent = `トランジット(${transitTzLabel})`;
+      // 地名の部分だけ押せるようにし、押すと場所パネルを直接開く
+      // (2026-09-29) -- 残りの部分は従来どおり人物選択へ。
+      line1.textContent = 'トランジット(';
+      const place = document.createElement('span');
+      place.className = 'badge-place';
+      place.textContent = transitTzLabel;
+      place.title = '押すと場所を変更';
+      place.addEventListener('click', openTransitPlacePanel);
+      line1.append(place, ')');
       const tLabel = tSpecialMoment ? typeLabelJa(tSpecialMoment, ANCHOR_DATA.transit[tSpecialMoment]) : null;
       renderEditableTime(line2, tLabel ? `${tLabel}　` : '');
       return;
@@ -2911,43 +2914,135 @@
   // 時刻の"読み方"(どのタイムゾームのカレンダーで見せるか)だけを変える。
   // 既定は東京。緯度経度は不要(タイムゾーン名だけで表示の変換が完結する
   // ため)、出生地の都道府県セレクターとは別に、世界の代表的なタイム
-  // ゾーンを地域別にまとめた軽量な一覧を用意した。
-  const TRANSIT_TZ_REGIONS = [
-    { region: '日本', zones: [['東京', 'Asia/Tokyo']] },
-    { region: 'アジア', zones: [
-      ['ソウル', 'Asia/Seoul'], ['上海', 'Asia/Shanghai'], ['台北', 'Asia/Taipei'],
-      ['シンガポール', 'Asia/Singapore'], ['バンコク', 'Asia/Bangkok'],
-      ['デリー/ムンバイ', 'Asia/Kolkata'], ['ドバイ', 'Asia/Dubai'],
+  // ゾーンをまとめた軽量な一覧を用意した(下のTRANSIT_TZ_COUNTRIES)。
+  // 国 -> 都市の2段で選ぶ(2026-09-29、「国、都市名を選択すると切り替え
+  // られる方がいい」より) -- 以前は地域(アジア/ヨーロッパ...)ごとに
+  // 代表都市を1つの<select>に並べていた。国の一覧自体は地域ごとの
+  // <optgroup>にまとめて探しやすくする。同じ国の中でタイムゾーンが
+  // 同じ都市(大阪・札幌など)も、ユーザーが自分の街の名前で選べるように
+  // 別項目として置いている(表示される地名が変わるだけで、時刻は同じ)。
+  // 都市名は一覧全体で重複させない(保存値の照合に使うため)。
+  const TRANSIT_TZ_COUNTRIES = [
+    { region: 'アジア', countries: [
+      { country: '日本', cities: [['東京', 'Asia/Tokyo'], ['大阪', 'Asia/Tokyo'], ['名古屋', 'Asia/Tokyo'], ['札幌', 'Asia/Tokyo'], ['福岡', 'Asia/Tokyo'], ['那覇', 'Asia/Tokyo']] },
+      { country: '韓国', cities: [['ソウル', 'Asia/Seoul'], ['釜山', 'Asia/Seoul']] },
+      { country: '中国', cities: [['北京', 'Asia/Shanghai'], ['上海', 'Asia/Shanghai']] },
+      { country: '香港', cities: [['香港', 'Asia/Hong_Kong']] },
+      { country: '台湾', cities: [['台北', 'Asia/Taipei']] },
+      { country: 'フィリピン', cities: [['マニラ', 'Asia/Manila']] },
+      { country: 'ベトナム', cities: [['ハノイ', 'Asia/Ho_Chi_Minh'], ['ホーチミン', 'Asia/Ho_Chi_Minh']] },
+      { country: 'タイ', cities: [['バンコク', 'Asia/Bangkok']] },
+      { country: 'シンガポール', cities: [['シンガポール', 'Asia/Singapore']] },
+      { country: 'マレーシア', cities: [['クアラルンプール', 'Asia/Kuala_Lumpur']] },
+      { country: 'インドネシア', cities: [['ジャカルタ', 'Asia/Jakarta'], ['バリ島', 'Asia/Makassar']] },
+      { country: 'インド', cities: [['デリー', 'Asia/Kolkata'], ['ムンバイ', 'Asia/Kolkata']] },
+      { country: 'ネパール', cities: [['カトマンズ', 'Asia/Kathmandu']] },
+      { country: 'アラブ首長国連邦', cities: [['ドバイ', 'Asia/Dubai']] },
+      { country: 'トルコ', cities: [['イスタンブール', 'Europe/Istanbul']] },
+      { country: 'イスラエル', cities: [['エルサレム', 'Asia/Jerusalem']] },
     ] },
-    { region: 'オセアニア', zones: [['シドニー', 'Australia/Sydney'], ['オークランド', 'Pacific/Auckland']] },
-    { region: 'ヨーロッパ', zones: [
-      ['ロンドン', 'Europe/London'], ['パリ', 'Europe/Paris'], ['ベルリン', 'Europe/Berlin'],
-      ['モスクワ', 'Europe/Moscow'],
+    { region: 'オセアニア', countries: [
+      { country: 'オーストラリア', cities: [['シドニー', 'Australia/Sydney'], ['メルボルン', 'Australia/Melbourne'], ['ブリスベン', 'Australia/Brisbane'], ['アデレード', 'Australia/Adelaide'], ['パース', 'Australia/Perth']] },
+      { country: 'ニュージーランド', cities: [['オークランド', 'Pacific/Auckland']] },
+      { country: 'グアム', cities: [['グアム', 'Pacific/Guam']] },
     ] },
-    { region: 'アフリカ', zones: [['カイロ', 'Africa/Cairo'], ['ヨハネスブルグ', 'Africa/Johannesburg']] },
-    { region: '北米', zones: [
-      ['ニューヨーク', 'America/New_York'], ['シカゴ', 'America/Chicago'],
-      ['デンバー', 'America/Denver'], ['ロサンゼルス', 'America/Los_Angeles'],
+    { region: 'ヨーロッパ', countries: [
+      { country: 'イギリス', cities: [['ロンドン', 'Europe/London']] },
+      { country: 'アイルランド', cities: [['ダブリン', 'Europe/Dublin']] },
+      { country: 'フランス', cities: [['パリ', 'Europe/Paris']] },
+      { country: 'ドイツ', cities: [['ベルリン', 'Europe/Berlin'], ['ミュンヘン', 'Europe/Berlin'], ['フランクフルト', 'Europe/Berlin']] },
+      { country: 'イタリア', cities: [['ローマ', 'Europe/Rome'], ['ミラノ', 'Europe/Rome']] },
+      { country: 'スペイン', cities: [['マドリード', 'Europe/Madrid'], ['バルセロナ', 'Europe/Madrid']] },
+      { country: 'ポルトガル', cities: [['リスボン', 'Europe/Lisbon']] },
+      { country: 'オランダ', cities: [['アムステルダム', 'Europe/Amsterdam']] },
+      { country: 'ベルギー', cities: [['ブリュッセル', 'Europe/Brussels']] },
+      { country: 'スイス', cities: [['チューリッヒ', 'Europe/Zurich'], ['ジュネーブ', 'Europe/Zurich']] },
+      { country: 'オーストリア', cities: [['ウィーン', 'Europe/Vienna']] },
+      { country: 'チェコ', cities: [['プラハ', 'Europe/Prague']] },
+      { country: 'スウェーデン', cities: [['ストックホルム', 'Europe/Stockholm']] },
+      { country: 'フィンランド', cities: [['ヘルシンキ', 'Europe/Helsinki']] },
+      { country: 'ギリシャ', cities: [['アテネ', 'Europe/Athens']] },
+      { country: 'ロシア', cities: [['モスクワ', 'Europe/Moscow']] },
     ] },
-    { region: '南米', zones: [['サンパウロ', 'America/Sao_Paulo'], ['ブエノスアイレス', 'America/Argentina/Buenos_Aires']] },
+    { region: 'アフリカ', countries: [
+      { country: 'エジプト', cities: [['カイロ', 'Africa/Cairo']] },
+      { country: 'ケニア', cities: [['ナイロビ', 'Africa/Nairobi']] },
+      { country: '南アフリカ', cities: [['ヨハネスブルグ', 'Africa/Johannesburg']] },
+    ] },
+    { region: '北米', countries: [
+      { country: 'アメリカ', cities: [['ニューヨーク', 'America/New_York'], ['ワシントンD.C.', 'America/New_York'], ['シカゴ', 'America/Chicago'], ['デンバー', 'America/Denver'], ['フェニックス', 'America/Phoenix'], ['ロサンゼルス', 'America/Los_Angeles'], ['サンフランシスコ', 'America/Los_Angeles'], ['シアトル', 'America/Los_Angeles'], ['アンカレッジ', 'America/Anchorage'], ['ホノルル', 'Pacific/Honolulu']] },
+      { country: 'カナダ', cities: [['トロント', 'America/Toronto'], ['バンクーバー', 'America/Vancouver']] },
+      { country: 'メキシコ', cities: [['メキシコシティ', 'America/Mexico_City']] },
+    ] },
+    { region: '南米', countries: [
+      { country: 'ブラジル', cities: [['サンパウロ', 'America/Sao_Paulo']] },
+      { country: 'アルゼンチン', cities: [['ブエノスアイレス', 'America/Argentina/Buenos_Aires']] },
+      { country: 'ペルー', cities: [['リマ', 'America/Lima']] },
+    ] },
   ];
+  const TRANSIT_TZ_ALL = TRANSIT_TZ_COUNTRIES.flatMap(r => r.countries.flatMap(c => c.cities.map(([name, tz]) => ({ country: c.country, name, tz }))));
   let transitTzName = loadSetting('transitTzName', 'Asia/Tokyo');
   let transitTzLabel = loadSetting('transitTzLabel', '東京');
+  // 以前の一覧で保存された地名(「デリー/ムンバイ」など)が新しい一覧に
+  // 無い場合は、同じタイムゾーンの最初の都市に読み替える(それも無ければ東京)。
+  (function normalizeSavedTransitPlace() {
+    const hit = TRANSIT_TZ_ALL.find(c => c.name === transitTzLabel && c.tz === transitTzName)
+      || TRANSIT_TZ_ALL.find(c => c.tz === transitTzName)
+      || TRANSIT_TZ_ALL[0];
+    transitTzName = hit.tz;
+    transitTzLabel = hit.name;
+  })();
+  function currentTransitPlace() {
+    return TRANSIT_TZ_ALL.find(c => c.name === transitTzLabel) || TRANSIT_TZ_ALL[0];
+  }
   function populateTzSelect() {
-    const sel = document.getElementById('tz-select');
-    if (!sel || sel.dataset.populated) return;
-    sel.dataset.populated = '1';
-    for (const { region, zones } of TRANSIT_TZ_REGIONS) {
+    const countrySel = document.getElementById('tz-country-select');
+    if (!countrySel || countrySel.dataset.populated) return;
+    countrySel.dataset.populated = '1';
+    for (const { region, countries } of TRANSIT_TZ_COUNTRIES) {
       const group = document.createElement('optgroup');
       group.label = region;
-      for (const [name, tz] of zones) {
+      for (const { country } of countries) {
         const opt = document.createElement('option');
-        opt.value = `${name}|${tz}`;
-        opt.textContent = name;
+        opt.value = country;
+        opt.textContent = country;
         group.appendChild(opt);
       }
-      sel.appendChild(group);
+      countrySel.appendChild(group);
     }
+  }
+  function fillTzCitySelect(country, selectedName) {
+    const citySel = document.getElementById('tz-select');
+    citySel.innerHTML = '';
+    TRANSIT_TZ_ALL.filter(c => c.country === country).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = `${c.name}|${c.tz}`;
+      opt.textContent = c.name;
+      citySel.appendChild(opt);
+    });
+    if (selectedName) citySel.value = `${selectedName}|${TRANSIT_TZ_ALL.find(c => c.name === selectedName).tz}`;
+  }
+  // パネルの2つのセレクトを、今選ばれている都市に合わせる
+  function syncTzSelects() {
+    populateTzSelect();
+    const place = currentTransitPlace();
+    document.getElementById('tz-country-select').value = place.country;
+    fillTzCitySelect(place.country, place.name);
+  }
+  // 国を変えたら、その国の最初の都市をすぐ適用する(選択の自動反映 --
+  // 「適用」ボタンは置かない、というこのアプリ全体の方針どおり)。
+  function applyTransitCountrySelection() {
+    const country = document.getElementById('tz-country-select').value;
+    fillTzCitySelect(country, null);
+    applyTransitTimezoneSelection();
+  }
+  // バーの「トランジット(東京)」の地名を押したとき用 -- メニューを経由
+  // せずに場所パネルを直接開く(2026-09-29)。
+  function openTransitPlacePanel(event) {
+    if (event) event.stopPropagation();  // #badge-line1自体のクリック(人物選択へ)を発火させない
+    closeAllPanels();
+    syncTzSelects();
+    openPanel('tz-panel');
   }
   function applyTransitTimezoneSelection() {
     const sel = document.getElementById('tz-select');
@@ -4613,8 +4708,7 @@
     // transitTzName/transitTzLabel自体もスクリプト上部で既にloadSetting
     // 済み(デフォルト東京/Asia/Tokyo) -- ここではセレクトの中身を作り、
     // 選択状態とメニュー上のラベルをそれに合わせるだけ。
-    populateTzSelect();
-    document.getElementById('tz-select').value = `${transitTzLabel}|${transitTzName}`;
+    syncTzSelects();
     document.getElementById('menu-tz-label').textContent = transitTzLabel;
   }
   restoreSettings();
