@@ -36,7 +36,6 @@ import struct
 import numpy as np
 from astropy.coordinates import ICRS, CartesianRepresentation, HeliocentricMeanEcliptic
 from astropy.time import Time
-from astroquery.jplhorizons import Horizons
 import astropy.units as u
 
 from . import config
@@ -67,6 +66,9 @@ SEGOE_FALLBACK_FONT_KEYS = {"ceres", "pallas", "juno", "vesta", "chiron", "eris"
 
 def minor_body_heliocentric_longitude(key: str, t: Time) -> float:
     horizons_id = MINOR_BODIES[key]["horizons_id"]
+    # astroquery(ネット照会用、ブラウザでは使わない重い部品)は、この照会を実際に
+    # 使うときだけ読み込む(ブラウザ版の初回読み込みを軽くするため)。
+    from astroquery.jplhorizons import Horizons
     obj = Horizons(id=horizons_id, location="@0", epochs=t.jd, id_type="smallbody")
     # refplane="earth" is required: Horizons' default `.vectors()` output
     # is the J2000 *ecliptic* frame, not equatorial/ICRF. Silently feeding

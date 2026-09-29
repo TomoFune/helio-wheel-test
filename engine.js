@@ -73,10 +73,11 @@ const HelioEngine = (() => {
     const t0 = performance.now();
     log("Pyodideを起動しています...");
     pyodide = await loadPyodide();
-    await pyodide.loadPackage(["numpy", "matplotlib", "sqlite3"]);
+    // matplotlib/astroquery はブラウザ版では使わないので読み込まない(初回の読み込みを約半分近く軽くするため、2026-09-30)。
+    await pyodide.loadPackage(["numpy", "sqlite3"]);
     await pyodide.loadPackage("micropip");
     const micropip = pyodide.pyimport("micropip");
-    await micropip.install(["astropy", "jplephem", "tzdata", "certifi", "astroquery"]);
+    await micropip.install(["astropy", "jplephem", "tzdata", "certifi"]);
     log("Pythonパッケージの準備完了 (" + Math.round(performance.now() - t0) + "ms)");
 
     // See app.js's identical stub for the full rationale: h3 (a
