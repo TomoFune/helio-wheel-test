@@ -635,9 +635,29 @@
      て見にくいという相談を受けて) -- only the two long pick-lists in the
      表示オプション panel use this; everything else stays a normal
      single-column .check-row. */
-  #minor-body-list, #aspect-type-list {
+  #minor-body-list {
     display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 10px;
   }
+  /* アスペクト一覧: 1行 = チェック+名前 | 出生図のオーブ | 経過図のオーブ
+     (2026-09-29、オーブ設定の追加に合わせて2列並びから表形式へ) */
+  .aspect-orb-row {
+    display: grid; grid-template-columns: 1fr 62px 62px; column-gap: 8px; align-items: center;
+    margin-bottom: 6px;
+  }
+  .aspect-orb-head { margin-top: 10px; }
+  .aspect-orb-col-label { font-size: 0.72rem; color: var(--ink-dim); text-align: center; }
+  .orb-input {
+    width: 100%; box-sizing: border-box; padding: 4px 4px; text-align: center;
+    font-size: 0.85rem; color: var(--ink); background: var(--bg-sunken);
+    border: 1px solid var(--line-strong); border-radius: 6px;
+  }
+  .orb-input:focus { outline: none; border-color: var(--accent); }
+  .orb-reset-btn {
+    margin-top: 10px; width: 100%; padding: 8px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    color: var(--ink); font-size: 0.8rem; font-weight: 700;
+  }
+  .orb-reset-btn:hover { border-color: var(--accent); color: var(--accent); }
   /* Groups the panel's toggle-rows/checkbox-lists into clearly separated
      blocks (度数表示・小惑星・アスペクト) instead of one long flat list --
      same "before you'd have to guess where one setting group ends and the
@@ -1633,6 +1653,8 @@
           </div>
           <p class="scrub-note" style="margin-top:8px;">円の下のアスペクト表は、「アスペクト」タブでいつでも見られます。対象は、上で表示を選んだ天体(主要9天体+チェックした小惑星)です。</p>
           <div id="aspect-type-list" style="margin-top:8px;"></div>
+          <p class="scrub-note" style="margin-top:10px;">数字は各アスペクトのオーブ(許容する度数のずれ、0〜15度・0.5度きざみ)です。出生図には「出生図」の列、経過図には「経過図」の列を使います。変えるとすぐ反映され、次回も同じ値で開きます。</p>
+          <button class="orb-reset-btn" onclick="resetAspectOrbs()">松村潔基準に戻す</button>
         </div>
       </div>
     </div>
@@ -3588,19 +3610,54 @@
   // aspects (tight orbs, off by default so existing charts don't
   // suddenly get busy) -- user explicitly asked for the minor set too.
   const ASPECT_DEFS = [
-    { type: "conjunction",    angle: 0,   orb: 6, color: "var(--aspect-neutral)", dash: "1,0", labelJa: "0度",    major: true },
-    { type: "semisextile",    angle: 30,  orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "30度",   major: false },
-    { type: "semisquare",     angle: 45,  orb: 2, color: "var(--aspect-hard)",    dash: "2,2", labelJa: "45度",   major: false },
-    { type: "sextile",        angle: 60,  orb: 4, color: "var(--aspect-soft)",    dash: "1,0", labelJa: "60度",   major: true },
-    { type: "quintile",       angle: 72,  orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "72度",   major: false },
-    { type: "square",         angle: 90,  orb: 6, color: "var(--aspect-hard)",    dash: "5,3", labelJa: "90度",   major: true },
-    { type: "trine",          angle: 120, orb: 6, color: "var(--aspect-soft)",    dash: "1,0", labelJa: "120度",  major: true },
-    { type: "sesquiquadrate", angle: 135, orb: 2, color: "var(--aspect-hard)",    dash: "2,2", labelJa: "135度",  major: false },
-    { type: "biquintile",     angle: 144, orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "144度",  major: false },
-    { type: "quincunx",       angle: 150, orb: 2, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "150度",  major: false },
-    { type: "opposition",     angle: 180, orb: 6, color: "var(--aspect-hard)",    dash: "1,0", labelJa: "180度",  major: true },
+    { type: "conjunction",    angle: 0,   color: "var(--aspect-neutral)", dash: "1,0", labelJa: "0度",    major: true },
+    { type: "semisextile",    angle: 30,  color: "var(--aspect-neutral)", dash: "2,2", labelJa: "30度",   major: false },
+    { type: "semisquare",     angle: 45,  color: "var(--aspect-hard)",    dash: "2,2", labelJa: "45度",   major: false },
+    { type: "sextile",        angle: 60,  color: "var(--aspect-soft)",    dash: "1,0", labelJa: "60度",   major: true },
+    { type: "quintile",       angle: 72,  color: "var(--aspect-neutral)", dash: "2,2", labelJa: "72度",   major: false },
+    { type: "square",         angle: 90,  color: "var(--aspect-hard)",    dash: "5,3", labelJa: "90度",   major: true },
+    { type: "trine",          angle: 120, color: "var(--aspect-soft)",    dash: "1,0", labelJa: "120度",  major: true },
+    { type: "sesquiquadrate", angle: 135, color: "var(--aspect-hard)",    dash: "2,2", labelJa: "135度",  major: false },
+    { type: "biquintile",     angle: 144, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "144度",  major: false },
+    { type: "quincunx",       angle: 150, color: "var(--aspect-neutral)", dash: "2,2", labelJa: "150度",  major: false },
+    { type: "opposition",     angle: 180, color: "var(--aspect-hard)",    dash: "1,0", labelJa: "180度",  major: true },
   ];
+  // オーブ(許容度数)はユーザーが変えられる(2026-09-29、7.96で依頼され
+  // 保留になっていたもの)。初期値=「松村潔基準に戻す」で戻る値は、
+  // ユーザーの記憶に基づく目安: 出生図は広め(メジャー6度・マイナー3度・
+  // 150度は1.5度)、経過図は狭め(メジャー3度・マイナー1.5度・150度は
+  // 1度)。以前は全モード共通の固定値(メジャー6度、60度だけ4度、マイナー
+  // 2度)だった。二重円はアスペクト自体を出さないので、出生図(N)用と
+  // 経過図(T)用の2組だけ持つ。
+  const ASPECT_ORB_MIN = 0, ASPECT_ORB_MAX = 15, ASPECT_ORB_STEP = 0.5;
+  const ASPECT_ORB_DEFAULTS = {
+    N: Object.fromEntries(ASPECT_DEFS.map(d => [d.type, d.major ? 6 : (d.type === 'quincunx' ? 1.5 : 3)])),
+    T: Object.fromEntries(ASPECT_DEFS.map(d => [d.type, d.major ? 3 : (d.type === 'quincunx' ? 1 : 1.5)])),
+  };
+  function clampAspectOrb(v) {
+    const n = Math.round(Number(v) / ASPECT_ORB_STEP) * ASPECT_ORB_STEP;
+    return Math.min(ASPECT_ORB_MAX, Math.max(ASPECT_ORB_MIN, n));
+  }
+  // 保存値は、欠けている項目・数値でない項目を初期値で補ってから使う
+  // (将来アスペクトの種類を増やしても、古い保存値で壊れないように)。
+  const aspectOrbs = (() => {
+    const saved = loadSetting('aspectOrbs', null) || {};
+    const out = {};
+    for (const set of ['N', 'T']) {
+      out[set] = {};
+      for (const d of ASPECT_DEFS) {
+        const v = saved[set] && saved[set][d.type];
+        out[set][d.type] = Number.isFinite(v) ? clampAspectOrb(v) : ASPECT_ORB_DEFAULTS[set][d.type];
+      }
+    }
+    return out;
+  })();
+  // 今表示している図が使うオーブの組(経過図だけT、出生図はN)
+  function currentAspectOrbSet() {
+    return displayMode === 'T' ? 'T' : 'N';
+  }
   function computeAspects(lonMap) {
+    const orbs = aspectOrbs[currentAspectOrbSet()];
     const keys = Object.keys(lonMap);
     const hits = [];
     for (let i = 0; i < keys.length; i++) {
@@ -3609,7 +3666,7 @@
         let diff = Math.abs(lonMap[a] - lonMap[b]) % 360;
         diff = Math.min(diff, 360 - diff);
         for (const def of ASPECT_DEFS) {
-          if (Math.abs(diff - def.angle) <= def.orb) hits.push({ a, b, ...def, exactDiff: diff });
+          if (Math.abs(diff - def.angle) <= orbs[def.type]) hits.push({ a, b, ...def, exactDiff: diff });
         }
       }
     }
@@ -3628,19 +3685,50 @@
     const container = document.getElementById('aspect-type-list');
     container.innerHTML = '';
     [['メジャーアスペクト', true], ['マイナーアスペクト', false]].forEach(([groupLabel, isMajor]) => {
+      // 見出し行: グループ名 + オーブ欄の列見出し(出生図/経過図)
       const heading = document.createElement('div');
-      heading.className = 'check-row-group-label';
-      heading.textContent = groupLabel;
+      heading.className = 'aspect-orb-row aspect-orb-head';
+      heading.innerHTML = `<span class="check-row-group-label" style="margin:0; grid-column:auto;">${groupLabel}</span>` +
+        `<span class="aspect-orb-col-label">出生図</span><span class="aspect-orb-col-label">経過図</span>`;
       container.appendChild(heading);
       ASPECT_DEFS.filter(d => d.major === isMajor).forEach((def) => {
         const isOn = aspectTypesOn.has(def.type);
         const row = document.createElement('div');
-        row.className = 'check-row';
-        row.innerHTML = `<span class="mini-check${isOn ? ' on' : ''}" data-type="${def.type}" onclick="toggleAspectType(this)">${isOn ? '✓' : ''}</span>` +
-          `<span class="aspect-swatch" style="background:${def.color};"></span><span>${def.labelJa}</span>`;
+        row.className = 'aspect-orb-row';
+        const orbInput = (set) =>
+          `<input type="number" class="orb-input mono" inputmode="decimal" data-type="${def.type}" data-set="${set}"` +
+          ` min="${ASPECT_ORB_MIN}" max="${ASPECT_ORB_MAX}" step="${ASPECT_ORB_STEP}" value="${aspectOrbs[set][def.type]}"` +
+          ` title="${set === 'N' ? '出生図' : '経過図'}のオーブ(度)">`;
+        row.innerHTML = `<span class="check-row" style="margin:0;"><span class="mini-check${isOn ? ' on' : ''}" data-type="${def.type}" onclick="toggleAspectType(this)">${isOn ? '✓' : ''}</span>` +
+          `<span class="aspect-swatch" style="background:${def.color};"></span><span>${def.labelJa}</span></span>` +
+          orbInput('N') + orbInput('T');
         container.appendChild(row);
       });
     });
+    container.querySelectorAll('.orb-input').forEach((input) => {
+      // 入力中(input)は数値として読めるときだけ即反映、確定(change)で
+      // 範囲・0.5度刻みにそろえて表示も直す。
+      const apply = (finalize) => {
+        const raw = parseFloat(input.value);
+        if (!Number.isFinite(raw)) {
+          if (finalize) input.value = aspectOrbs[input.dataset.set][input.dataset.type];
+          return;
+        }
+        const v = clampAspectOrb(raw);
+        aspectOrbs[input.dataset.set][input.dataset.type] = v;
+        if (finalize) input.value = v;
+        saveSetting('aspectOrbs', aspectOrbs);
+        redrawAspects();
+      };
+      input.addEventListener('input', () => apply(false));
+      input.addEventListener('change', () => apply(true));
+    });
+  }
+  function resetAspectOrbs() {
+    for (const set of ['N', 'T']) Object.assign(aspectOrbs[set], ASPECT_ORB_DEFAULTS[set]);
+    saveSetting('aspectOrbs', aspectOrbs);
+    fillAspectTypeList();
+    redrawAspects();
   }
   function redrawAspects() {
     const group = document.getElementById('aspect-lines');
