@@ -334,6 +334,13 @@
      ‹ › 今 を出さないため行がボタン分(6px)低くなり、トップバーの区切り線
      と円の位置が他の図より上にずれていた。 */
   .badge-top-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; min-height: 30px; }
+  /* 経過図/二重円で付く.stacked-time(setDisplayMode/updateControlAvailability
+     参照): 日時+‹›今▾の行は、名前とは無条件に別行にする。flex-wrapの
+     自然な折り返し判定だと、#badge-line2のellipsis前提の"折り返さない
+     フル文字列幅"が使われて挙動が安定しない(旧コメント参照)ため、
+     flex-basis:100%で強制的に単独行にする(測定に依存しない)。 */
+  .person-badge.stacked-time .badge-top-row { flex-wrap: wrap; }
+  .person-badge.stacked-time .badge-line2-row { flex-basis: 100%; margin-top: 2px; }
   #badge-line1 {
     font-size: 0.84rem; font-weight: 700; color: var(--ink);
     flex-shrink: 0;
@@ -2359,6 +2366,14 @@
     document.getElementById('badge-scrub-prev').style.display = showScrubHandles ? 'flex' : 'none';
     document.getElementById('badge-scrub-next').style.display = showScrubHandles ? 'flex' : 'none';
     document.getElementById('badge-now-btn').style.display = showScrubHandles ? 'flex' : 'none';
+    // 経過図/二重円では、‹ › 今▾の3ボタン+日時の全桁が名前と同じ1行に
+    // 収まりきらない(2026-09-30、実機で「経過図が…だけになって切れて
+    // 見える/ぐるぐるできない」の報告 -- #badge-line2のellipsisで見た目
+    // 上は省略されるだけだったが、実際に数字も操作ボタンも隠れていた)。
+    // .stacked-timeを付けて、日時+ボタンの行を名前の下に折り返す
+    // (#person-badgeはposition:staticなので、2行になった分は自動的に
+    // 後続要素を押し下げる -- 上のコメント参照)。
+    document.getElementById('person-badge').classList.toggle('stacked-time', showScrubHandles);
   }
   const DISPLAY_MODE_LABELS = { N: '出生図', T: '経過図', both: '二重円' };
   function setDisplayMode(btn, mode) {
@@ -2503,7 +2518,12 @@
       // no way to tell "this person's natal" from "this person's eclipse"
       // apart at a glance.
       line1.textContent = currentPersonName;
-      renderEditableTime(line2, '経過図　');
+      // 「経過図」の接頭辞は付けない(2026-09-30) -- 二重円では狭い画面
+      // だと.badge-line2-row自体の幅が足りず、接頭辞込みだと日時の末尾
+      // (秒)が隠れてしまっていた(実測)。名前(1行目)・「図: 二重円」
+      // (現在値の行)・特別行の「経過図…」ラベルで、これが経過図側の
+      // 日時であることは既に分かるため、ここでは省く。
+      renderEditableTime(line2, '');
       updateSpecialLine();
       return;
     }
@@ -3797,7 +3817,11 @@
     }
     return hits;
   }
-  const aspectTypesOn = new Set(ASPECT_DEFS.filter(d => d.major).map(d => d.type));
+  // 150度(クインカンクス)は分類上はマイナーアスペクトのままだが、松村
+  // 潔基準では初期状態から表示する(2026-09-30、「デフォルトで150度も
+  // 入ります」より) -- オーブの初期値(1.5度/1度)は元々そうなっていた
+  // (ASPECT_ORB_DEFAULTS参照)ので、ここは表示チェックの初期状態だけの話。
+  const aspectTypesOn = new Set(ASPECT_DEFS.filter(d => d.major || d.type === 'quincunx').map(d => d.type));
   function toggleAspectType(el) {
     el.classList.toggle('on');
     el.textContent = el.classList.contains('on') ? '✓' : '';
