@@ -108,6 +108,12 @@
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
+  /* iPhoneで、横にずれたり拡大されたまま(円や「設定」ボタンが端で切れる)に
+     ならないようにする(2026-10-02): htmlにも横はみ出しを止める指定を付ける
+     (bodyだけでは、Safariが横にスクロールできてしまう)。ダブルタップでの
+     拡大は止める(‹ › などを続けて押したときに、意図せず拡大されるため。
+     ピンチでの拡大は残す)。 */
+  html { overflow-x: hidden; -webkit-text-size-adjust: 100%; touch-action: manipulation; }
   body {
     background: var(--bg);
     color: var(--ink);
@@ -833,6 +839,11 @@
     border-radius: var(--radius-sm); background: var(--bg-sunken);
   }
   .place-form-error { color: #c0392b; }
+  /* データの書き出し・読み込み画面 */
+  .dt-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dt-buttons .add-btn { padding: 11px 16px; font-size: 0.84rem; }
+  .add-btn.sub { background: var(--bg-elevated); color: var(--ink); border: 1px solid var(--line-strong); }
+  .add-btn:disabled { opacity: 0.45; cursor: default; }
 
   /* bottom back-nav for sub-screens */
   .subnav {
@@ -1498,6 +1509,7 @@
              Menuに入れてもいいのではないだろうか」より)。他のトグル
              (度数表示・アスペクト線)と見た目を揃えるため、
              row-btn一覧の中でもここだけtoggle-row(スイッチ)にした。 -->
+        <button class="row-btn" onclick="openDataTransfer('chart')"><span>データの書き出し・読み込み(別の端末へ移す)</span><span class="chevron">›</span></button>
         <button class="row-btn" onclick="closeAllPanels(); openPanel('about-panel');"><span>このアプリについて・ご利用にあたって</span><span class="chevron">›</span></button>
         <div class="row-btn" style="cursor:default;">
           <div class="toggle-row" style="width:100%;">
@@ -1550,6 +1562,16 @@
           <li>スマホで一覧を大きく見たいときは、一覧の見出し(━ のある行)を上にシュッとするか、右端の ▲ を押します。戻すときは、下にシュッとするか、▼ を押します。</li>
         </ul>
 
+        <h3>別の端末にデータを移す(書き出し・読み込み)</h3>
+        <ul>
+          <li>⚙設定の「データの書き出し・読み込み」(最初の画面の「人物データを管理」の下にもあります)を開きます。</li>
+          <li>元の端末で「ファイルに書き出す」を押すと、人物(名前・出生日時・場所・分類・メモ)、自分で追加した場所、設定が1つのファイルになります。AirDrop・メール・クラウドなどで、そのファイルを別の端末に送ってください。「共有する」(対応している端末だけ)で、そのまま送ることもできます。「コピーする」は、文字としてコピーします。</li>
+          <li>別の端末では「ファイルを選ぶ」で選ぶか、コピーした文字を貼り付けて「確認する」を押します。中身(人数・場所の数など)を確かめてから「読み込む」を押すと反映されます。</li>
+          <li>名前と生年月日が同じ人物は、同じ人物として扱います。そのとき「上書き」「追加」「飛ばす」から選べます。同じ名前の場所も同じ選び方です。</li>
+          <li>設定を読み込むと、画面が読み込み直されます。画面の開閉状態など、端末ごとの見え方は移りません。</li>
+          <li>データは作者のサーバーを通りません。ファイルや文字をメールなどに載せたあとの扱いは、ご自身の責任でお願いします。</li>
+        </ul>
+
         <h3>恒星・銀河との合</h3>
         <ul>
           <li>円の上の「恒星の合」を押すと、合になっている星の一覧(名前・星座・サイン・度数・サビアン)が見られます。</li>
@@ -1583,6 +1605,7 @@
         <ul>
           <li>保存した人物(名前・出生日時・場所)と設定は、<b>お使いの端末のブラウザの中にだけ</b>保存されます。作者のサーバーには送りません(データを受け取る仕組みがありません)。</li>
           <li>ブラウザのデータを消すと、保存した人物も消えます。大切なデータは、別にメモしておいてください。</li>
+          <li>⚙設定の「データの書き出し・読み込み」で、人物・自分で追加した場所・設定を、ファイルやコピーした文字にして別の端末へ移せます。受け渡しは利用者ご自身で行うもので、メール・メッセージ・クラウドなどに載せたあとの扱いは利用者ご自身の責任となります。この場合も、データが作者のサーバーに送られることはありません。</li>
           <li>画面の表示に必要なプログラムやフォントは、Google Fonts・jsDelivr・PyPI などから読み込みます。このため、それらの配信元には、アクセスの記録(IP アドレスなど)が残ることがあります。出生データは含まれません。</li>
         </ul>
 
@@ -1844,6 +1867,62 @@
         <button class="add-btn" onclick="openPersonEdit(null)">+ 新規追加</button>
       </div>
       <div class="person-list" id="person-manage-list"></div>
+      <button type="button" class="place-add-btn" style="margin-top:22px;" onclick="openDataTransfer('person-manage')">データの書き出し・読み込み(別の端末へ移す)</button>
+    </div>
+  </div>
+
+  <!-- ============ VIEW: データの書き出し・読み込み(2026-10-01) ============
+       スマホとPCなど、端末どうしでデータを移すための画面。作者のサーバーには
+       何も送らない(ファイル・コピー・共有ボタンで、利用者が自分で受け渡す)。
+       ⚙設定と「人物データを管理」の両方から開く(最初の画面から入れるように)。 -->
+  <div class="view" id="view-data-transfer">
+    <div class="subnav">
+      <button class="back-btn" onclick="closeDataTransfer()">←</button>
+      <h2>データの書き出し・読み込み</h2>
+    </div>
+    <div class="screen-pad">
+      <p class="lead" style="margin-top:0;">スマホとPCなど、別の端末にデータを移せます。人物(名前・出生日時・場所・分類・メモ)、自分で追加した場所、設定が対象です。</p>
+
+      <div class="section-label">書き出す(この端末のデータ)</div>
+      <p class="scrub-note" id="dt-export-summary" style="margin:0 0 10px;"></p>
+      <div class="dt-buttons">
+        <button type="button" class="add-btn" onclick="exportDataToFile()">ファイルに書き出す</button>
+        <button type="button" class="add-btn sub" id="dt-share-btn" style="display:none;" onclick="exportDataShare()">共有する</button>
+        <button type="button" class="add-btn sub" onclick="exportDataCopy()">コピーする</button>
+      </div>
+
+      <div class="section-label" style="margin-top:30px;">読み込む(別の端末で書き出したデータ)</div>
+      <input type="file" id="dt-file" accept=".json,application/json,text/plain" style="display:none;" onchange="onDataFileChosen(this)">
+      <div class="dt-buttons">
+        <button type="button" class="add-btn" onclick="document.getElementById('dt-file').click()">ファイルを選ぶ</button>
+      </div>
+      <textarea id="dt-paste" class="pe-input pe-textarea" style="margin-top:12px;" placeholder="コピーしたデータを、ここに貼り付けてもかまいません"></textarea>
+      <div class="dt-buttons" style="margin-top:8px;">
+        <button type="button" class="add-btn sub" onclick="onDataPasteChosen()">貼り付けた内容を確認する</button>
+      </div>
+
+      <div class="place-form" id="dt-preview" style="display:none;">
+        <div id="dt-preview-text" style="font-size:0.86rem; line-height:1.7;"></div>
+        <div id="dt-policy-block">
+          <span class="field-label" style="margin-top:14px;">同じ人物(名前と生年月日が同じ)・同じ名前の場所があったとき</span>
+          <div class="segmented" id="dt-policy">
+            <button type="button" class="seg-btn active" data-policy="overwrite" onclick="setDataImportPolicy('overwrite')">上書き</button>
+            <button type="button" class="seg-btn" data-policy="add" onclick="setDataImportPolicy('add')">追加</button>
+            <button type="button" class="seg-btn" data-policy="skip" onclick="setDataImportPolicy('skip')">飛ばす</button>
+          </div>
+        </div>
+        <div class="toggle-row" id="dt-settings-row" style="margin-top:14px;">
+          <span class="field-label" style="margin-bottom:0;">設定も読み込む</span>
+          <div class="switch on" id="dt-settings-switch" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="pe-row" style="margin-top:16px;">
+          <button type="button" class="add-btn" style="justify-content:center; padding:12px;" id="dt-apply-btn" onclick="applyDataImport()">読み込む</button>
+          <button type="button" class="add-btn" style="justify-content:center; padding:12px; background:var(--bg-elevated); color:var(--ink); border:1px solid var(--line-strong);" onclick="cancelDataImport()">キャンセル</button>
+        </div>
+      </div>
+      <p class="scrub-note" id="dt-message" style="display:none; margin-top:14px; font-weight:700; color:var(--accent-strong);"></p>
+
+      <p class="scrub-note" style="margin-top:28px;">書き出したデータには、名前や出生日時などが含まれます。メール・メッセージ・クラウドなどに載せたあとの扱いは、利用者ご自身の責任でお願いします。データは作者のサーバーには送られず、作者が内容を見ることはできません。</p>
     </div>
   </div>
 
@@ -2422,6 +2501,282 @@
     renderPersonLists();
     showPeToast('削除しました');
     showView('person-manage');
+  }
+
+  // ---------- データの書き出し・読み込み(2026-10-01) ----------
+  // 端末間(スマホ⇔PC)でデータを移すための機能。ログインやサーバーは使わず、
+  // 全データを1つのJSONにして、ファイル・コピー・共有ボタンで利用者が自分で
+  // 受け渡す(作者のサーバーには何も送らない)。対象: 人物(storage.py、
+  // Pyodide上のSQLite)、自分で追加した場所(customPlaces)、設定(localStorage)。
+  // 画面の開閉状態(sheetExpanded)は端末ごとの見え方なので含めない。
+  const DATA_FORMAT = 'helio-wheel-data';
+  const DATA_VERSION = 1;
+  const DATA_MAX_CHARS = 5000000;
+  const DATA_DEVICE_ONLY_SETTINGS = ['sheetExpanded', 'customPlaces'];
+  let dataTransferBack = 'chart';
+  let pendingImport = null;
+  let dataImportPolicy = 'overwrite';
+
+  function openDataTransfer(from) {
+    dataTransferBack = from;
+    cancelDataImport();
+    showDataMessage('');
+    document.getElementById('dt-file').value = '';
+    document.getElementById('dt-paste').value = '';
+    // 共有ボタンは、この端末・ブラウザが「ファイルの共有」に対応しているときだけ出す
+    let canShare = false;
+    try {
+      canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] }));
+    } catch (e) {}
+    document.getElementById('dt-share-btn').style.display = canShare ? '' : 'none';
+    showView('data-transfer');
+    refreshDataExportSummary();
+  }
+  function closeDataTransfer() { showView(dataTransferBack); }
+  function showDataMessage(msg) {
+    const el = document.getElementById('dt-message');
+    el.textContent = msg;
+    el.style.display = msg ? '' : 'none';
+  }
+  function collectLocalSettings() {
+    const out = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith(SETTINGS_PREFIX)) continue;
+        const name = k.slice(SETTINGS_PREFIX.length);
+        if (DATA_DEVICE_ONLY_SETTINGS.includes(name)) continue;
+        try { out[name] = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      }
+    } catch (e) {}
+    return out;
+  }
+  async function loadPeopleForTransfer() {
+    if (!engineAvailable) return null;
+    try {
+      await ensureEngineReady();
+      return await HelioEngine.listPeople();
+    } catch (err) {
+      return null;
+    }
+  }
+  async function refreshDataExportSummary() {
+    const el = document.getElementById('dt-export-summary');
+    el.textContent = '数えています...';
+    const list = await loadPeopleForTransfer();
+    const settingsCount = Object.keys(collectLocalSettings()).length;
+    el.textContent = list === null
+      ? `人物は、この環境では書き出せません(Pyodide版でだけ使えます)。自分で追加した場所 ${customPlaces.length}件・設定 ${settingsCount}項目を書き出せます。`
+      : `人物 ${list.length}人・自分で追加した場所 ${customPlaces.length}件・設定 ${settingsCount}項目 を書き出します。`;
+  }
+  async function buildExportJson() {
+    const list = await loadPeopleForTransfer();
+    const data = {
+      format: DATA_FORMAT,
+      version: DATA_VERSION,
+      exportedAt: new Date().toISOString(),
+      people: (list || []).map(p => ({
+        name: p.name, birth_date: p.birth_date, birth_time: p.birth_time, time_unknown: !!p.time_unknown,
+        timezone: p.timezone, latitude: p.latitude, longitude: p.longitude,
+        place_name: p.place_name || '', category: p.category || '', notes: p.notes || '',
+      })),
+      customPlaces: customPlaces.map(c => ({ name: c.name, tz: c.tz, lat: c.lat, lon: c.lon, ref: c.ref || null })),
+      settings: collectLocalSettings(),
+    };
+    return JSON.stringify(data, null, 1);
+  }
+  function exportFileName() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `helio-wheel-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+  }
+  async function exportDataToFile() {
+    const json = await buildExportJson();
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = exportFileName();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showDataMessage('書き出しました。できたファイルを、AirDrop・メール・クラウドなどで別の端末に送ってください。');
+  }
+  async function exportDataShare() {
+    const json = await buildExportJson();
+    const file = new File([json], exportFileName(), { type: 'application/json' });
+    try {
+      await navigator.share({ files: [file], title: '日輪のデータ' });
+      showDataMessage('共有しました。');
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;  // 共有をやめた
+      showDataMessage('共有できませんでした。「ファイルに書き出す」を使ってください。');
+    }
+  }
+  async function exportDataCopy() {
+    const json = await buildExportJson();
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(json); ok = true; }
+    } catch (e) {}
+    if (!ok) {
+      // http(ローカル確認など)ではclipboard APIが使えないので、選択+コピーで代用
+      const ta = document.createElement('textarea');
+      ta.value = json;
+      ta.style.cssText = 'position:fixed; top:0; left:0; opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+    }
+    showDataMessage(ok
+      ? 'コピーしました。別の端末で、「読み込む」の欄に貼り付けてください(メモ・メッセージなどを経由できます)。'
+      : 'コピーできませんでした。「ファイルに書き出す」を使ってください。');
+  }
+
+  // 読み込み: ファイルまたは貼り付けた文字を読み取り、内容を確認してから反映する
+  function parseImportText(text) {
+    if (typeof text !== 'string' || text.length > DATA_MAX_CHARS) throw new Error('データが大きすぎるか、読み取れませんでした');
+    let data;
+    try { data = JSON.parse(text.trim()); } catch (e) { throw new Error('読み取れませんでした。書き出したデータを、そのまま選ぶか貼り付けてください'); }
+    if (!data || data.format !== DATA_FORMAT || !Array.isArray(data.people)) throw new Error('日輪から書き出したデータではありません');
+    if (Number(data.version) > DATA_VERSION) throw new Error('新しい版の日輪で書き出したデータです。このアプリを最新にしてから読み込んでください');
+    const str = v => (typeof v === 'string' ? v : '');
+    let invalid = 0;
+    const peopleIn = [];
+    for (const p of data.people) {
+      const ok = p && typeof p.name === 'string' && p.name.trim()
+        && /^\d{4}-\d{2}-\d{2}$/.test(str(p.birth_date))
+        && (p.birth_time === null || p.birth_time === undefined || /^\d{2}:\d{2}(:\d{2})?$/.test(str(p.birth_time)))
+        && typeof p.timezone === 'string' && isValidTz(p.timezone)
+        && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude));
+      if (!ok) { invalid++; continue; }
+      peopleIn.push({
+        name: p.name.trim(), birth_date: p.birth_date, birth_time: p.birth_time || null, time_unknown: !!p.time_unknown,
+        timezone: p.timezone, latitude: Number(p.latitude), longitude: Number(p.longitude),
+        place_name: str(p.place_name), category: str(p.category), notes: str(p.notes),
+      });
+    }
+    const placesIn = [];
+    for (const c of (Array.isArray(data.customPlaces) ? data.customPlaces : [])) {
+      const ok = c && typeof c.name === 'string' && c.name.trim() && !c.name.includes('|') && typeof c.tz === 'string' && isValidTz(c.tz)
+        && Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lon));
+      if (!ok) { invalid++; continue; }
+      placesIn.push({ name: c.name.trim(), tz: c.tz, lat: Number(c.lat), lon: Number(c.lon), ref: typeof c.ref === 'string' ? c.ref : null });
+    }
+    const settingsIn = {};
+    if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
+      for (const [k, v] of Object.entries(data.settings)) {
+        if (/^[A-Za-z0-9_:.\-]{1,80}$/.test(k) && !DATA_DEVICE_ONLY_SETTINGS.includes(k)) settingsIn[k] = v;
+      }
+    }
+    return { people: peopleIn, customPlaces: placesIn, settings: settingsIn, invalid };
+  }
+  const personKey = (name, birthDate) => `${String(name).trim()}|${birthDate}`;
+  async function previewDataImport(text) {
+    showDataMessage('');
+    let parsed;
+    try { parsed = parseImportText(text); } catch (err) { cancelDataImport(); showDataMessage(err.message); return; }
+    const local = await loadPeopleForTransfer();
+    const localKeys = new Set((local || []).map(p => personKey(p.name, p.birth_date)));
+    const same = parsed.people.filter(p => localKeys.has(personKey(p.name, p.birth_date))).length;
+    const placeSame = parsed.customPlaces.filter(c => customPlaces.some(x => x.name === c.name)).length;
+    const settingsCount = Object.keys(parsed.settings).length;
+    pendingImport = { ...parsed, canSavePeople: local !== null };
+    const lines = [];
+    lines.push(`人物 ${parsed.people.length}人(新しい人 ${parsed.people.length - same}人・同じ人物 ${same}人)`);
+    lines.push(`自分で追加した場所 ${parsed.customPlaces.length}件(同じ名前 ${placeSame}件)`);
+    lines.push(`設定 ${settingsCount}項目`);
+    if (parsed.invalid) lines.push(`読み取れなかった項目 ${parsed.invalid}件(飛ばします)`);
+    if (local === null && parsed.people.length) lines.push('※この環境では人物を保存できないため、人物は読み込みません');
+    document.getElementById('dt-preview-text').innerHTML = lines.map(escapeHtml).join('<br>');
+    document.getElementById('dt-policy-block').style.display = same || placeSame ? '' : 'none';
+    document.getElementById('dt-settings-row').style.display = settingsCount ? '' : 'none';
+    setDataImportPolicy('overwrite');
+    document.getElementById('dt-settings-switch').classList.add('on');
+    document.getElementById('dt-preview').style.display = '';
+    document.getElementById('dt-apply-btn').disabled = !(parsed.people.length || parsed.customPlaces.length || settingsCount);
+  }
+  function onDataFileChosen(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > DATA_MAX_CHARS) { showDataMessage('ファイルが大きすぎます'); return; }
+    const reader = new FileReader();
+    reader.onload = () => previewDataImport(String(reader.result || ''));
+    reader.onerror = () => showDataMessage('ファイルを読み取れませんでした');
+    reader.readAsText(file);
+  }
+  function onDataPasteChosen() {
+    const text = document.getElementById('dt-paste').value;
+    if (!text.trim()) { showDataMessage('貼り付ける欄が空です'); return; }
+    previewDataImport(text);
+  }
+  function setDataImportPolicy(policy) {
+    dataImportPolicy = policy;
+    document.querySelectorAll('#dt-policy .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.policy === policy));
+  }
+  function cancelDataImport() {
+    pendingImport = null;
+    document.getElementById('dt-preview').style.display = 'none';
+  }
+  async function applyDataImport() {
+    const st = pendingImport;
+    if (!st) return;
+    const policy = dataImportPolicy;
+    const withSettings = document.getElementById('dt-settings-switch').classList.contains('on');
+    const btn = document.getElementById('dt-apply-btn');
+    btn.disabled = true;
+    const r = { added: 0, updated: 0, skipped: 0, placesAdded: 0, placesUpdated: 0, placesSkipped: 0, settings: 0 };
+    try {
+      if (st.people.length && st.canSavePeople) {
+        await ensureEngineReady();
+        const local = await HelioEngine.listPeople();
+        const byKey = new Map();
+        for (const p of local) { const k = personKey(p.name, p.birth_date); if (!byKey.has(k)) byKey.set(k, p); }
+        for (const p of st.people) {
+          const form = {
+            id: null, name: p.name, birthDate: p.birth_date, birthTime: p.birth_time, timeUnknown: p.time_unknown,
+            timezone: p.timezone, latitude: p.latitude, longitude: p.longitude,
+            placeName: p.place_name, category: p.category, notes: p.notes,
+          };
+          const existing = byKey.get(personKey(p.name, p.birth_date));
+          if (existing && policy === 'skip') { r.skipped++; continue; }
+          if (existing && policy === 'overwrite') { form.id = existing.id; await HelioEngine.savePerson(form); r.updated++; continue; }
+          await HelioEngine.savePerson(form);
+          r.added++;
+        }
+        people = await HelioEngine.listPeople();
+        renderPersonLists();
+      }
+      for (const c of st.customPlaces) {
+        if (BUILTIN_PLACES.some(b => b.name === c.name)) { r.placesSkipped++; continue; }  // 一覧にある名前とは重ねない
+        const i = customPlaces.findIndex(x => x.name === c.name);
+        if (i >= 0) {
+          if (policy === 'overwrite') { customPlaces[i] = c; r.placesUpdated++; } else r.placesSkipped++;
+        } else { customPlaces.push(c); r.placesAdded++; }
+      }
+      if (r.placesAdded || r.placesUpdated) saveCustomPlaces();
+      if (withSettings) {
+        for (const [k, v] of Object.entries(st.settings)) { saveSetting(k, v); r.settings++; }
+      }
+    } catch (err) {
+      showDataMessage('読み込み中にエラーが起きました: ' + (err.message || err));
+      btn.disabled = false;
+      return;
+    }
+    cancelDataImport();
+    const parts = [];
+    if (st.people.length && st.canSavePeople) parts.push(`人物: 追加${r.added}・上書き${r.updated}・飛ばした${r.skipped}`);
+    if (st.customPlaces.length) parts.push(`場所: 追加${r.placesAdded}・上書き${r.placesUpdated}・飛ばした${r.placesSkipped}`);
+    if (withSettings && r.settings) parts.push(`設定 ${r.settings}項目`);
+    if (withSettings && r.settings) {
+      showDataMessage(`読み込みました(${parts.join(' / ')})。設定を反映するため、画面を読み込み直します。`);
+      setTimeout(() => location.reload(), 1600);
+    } else {
+      showDataMessage(`読み込みました(${parts.join(' / ') || '変更なし'})。`);
+      refreshDataExportSummary();
+    }
   }
 
   // ---------- display mode (N / T / biwheel) + N-type + T-type ----------
