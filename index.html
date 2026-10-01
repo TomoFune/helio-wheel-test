@@ -183,7 +183,10 @@
     display: flex;
     align-items: baseline;
     gap: 8px;
+    /* ロゴを押すとホームへ(2026-10-01) -- buttonの既定の見た目を消す */
+    background: none; border: none; padding: 0; cursor: pointer; color: inherit; flex-shrink: 0;
   }
+  .brand:hover .brand-mark { color: var(--accent-strong); }
   .brand-mark {
     font-family: "Shippori Mincho", serif;
     font-size: 1.25rem;
@@ -212,6 +215,20 @@
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
   .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* 「⚙ 設定」(2026-10-01) -- アイコンだけだと何のボタンか分からないので文字も添える */
+  .settings-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    color: var(--ink); font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .settings-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .settings-btn.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  /* 図を見ていない画面では、設定ボタンと(PCでトップバーに入っている)状態
+     ボタン・日時を出さない(showView()が.on-chartを付け外しする)。 */
+  .app:not(.on-chart) #icon-btn-settings,
+  .app:not(.on-chart) #topbar-badge-slot { display: none; }
   /* パネルが開いている間、対応するアイコンを「選択中」と分かる見た目に
      (2026-09-04、「選択したときは、選択したのがわかる表示にしてほしい」
      より) -- openMainMenu()/openViewMenu()/openChartTypeMenu()がそれぞれ
@@ -280,121 +297,73 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding: 18px 16px 8px;
+    padding: 10px 16px calc(8px + env(safe-area-inset-bottom));
     min-height: 0;
     position: relative;
   }
+  /* ---------- 円の上の「今の状態」(2026-10-01、メニュー再設計) ----------
+     旧バッジ(名前+日時)と#current-state-line(「図: 出生図 起点: …」の
+     押せない文字)を置き換えたもの。「見えている文字を押せば、それが
+     変わる」: 1段目の状態ボタン(人物/図の種類/起点/恒星の合)を押すと、
+     それぞれのパネルが開く。2段目は日時(経過図・二重円では ‹ › 今
+     日食・四季へ と送る単位)。スマホでは.chart-stageの先頭、PCでは
+     トップバーの中(layoutBadgeForWidth())に置く。 */
   .person-badge {
-    /* position:absolute -> static(2026-09-03、実機のスマホ幅で「スマホ
-       版が、ひどかったです」の調査中に発覚した重なりバグの修正) --
-       名前+日時が横並びの1行に収まらないほど幅が狭い実機(375px幅など)
-       では、下のbadge-line1/line2-rowが自然に2行へ折り返す(意図通りの
-       フォールバック挙動)。だが親要素側は絶対配置ぶん高さを無視するため、
-       .pane-tabsの固定margin-top(34px、1行想定でチューニングされた値)
-       では2行になった場合の実高さに足りず、バッジとタブが重なっていた。
-       絶対配置をやめて通常のフローに戻せば、何行に折り返しても後続の
-       要素が自動的に押し下げられる -- デスクトップ側は既に同じ理由で
-       position:staticへ上書き済み(トップバー統合時、同じくstatic化)
-       だったので、モバイル側もベースから同じ方針に揃えた。
-       left/right/z-indexはstaticでは意味を持たないため削除。 */
     position: static;
-    display: flex; align-items: center; gap: 6px;
-    /* width:100%+box-sizing(margin:14px 16px 0だけだと、.chart-stageの
-       flex-column子として「内容にフィットする幅」で中央寄せされる
-       だけになり、幅の制約が一切なくなって画面の外まではみ出していた
-       -- 実測で気づいて修正、2026-09-03)。親幅いっぱいを取った上で
-       左右の余白はpaddingで確保することで、中の.person-badge-linesが
-       正しい利用可能幅を認識し、必要な時だけ2行に折り返せるようにした。 */
-    width: 100%; box-sizing: border-box; padding: 0 16px;
-    margin-top: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    width: 100%; box-sizing: border-box; padding: 0 2px;
+    margin-top: 2px;
   }
-  .person-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-  /* 1行化(2026-09-01、「自分/年月日が二段になっている、一段にしたら
-     その分円を大きくできないか」より) -- 以前は#badge-line1(名前)と
-     .badge-line2-row(日時)を縦に2段積みしていたが、横並びの1行に変更。
-     浮いた高さぶんは.pane-tabs/.chart-columnsの上マージンを詰めて円の
-     高さ予算に還元している(下の該当コメント参照)。
-     2026-09-04、.badge-top-row導入 -- 「サンプル花子の表示をもっと
-     左に寄せて...出生図＋出生データを、サンプル花子の右わきに持って
-     くる」より。#current-state-line追加(7.69)後、3行に分かれていた
-     (名前/日付/現在値)のを2行に戻したかったが、単純にflex-wrapで
-     まとめるだけでは、#badge-line2(ellipsis指定)の"折り返さない前提の
-     フル文字列幅"がflex-wrapの折り返し判定にそのまま使われてしまい
-     (ellipsisは見た目だけ省略するだけで、レイアウト計算上のサイズには
-     関係しない)、名前+日付がいつまでも1行にまとまらなかった。名前+
-     日付を.badge-top-rowという専用のflex-wrap:nowrap行に切り出し、
-     日付側(.badge-line2-row)にflex:1 min-width:0を与えて明示的に
-     縮められるようにすることで解決。 */
-  .person-badge-lines {
-    min-width: 0; flex: 1;
-    display: flex; flex-direction: column; gap: 2px;
+  .state-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    color: var(--ink); font-family: inherit; font-size: 0.8rem; font-weight: 700;
+    cursor: pointer; white-space: nowrap; max-width: 100%;
+    transition: border-color 0.15s, background 0.15s;
   }
-  /* min-heightはスクラブボタン(.badge-scrub-btn)の高さと同じ(2026-09-26、
-     「出生図だけ、日輪の下の区切り線の高さが高い」より) -- 出生図では
-     ‹ › 今 を出さないため行がボタン分(6px)低くなり、トップバーの区切り線
-     と円の位置が他の図より上にずれていた。 */
-  .badge-top-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; min-height: 30px; }
-  /* 経過図/二重円で付く.stacked-time(setDisplayMode/updateControlAvailability
-     参照): 日時+‹›今▾の行は、名前とは無条件に別行にする。flex-wrapの
-     自然な折り返し判定だと、#badge-line2のellipsis前提の"折り返さない
-     フル文字列幅"が使われて挙動が安定しない(旧コメント参照)ため、
-     flex-basis:100%で強制的に単独行にする(測定に依存しない)。 */
-  .person-badge.stacked-time .badge-top-row { flex-wrap: wrap; }
-  .person-badge.stacked-time .badge-line2-row { flex-basis: 100%; margin-top: 2px; }
-  #badge-line1 {
-    font-size: 0.84rem; font-weight: 700; color: var(--ink);
-    flex-shrink: 0;
-    /* 折り返し(overflow-wrap)は残す -- 二重円モードで名前+種別ラベル+
-       日付が全部ここに入ることがあり、1行に収まりきらない場合の保険。 */
-    overflow-wrap: break-word;
-  }
-  .badge-place { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
-  .badge-place:hover { color: var(--accent); }
-  .badge-line2-row { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.active { border-color: var(--accent); background: var(--accent-soft); }
+  /* 押せないとき(二重円の恒星の合など)は、updateControlAvailability()が
+     opacity 0.4+pointer-events:noneにする(以前のメニュー行と同じ)。 */
+  .chip-key { color: var(--ink-faint); font-weight: 500; margin-right: 3px; }
+  .chip-caret { color: var(--ink-faint); font-size: 0.68em; margin-left: 3px; }
+  .chip.chip-empty { border-style: dashed; color: var(--ink-dim); }
+  #badge-line1 { overflow: hidden; text-overflow: ellipsis; max-width: 11em; }
+
+  .time-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  /* min-heightは‹ ›ボタンの高さ -- 出生図(ボタンなし)でも行の高さを
+     経過図と同じにして、図を切り替えても円の位置がずれないように
+     (2026-09-26の「出生図だけ区切り線が高い」と同じ理由)。 */
+  .time-main { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 30px; }
   #badge-line2 {
-    /* --ink-dim -> --ink(2026-09-04、「出生図　1990-06-15 09:30:00
-       (Asia/Tokyo)　この青灰色が、くらい」より) -- サビアン本文(7.74)と
-       同じ理由で、副次的な色のまま読むための情報(出生日時)に使われて
-       いた。 */
-    font-size: 0.8rem; color: var(--ink);
-    /* text-overflow:ellipsis追加(2026-09-03、実機iPhoneで「出生図の
-       データの右側の[みたいなやつはなんだろう」より) -- overflow:hidden
-       だけだと、幅が足りない時に文字列の途中でぶつ切りになり(タイム
-       ゾーンの"(Asia/Tokyo)"の"("だけが中途半端に見える、等)、省略され
-       ていることが伝わらず壊れて見えていた。"…"で切れていることを
-       明示する。 */
+    /* --ink-dim -> --ink(2026-09-04、「この青灰色が、くらい」より)。 */
+    font-size: 0.82rem; color: var(--ink);
+    /* text-overflow:ellipsisはブロックの箱にしか効かない(display:flex
+       では効かない、2026-09-03に実機で判明)ので、block のまま。 */
     min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
     display: block;
-    /* display:flexだとtext-overflow:ellipsisが効かない(2026-09-03、
-       実機で「7.65で直したはずの右側の[みたいなやつ」が再発している
-       のを見て判明) -- ellipsisはブロックレベルの箱にしか適用されず、
-       flexコンテナ自身には効かない(子要素は個別にellipsisできるが、
-       ここは単純なtextContentの差し込みなので子要素化していなかった)。
-       align-items:centerは元々トランジット編集モード(renderEditableTime
-       が差し込むprefixのspan+.time-seg-row)の横並び調整用だったが、
-       .time-seg-row自体が既にinline-flexで自己完結しているため、外側の
-       #badge-line2をブロック化しても実機で見た目の崩れは無いことを確認
-       済み。 */
   }
-  /* 日食/月食/四季図を表示中だけ出す1行(種類+年月日時分秒の全体)。円の上の
-     日時欄は幅が狭く、種類の文字を付けると日時のほうが「…」で省略される
-     ため、種類と日時はこちらに出す。 */
+  .badge-place-text { font-size: 0.8rem; color: var(--ink-dim); white-space: nowrap; }
+  .place-btn {
+    font: inherit; font-size: 0.8rem; color: var(--ink); cursor: pointer;
+    background: none; border: none; border-bottom: 1px dotted var(--ink-faint);
+    padding: 0 1px; white-space: nowrap;
+  }
+  .place-btn:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  .time-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .tool-btn {
+    font-family: inherit; font-size: 0.76rem; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+    border: 1px solid var(--line-strong); background: var(--bg-elevated); color: var(--accent-strong);
+  }
+  .tool-btn:hover { border-color: var(--accent); }
   #badge-special-line { font-size: 0.74rem; color: var(--accent-strong); font-weight: 700; line-height: 1.4; }
-  #current-state-line {
-    /* 7.69: 旧#settings-menuの図/起点/恒星の合ボタン(値を見せる役目
-       だった3つ)の現在値だけを、メニュー一本化後もバッジ直下に残す
-       (押しても何も起きない、単なる常時表示のテキスト行)。7.76で
-       親.person-badge-linesがflex-direction:columnになったため、
-       flex-basis:100%指定(旧flex-wrap前提)は不要になり削除した --
-       単純にcolumnの2番目の子として、自動的に.badge-top-rowの下に
-       積まれる。 */
-    font-size: 0.74rem; color: var(--ink-faint);
-    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  }
   .time-seg-row { display: inline-flex; align-items: center; }
   .time-seg {
     font: inherit; font-family: "Space Mono", "JetBrains Mono", monospace;
-    color: var(--ink-dim); background: transparent; border: none; border-radius: 4px;
+    color: var(--ink); background: transparent; border: none; border-radius: 4px;
     padding: 1px 1px; text-align: center; -webkit-appearance: none; appearance: none;
   }
   .time-seg:focus, .time-seg.active {
@@ -408,23 +377,13 @@
     display: flex; align-items: center; justify-content: center; padding: 0;
   }
   .badge-scrub-btn:hover { border-color: var(--accent); }
-  .badge-now-btn { font-size: 0.7rem; font-weight: 700; color: var(--accent-strong); margin-left: 2px; }
 
   /* ---------- Pane switcher ----------
-     #pane-tabs(スマホ専用、円・度数・アスペクト・サビアンをタブで
-     1つずつ切り替えていた行)は7.70で#main-menu-panelの「表示」グループ
-     に統合し廃止(2026-09-03、「アスペクト/サビアンを見ている時に円へ
-     戻る手段が分かりにくい...ボタンいらなくない？」より)。DOM自体は
-     残しつつdisplay:noneで非表示にした(setPane()が
-     `.pane-tabs .pane-tab-btn`をquerySelectorAllしている箇所が、要素が
-     0件でも安全にno-opするため、JS側は無変更で済む)。
-     Desktop: .data-panel-tabs(度数/アスペクト/サビアンの3ボタン、
-     .data-panel内)が同じsetPane()を呼んで.data-activeを切り替える
-     (円は元々.chart-columnsで常時表示なので専用タブ不要)。 */
-  .pane-tabs {
-    display: none; gap: 8px; width: 100%; max-width: 380px;
-    margin-top: 14px;
-  }
+     スマホ: 円の下の見出し(#sheet-pick)から「円だけ/度数/アスペクト/
+     サビアン」を選ぶ(#pane-menu、下のスマホ用media query参照)。
+     PC: .data-panel-tabs(度数/アスペクト/サビアンの3ボタン、.data-panel
+     内)が同じsetPane()を呼んで.data-activeを切り替える(円は常に左に
+     出ているので専用タブ不要)。 */
   .pane-tab-btn {
     flex: 1; padding: 8px 4px; border-radius: 999px;
     border: 1px solid var(--line-strong); background: var(--bg-elevated);
@@ -434,8 +393,23 @@
   .pane-tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg-sunken); }
   .pane-tab-btn:hover:not(.active):not(:disabled) { border-color: var(--accent); color: var(--ink); }
   /* 二重円ではアスペクト・サビアンを表示しないので、押せないことが見て
-     分かるようにする(2026-09-26) -- メニューの「恒星の合」と同じopacity。 */
-  .pane-tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+     分かるようにする(2026-09-26) -- 状態ボタンの「恒星の合」と同じopacity。 */
+  .pane-tab-btn:disabled, .pane-opt:disabled { opacity: 0.4; cursor: not-allowed; }
+  #pane-menu {
+    pointer-events: auto;
+    position: fixed; z-index: 60; min-width: 160px;
+    padding: 6px; border-radius: var(--radius-md);
+    background: var(--bg-elevated); border: 1px solid var(--line-strong); box-shadow: var(--shadow);
+    flex-direction: column; gap: 2px;
+  }
+  .pane-opt {
+    font-family: inherit; font-size: 0.9rem; text-align: left;
+    padding: 10px 14px; border: none; border-radius: 8px; background: transparent;
+    color: var(--ink); cursor: pointer;
+  }
+  .pane-opt:hover:not(:disabled) { background: var(--accent-soft); }
+  .pane-opt.active { color: var(--accent-strong); font-weight: 700; }
+  .pane-opt.active::after { content: "  \2713"; }
   .data-panel-tabs { display: none; }  /* desktop-only, see media query */
 
   .chart-columns { width: 100%; display: flex; flex-direction: column; align-items: center; }
@@ -593,7 +567,13 @@
     cursor: pointer;
     text-align: center;
   }
+  /* pointer-events:auto(2026-10-01) -- この2つは.panel-layer(pointer-events:none、
+     下の円を押せるようにするための透明な層)の中にあるため、指定しないと
+     「押せない」設定を受け継ぎ、実際に指やマウスで押すと下の円に抜けていた
+     (iPhone実機で「度数▾から切り替えられない」で発覚。プログラムから.click()
+     する自動確認では気づけなかった)。 */
   #special-popover {
+    pointer-events: auto;
     position: fixed; z-index: 60; width: min(340px, calc(100vw - 24px));
     padding: 14px; border-radius: var(--radius-md);
     background: var(--bg-elevated); border: 1px solid var(--line-strong);
@@ -615,6 +595,7 @@
     color: var(--ink);
     cursor: pointer;
     font-size: 0.84rem;
+    text-align: left;
   }
   .row-btn .row-btn-value { color: var(--accent); font-weight: 700; }
   .row-btn .chevron { font-size: 0.9rem; }
@@ -782,14 +763,20 @@
     display: flex; align-items: center; justify-content: center; font-size: 0.86rem;
     font-family: "Astronomicon", sans-serif;  /* 2026-09-05、③ */
   }
+  /* 1件 = 1行目「名前 星座名 サイン+度数」+2行目「サビアン」(2026-10-01)。
+     星座名は小さく薄い文字にしてカッコを使わず、幅が足りないときは星座名
+     だけを省略する(名前と度数は縮めない)。 */
   .conj-hit {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 4px 9px 30px;
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 4px 8px 30px;
   }
+  .conj-hit .mini-check { margin-top: 1px; }
   .conj-hit-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .conj-hit-name { font-size: 0.82rem; }
-  .conj-hit-cat { font-size: 0.74rem; color: var(--ink-faint); margin-top: 1px; }
-  .conj-hit-sep { font-size: 0.8rem; color: var(--ink-faint); flex-shrink: 0; }
+  .conj-hit-line1 { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+  .conj-hit-name { font-size: 0.88rem; color: var(--ink); flex-shrink: 0; }
+  .conj-hit-cat { font-size: 0.72rem; color: var(--ink-faint); min-width: 0; flex: 0 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .conj-hit-deg { margin-left: auto; flex-shrink: 0; font-size: 0.86rem; color: var(--ink); font-family: "Space Mono", "JetBrains Mono", monospace; }
+  .conj-hit-sabian { font-size: 0.76rem; color: var(--ink-dim); margin-top: 3px; }
   .mini-check {
     width: 18px; height: 18px; border-radius: 5px;
     border: 1.5px solid var(--line-strong);
@@ -826,6 +813,26 @@
   .pe-row { display: flex; gap: 8px; }
   .pe-row .pe-input { margin-top: 6px; flex: 1; }
   .pe-textarea { min-height: 72px; resize: vertical; }
+  /* 場所の追加・編集・削除(経過図の場所パネルと人物の出生地で共通) */
+  .row-btn.active { border-color: var(--accent); }
+  .place-actions { display: flex; gap: 16px; margin-top: 12px; }
+  .place-link {
+    font: inherit; font-size: 0.82rem; color: var(--accent-strong); cursor: pointer;
+    background: none; border: none; padding: 4px 0; text-decoration: underline;
+  }
+  .place-link-danger { color: #c0392b; }
+  .place-add-btn {
+    display: block; width: 100%; margin-top: 14px; padding: 11px 12px;
+    font: inherit; font-size: 0.86rem; font-weight: 700; color: var(--accent-strong);
+    background: var(--bg-elevated); border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .place-add-btn:hover { border-color: var(--accent); }
+  .place-form {
+    margin-top: 14px; padding: 14px; border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm); background: var(--bg-sunken);
+  }
+  .place-form-error { color: #c0392b; }
 
   /* bottom back-nav for sub-screens */
   .subnav {
@@ -841,11 +848,70 @@
   .subnav h2 { font-size: 1rem; }
 
   .flow-note {
-    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%);
     background: var(--ink); color: var(--bg);
     font-size: 0.78rem; padding: 7px 14px; border-radius: 999px;
     z-index: 50; opacity: 0.88; pointer-events: none;
     white-space: nowrap;
+  }
+
+  /* ---------- スマホ: 円の下の引き出し(2026-10-01) ----------
+     「円」タブは円だけ。度数・アスペクト・サビアンのタブは、円の位置と大きさは
+     そのままに、円の下から画面下のタブまでの空きに一覧を出す(一覧は枠の中で
+     スクロール)。見出しの行(.sheet-head)を上にシュッ/押すと一覧が画面いっぱい
+     (.sheet-expanded、円を隠す)、下にシュッ/押すと戻る。PCは使わない。
+     そのために、図の画面だけは.app自体を画面の高さに固定し、ページ全体では
+     なく中の枠をスクロールさせる。 */
+  .sheet-head { display: none; }
+  @media (max-width: 899.98px) {
+    .desktop-only { display: none !important; }
+    .app.on-chart { height: 100vh; height: 100dvh; min-height: 0; }
+    .chart-stage { overflow-y: auto; overscroll-behavior: contain; }
+    .chart-columns { flex: 1 1 auto; min-height: 0; }
+    #pane-wheel { flex: none; }
+    /* 見出しの行は「円だけ」のときも出す(そこから選び直すため)。 */
+    .data-panel {
+      display: flex; flex-direction: column; flex: none; max-width: none;
+      margin-top: 4px; border-top: 1px solid var(--line-strong);
+    }
+    .chart-stage.with-sheet .data-panel {
+      flex: 1 1 auto; min-height: 48px;  /* 小さい画面でも見出しの行は見えるように(押せば広がる) */
+    }
+    .chart-stage:not(.with-sheet) .sheet-arrow { visibility: hidden; }
+    /* 「円だけ」のときは、見出しの行「円だけ▾」を画面の一番下に置き、円との間を
+       空ける(2026-10-01、「円だけを選択したときだけ、表示を一番下に配置して、
+       円と空間がひろくあくように」より)。 */
+    .chart-stage:not(.with-sheet) .data-panel { margin-top: auto; }
+    .chart-stage.with-sheet:not(.sheet-expanded) #pane-wheel { display: flex; flex-direction: column; align-items: center; }
+    .chart-stage.with-sheet.sheet-expanded #pane-wheel { display: none; }
+    .chart-stage.with-sheet.sheet-expanded .data-panel { margin-top: 4px; }
+    .data-panel .pane-content.mobile-active { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+    .sheet-head {
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+      position: relative; padding: 9px 0 2px;
+      touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+    }
+    /* 上のバーを薄く(2026-10-01、一覧に使える高さを増やすため、スマホのみ)。 */
+    .topbar { padding: 9px 16px 8px; }
+    .settings-btn { padding: 5px 11px; }
+    .sheet-grip {
+      position: absolute; left: 50%; top: 3px; transform: translateX(-50%);
+      width: 40px; height: 4px; border-radius: 2px; background: var(--line-strong);
+    }
+    .sheet-pick {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-family: inherit; font-size: 0.84rem; font-weight: 700; color: var(--ink);
+      padding: 3px 12px; border-radius: 999px; cursor: pointer;
+      border: 1px solid var(--line-strong); background: var(--bg-elevated);
+    }
+    /* 一覧に使える高さを増やすため、円の上下の余白を詰める(円の大きさは同じ)。 */
+    .chart-stage { padding-top: 6px; }
+    .wheel-wrap { margin-top: 4px; }
+    .data-panel .legend-grid, .data-panel .sabian-list { margin-top: 2px; }
+    .sheet-arrow {
+      margin-left: auto; font-size: 0.75rem; color: var(--ink-dim); cursor: pointer;
+      width: 34px; height: 30px; border: none; background: transparent;
+    }
   }
 
   /* ---------- Desktop layout (wide viewport) ----------
@@ -933,9 +999,9 @@
        かなー」より。 */
     .topbar { padding: 8px 20px 6px; }
     .icon-btn { width: 28px; height: 28px; font-size: 0.85rem; }
-    .person-badge { top: 8px; }
+    .settings-btn { padding: 5px 11px; font-size: 0.78rem; }
     .badge-scrub-btn { width: 24px; height: 24px; font-size: 1.1rem; }
-    .badge-top-row { min-height: 24px; }  /* ボタンの高さに合わせる(上の.badge-top-rowのコメント参照) */
+    .time-main { min-height: 24px; }  /* ボタンの高さに合わせる(上の.time-mainのコメント参照) */
 
     /* 人物バッジ(名前・日時・トランジットのスクラブボタン)をトップ
        バーへ物理移動(2026-09-03、「バッジ行を...トップバーに統合」より)
@@ -953,11 +1019,14 @@
        参照)ので、幅いっぱいに広がると他のトップバー要素を押しのけて
        しまう。ここで打ち消してコンテンツ幅に戻す(2026-09-03、モバイル
        側のposition:absolute->static修正に合わせて追加)。 */
-    .person-badge { position: static; top: auto; width: auto; padding: 0; margin-top: 0; }
-    #topbar-badge-slot { display: flex; align-items: center; }
-    #topbar-badge-slot .person-badge { gap: 6px; }
-    #topbar-badge-slot #badge-line1 { font-size: 0.78rem; }
-    #topbar-badge-slot #badge-line2 { font-size: 0.74rem; }
+    /* 状態ボタン(22px)+日時の行(24px)+間3px。円の高さ予算(下の#pane-wheelの
+       81px)を、メニュー再設計の前(2026-10-01)と同じに保つための値(実測)。 */
+    .person-badge { position: static; width: auto; padding: 0; margin-top: 0; gap: 3px; }
+    #topbar-badge-slot { display: flex; align-items: center; flex: 1; min-width: 0; }
+    #topbar-badge-slot .chip { padding: 2px 9px; font-size: 0.74rem; line-height: 1.3; }
+    #topbar-badge-slot #badge-line2 { font-size: 0.76rem; }
+    .tool-btn { padding: 2px 9px; font-size: 0.72rem; }
+    /* PCは円が常に左、度数などは右のタブで切り替えるので、画面下のタブは使わない。 */
 
     /* Side-by-side: 円(左)+ データパネル(右)を一枚で(2026-08-31の相談
        "PCでは円表示とデータを一枚で表示したい"より)。円・データパネル
@@ -1097,7 +1166,9 @@
        (1365×728相当)で円の上のchrome合計が88px->76pxに縮小、5px弱の
        安全マージンを足して81pxとした。 */
     #pane-wheel { display: flex !important; flex-direction: column; align-items: center; width: min(68vw, calc(100vh - 81px), 820px); }
-    .wheel-wrap { max-width: min(68vw, calc(100vh - 81px), 820px); margin-top: 6px; }
+    /* margin-top 6px -> 0(2026-10-01) -- トップバーに状態ボタンの段が増えた分を
+       ここで相殺し、円の大きさを再設計前と同じに保つ。 */
+    .wheel-wrap { max-width: min(68vw, calc(100vh - 81px), 820px); margin-top: 0; }
 
     /* min(22vw,360px)固定幅 -> flex:1で余った横幅を埋める方式に変更
        (2026-09-01、「やたらと開いている空間をもっと利用できないか」より)
@@ -1171,10 +1242,12 @@
 
   <!-- ============ TOP BAR ============ -->
   <div class="topbar">
-    <div class="brand">
+    <!-- ロゴを押すとホーム(人物選択)へ(2026-10-01、メニュー再設計 --
+         旧⌂アイコンの役目をロゴに移した)。 -->
+    <button class="brand" onclick="showView('person-select')" title="ホーム(人物選択)に戻る">
       <span class="brand-mark">日輪</span>
       <span class="brand-sub">HELIO&nbsp;WHEEL</span>
-    </div>
+    </button>
     <!-- Desktop-only home for #person-badge, physically moved here by
          layoutBadgeForWidth() (2026-09-03, "バッジ行を...トップバーに
          統合" -- #badge-line1/#badge-line2/the scrub buttons are all
@@ -1183,36 +1256,20 @@
          container it's currently sitting in). -->
     <div class="topbar-badge-slot" id="topbar-badge-slot"></div>
     <div class="topbar-actions">
-      <!-- 7.72: 👁(表示)・◎(図の種類・種別)の2アイコンを☰の左に追加
-           (2026-09-04、「目のアイコンと、図の種類のアイコンと、三本線の
-           メニュー、この三つが横になれば解決しませんかね」より)。
-           絵文字(👁等)や特殊なUnicode記号(◎等)は、サイン記号(♐)や
-           エリス(⯰)と同じフォント依存問題を新たに持ち込むため使わず、
-           ☰と同じ発想の手描きSVG線画にした(stroke="currentColor"で
-           .icon-btnの文字色をそのまま継承、ホバー色も自動追従)。 -->
-      <!-- ホームボタン(2026-09-11、フィードバック「いろいろいじったあと、
-           最初の表示に戻ることができなかった」より) -- 常にVIEW 1(人物
-           選択画面)へ戻るだけの単純な導線。他のアイコンと同じ手描きSVG
-           線画スタイル(家の形)。 -->
-      <button class="icon-btn" id="icon-btn-home" title="ホーム(人物選択に戻る)" onclick="showView('person-select')">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-          <path d="M4 12L12 5L20 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M6 10.5V19H18V10.5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+      <!-- 2026-10-01、メニュー再設計: ⌂(ホーム)👁(表示)◎(図の種類)☰(設定)の
+           4アイコンを「⚙ 設定」1つにした。人物・図の種類・起点・恒星の合は、
+           円の上の状態ボタン(#state-chips)を押して直接変える。度数・
+           アスペクト・サビアンは、PCは右のタブ、スマホは画面下のタブ。
+           ここに残すのは、あまり変えない好み(表示オプション・ダーク
+           モード・このアプリについて)だけ。アイコンだけだと何のボタンか
+           分からないので、文字も添える。 -->
+      <button class="settings-btn" id="icon-btn-settings" title="設定" onclick="openSettingsMenu()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
+        <span>設定</span>
       </button>
-      <button class="icon-btn" id="icon-btn-view" title="表示(円・度数・アスペクト・サビアン)" onclick="openViewMenu()">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-          <path d="M2 12C2 12 6.2 6 12 6C17.8 6 22 12 22 12C22 12 17.8 18 12 18C6.2 18 2 12 2 12Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-          <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
-        </svg>
-      </button>
-      <button class="icon-btn" id="icon-btn-chart-type" title="図の種類・種別" onclick="openChartTypeMenu()">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
-          <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/>
-        </svg>
-      </button>
-      <button class="icon-btn" id="icon-btn-main-menu" title="メニュー" onclick="openMainMenu()">☰</button>
     </div>
   </div>
 
@@ -1253,49 +1310,44 @@
 
   <!-- ============ VIEW 2: メインチャート ============ -->
   <div class="view" id="view-chart">
-    <!-- 7.69: 図/起点/種別/表示/恒星の合/サビアンの6ボタン(旧#settings-menu)
-         を、トップバーの☰1つ(メニュー)にまとめた(2026-09-03、「メニュー
-         を一本化すると、円を大きく表示できますか？」より、円の上の帯を
-         1段丸ごと消せるので効果が大きいと判断)。実際のパネル(mode-panel
-         等)は変更なし、入り口だけ#main-menu-panel(下のside-panel群を
-         参照)に統一。「今何を見ているか」が分からなくならないよう、
-         図/起点/恒星の合(元々値を見せていた3つ)の現在値だけは、下の
-         バッジのすぐ下に#current-state-lineとして常時表示を残した
-         (案B、「現在値はメニューを開かないと見えない」案Aとの比較で
-         ユーザーと合意)。 -->
     <div class="chart-stage">
+      <!-- 円の上の「今の状態」(2026-10-01、メニュー再設計) -- 「見えている
+           文字を押せば、それが変わる」。1段目は状態ボタン(人物/図の種類/
+           起点/恒星の合)、2段目は日時(出生図は出生日時と出生地、経過図・
+           二重円は ‹ 日時 › 場所 [今] [日食・四季へ] と送る単位)。
+           PCでは丸ごとトップバーへ移す(layoutBadgeForWidth()、idは
+           person-badgeのまま)。 -->
       <div class="person-badge" id="person-badge">
-        <span class="dot"></span>
-        <div class="person-badge-lines">
-          <div class="badge-top-row">
-            <div id="badge-line1" onclick="showView('person-select')" style="cursor:pointer;" title="タップして人物を切り替え">サンプル花子</div>
-            <div class="badge-line2-row">
-              <button class="badge-scrub-btn" id="badge-scrub-prev" style="display:none;" title="選択中の単位を戻す(長押し/ホイールでも)">‹</button>
-              <span class="mono" id="badge-line2">出生図 1990-06-15 09:30:00</span>
-              <button class="badge-scrub-btn" id="badge-scrub-next" style="display:none;" title="選択中の単位を進める(長押し/ホイールでも)">›</button>
-              <button class="badge-scrub-btn badge-now-btn" id="badge-now-btn" style="display:none;" title="今に戻す / 日食・春分などへ移動" onclick="toggleSpecialMenu(event)">今▾</button>
-            </div>
-          </div>
-          <div id="badge-special-line" style="display:none;"></div>
-          <div id="current-state-line">図: <span id="menu-mode-label">出生図</span>　起点: <span id="menu-ref-label">トロピカル</span>　<span id="menu-conj-label">恒星の合</span></div>
+        <div class="state-chips" id="state-chips">
+          <button class="chip" id="chip-person" onclick="showView('person-select')"><span id="badge-line1">サンプル花子</span><span class="chip-caret">▾</span></button>
+          <button class="chip" id="chip-mode" onclick="openChipPanel('chart-type-panel', this)"><span id="menu-mode-label">出生図</span><span class="chip-caret">▾</span></button>
+          <button class="chip" id="menu-ref-btn" onclick="openChipPanel('ref-panel', this)"><span class="chip-key">起点</span><span id="menu-ref-label">トロピカル</span><span class="chip-caret">▾</span></button>
+          <button class="chip" id="menu-conj-btn" onclick="openChipPanel('conj-panel', this)"><span id="menu-conj-label">恒星の合</span><span class="chip-caret">▾</span></button>
         </div>
+        <div class="time-line" id="time-line">
+          <div class="time-main">
+            <button class="badge-scrub-btn" id="badge-scrub-prev" style="display:none;" aria-label="戻す">‹</button>
+            <span class="mono" id="badge-line2">1990-06-15 09:30:00</span>
+            <button class="badge-scrub-btn" id="badge-scrub-next" style="display:none;" aria-label="進める">›</button>
+            <span class="badge-place-text" id="badge-place"></span>
+          </div>
+          <div class="time-tools" id="time-tools" style="display:none;">
+            <button class="tool-btn" id="badge-now-btn" onclick="resetTransitToNow()">今</button>
+            <button class="tool-btn" id="badge-jump-btn" onclick="toggleSpecialMenu(event)">日食・四季へ<span class="chip-caret">▾</span></button>
+          </div>
+        </div>
+        <div id="badge-special-line" style="display:none;"></div>
       </div>
 
-      <!-- Mobile: switches which single pane is visible (円/度数/アスペ
-           クト/サビアン). Desktop: the 円 button is hidden (the wheel is
-           always shown in its own column there) and the other 3 instead
-           control which pane shows in .data-panel alongside it -- see
-           setPane() and the desktop media query. -->
-      <div class="pane-tabs" id="pane-tabs">
-        <button class="pane-tab-btn active" data-pane="wheel" onclick="setPane('wheel')">円</button>
-        <button class="pane-tab-btn" data-pane="degrees" onclick="setPane('degrees')">度数</button>
-        <button class="pane-tab-btn" data-pane="aspects" onclick="setPane('aspects')">アスペクト</button>
-        <button class="pane-tab-btn" data-pane="sabian" onclick="setPane('sabian')">サビアン</button>
-      </div>
+      <!-- スマホの「円/度数/アスペクト/サビアン」の切り替えは、画面下のタブを
+           やめて、円の下の見出し(#sheet-pick「度数▾」など)から選ぶ形にした
+           (2026-10-01、「サビアンという文字そのものをボタンみたいに…日食、
+           四季へと同じように選べる方式」より)。下のタブのぶん、一覧が広く
+           なる。PCは右の.data-panel-tabsのまま。 -->
 
       <div class="chart-columns">
         <div class="pane-content mobile-active" id="pane-wheel">
-          <div class="wheel-wrap" tabindex="0" title="トランジット表示中は↑↓キーやホイールで日時を送れます">
+          <div class="wheel-wrap" tabindex="0">
             <!-- viewBox 0 0 400 400 -> -50 -50 500 500(2026-09-03、「円の
                  外側に恒星、つぎにサイン、その次、度数表示エリア、惑星
                  サインエリア...」の帯レイアウト作り直しより) -- 中心
@@ -1387,7 +1439,16 @@
           </div>
         </div>
 
-        <div class="data-panel">
+        <div class="data-panel" id="data-panel">
+          <!-- スマホ専用の引き出しの見出し(2026-10-01) -- 円の下に一覧を出したとき、
+               ここを上にシュッとするか押すと一覧が画面いっぱいに広がり(円を隠す)、
+               下にシュッとするか押すと円+一覧に戻る(wireSheetHandle()参照)。
+               一覧の中身は普通にスクロールできるよう、つかむ場所はこの行だけ。 -->
+          <div class="sheet-head" id="sheet-head">
+            <span class="sheet-grip"></span>
+            <button class="sheet-pick" id="sheet-pick" onclick="togglePaneMenu(event)"><span id="sheet-title">度数</span><span class="chip-caret">▾</span></button>
+            <button class="sheet-arrow" id="sheet-arrow" aria-label="一覧を広げる/戻す">▲</button>
+          </div>
           <!-- Desktop-only tab row (mirrors pane-tabs minus 円) -- see
                .data-panel-tabs in the desktop media query. -->
           <div class="data-panel-tabs">
@@ -1426,17 +1487,16 @@
         <h2>設定</h2>
         <button class="icon-btn" onclick="closeAllPanels()">✕</button>
       </div>
+      <!-- 2026-10-01、メニュー再設計: 起点・恒星の合は円の上の状態ボタンへ、
+           経過図の場所は日時の横の地名ボタンへ移した。ここには、あまり
+           変えない好みだけを残す。 -->
       <div class="panel-body" style="display:flex; flex-direction:column; gap:8px;">
-        <button class="row-btn" id="menu-ref-btn" onclick="closeAllPanels(); openPanel('ref-panel');"><span>起点(トロピカル/恒星)</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); openPanel('display-panel');"><span>表示オプション(度数・恒星名・アスペクト)</span><span class="chevron">›</span></button>
-        <button class="row-btn" id="menu-conj-btn" onclick="closeAllPanels(); openPanel('conj-panel');"><span>恒星・銀河との合</span><span class="chevron">›</span></button>
-        <!-- 2026-09-11: 「経過図(今)を見る」の日付表示に使う場所(タイム
-             ゾーン)。天体位置の計算自体には影響しない、表示専用。 -->
-        <button class="row-btn" id="menu-tz-btn" onclick="openTransitPlacePanel();"><span>経過図の場所(<span id="menu-tz-label">東京</span>)</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('usage-panel');"><span>使い方</span><span class="chevron">›</span></button>
+        <button class="row-btn" onclick="closeAllPanels(); openPanel('display-panel');"><span>表示オプション(円の中の度数・アスペクト・小惑星)</span><span class="chevron">›</span></button>
         <!-- 7.71: トップバーの◐(テーマ切替)をここへ移動(2026-09-04、
              「三本線のメニューの右にあるダークモード選択のアイコンは
              Menuに入れてもいいのではないだろうか」より)。他のトグル
-             (度数表示・恒星名表示・アスペクト線)と見た目を揃えるため、
+             (度数表示・アスペクト線)と見た目を揃えるため、
              row-btn一覧の中でもここだけtoggle-row(スイッチ)にした。 -->
         <button class="row-btn" onclick="closeAllPanels(); openPanel('about-panel');"><span>このアプリについて・ご利用にあたって</span><span class="chevron">›</span></button>
         <div class="row-btn" style="cursor:default;">
@@ -1445,6 +1505,56 @@
             <div class="switch on" id="theme-switch" onclick="toggleThemeSwitch(this)"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ---- side panel: 使い方(2026-10-01) ----
+         操作の説明は画面に出さず(マウスを乗せたときの説明なども出さない)、
+         ここにまとめる(「まにゅあるよんでーってかんじ」より)。 -->
+    <div class="side-panel" id="usage-panel">
+      <div class="panel-head">
+        <h2>使い方</h2>
+        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
+      </div>
+      <div class="panel-body about-body">
+        <h3>図を変える</h3>
+        <ul>
+          <li>円の上のボタン(人物・図の種類・起点・恒星の合)を押すと、それぞれを変えられます。</li>
+          <li>左上の「日輪」を押すと、最初の画面(人物を選ぶ画面)に戻ります。</li>
+        </ul>
+
+        <h3>経過図の日時を動かす</h3>
+        <ul>
+          <li>日時の数字(年・月・日・時・分・秒)のどれかを押すと、その数字の色が変わります。これが「動かす単位」です。</li>
+          <li>‹ › を押すと、その単位ずつ戻る/進みます。押したままにすると、続けて動きます。</li>
+          <li>PCでは、円の上でマウスのホイールを回すか、円を押してから ↑↓ キーでも動かせます。</li>
+          <li>数字を押してから、そのまま数字を入力することもできます。入力したら Enter を押すか、別の場所を押すと反映されます。</li>
+          <li>「今」で今の日時に戻ります。「日食・四季へ」で、日食・月食・春分などの瞬間へ移動できます。</li>
+          <li>日時の右の地名を押すと、日時をどの場所の時計で表示するかを変えられます(天体の位置は変わりません)。</li>
+        </ul>
+
+        <h3>場所(経過図の場所・出生地)</h3>
+        <ul>
+          <li>人物を選んで経過図を見るときは、日時はその人物の出生地の時計で表示されます。地名を押して別の場所を選ぶと、その人物を見ている間だけ、その場所の時計になります(人物を切り替えると、その人の出生地に戻ります)。場所の一覧の一番上の「出生地」を押すと、いつでも出生地に戻せます。</li>
+          <li>「経過図(今)を見る」(人物を選ばない)ときは、選んだ場所がそのまま保存され、次からもその場所で始まります。最初は東京です。</li>
+          <li>「今」を見ているときに場所を変えると、同じ瞬間をその場所の時計で表示します(図は変わりません)。日時を動かしたり入力したりしたあとで場所を変えると、時計の数字はそのままで、その場所のその時刻として読み直します(図が変わります)。たとえば、東京とスコットランドで同じ10月1日14時にすると、天体の位置は違います。</li>
+          <li>場所は「国」→「都市」の順に選びます。人物の出生地も同じで、都市を選ぶとタイムゾーンと緯度経度が自動で入ります。日本は、都道府県からも選べます。</li>
+          <li>一覧にない場所は、「+ 場所を追加」で自分で足せます。地名を入れ、時刻の決め方を「同じ時刻の都市を選ぶ」か「緯度・経度を入れる」から選びます(緯度経度のときは、タイムゾーンを自動で判定します。インターネットに接続している必要があります)。足した場所は、国の一覧の「自分で追加した場所」にまとまり、選ぶと「この場所を編集」「この場所を削除」が出ます。</li>
+          <li>自分で追加した場所は、この端末のブラウザの中に保存されます(人物のデータと同じで、端末ごとです)。ブラウザのデータを消すと、なくなります。位置情報を自動で取得することはありません。</li>
+        </ul>
+
+        <h3>度数・アスペクト・サビアン</h3>
+        <ul>
+          <li>PC: 円の右のタブで切り替えます。</li>
+          <li>スマホ: 円の下の「度数▾」などを押して、円だけ/度数/アスペクト/サビアンから選びます。</li>
+          <li>スマホで一覧を大きく見たいときは、一覧の見出し(━ のある行)を上にシュッとするか、右端の ▲ を押します。戻すときは、下にシュッとするか、▼ を押します。</li>
+        </ul>
+
+        <h3>恒星・銀河との合</h3>
+        <ul>
+          <li>円の上の「恒星の合」を押すと、合になっている星の一覧(名前・星座・サイン・度数・サビアン)が見られます。</li>
+          <li>PCでは、チェックした星が円の外側に「名前 サイン 度数」で出ます。まとめて消したいときは、一覧の上のスイッチを切ります。</li>
+        </ul>
       </div>
     </div>
 
@@ -1492,27 +1602,20 @@
       </div>
     </div>
 
-    <!-- ---- side panel: 👁 表示(円/度数/アスペクト/サビアン、旧7.70で
-         ☰に統合していたものを7.72で独立icon化) ---- -->
-    <div class="side-panel" id="view-menu-panel">
-      <div class="panel-head">
-        <h2>表示</h2>
-        <button class="icon-btn" onclick="closeAllPanels()">✕</button>
-      </div>
-      <div class="panel-body" style="display:flex; flex-direction:column; gap:8px;">
-        <button class="row-btn" onclick="closeAllPanels(); setPane('wheel');"><span>円(チャート)</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('degrees');"><span>度数</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('aspects');"><span>アスペクト</span><span class="chevron">›</span></button>
-        <button class="row-btn" onclick="closeAllPanels(); setPane('sabian');"><span>サビアン</span><span class="chevron">›</span></button>
-      </div>
+    <!-- 経過図の日時を日食・月食・四季図へ移動/前後へ。円の上の日時欄の
+         「日食・四季へ▾」から開く(「今に戻る」は2026-10-01に独立した
+         「今」ボタンへ分けた)。パネルの外に置いて、出す/隠すで円の大きさ
+         が変わらない(絶対配置のポップアップ)ようにしている。 -->
+    <!-- スマホの見出し「度数▾」などから開く、表示するものの選択(2026-10-01)。
+         見出しは画面の下の方にあるので、上向きに開く(togglePaneMenu())。 -->
+    <div id="pane-menu" style="display:none;">
+      <button class="pane-opt" data-pane="wheel" onclick="pickPane('wheel')">円だけ</button>
+      <button class="pane-opt" data-pane="degrees" onclick="pickPane('degrees')">度数</button>
+      <button class="pane-opt" data-pane="aspects" onclick="pickPane('aspects')">アスペクト</button>
+      <button class="pane-opt" data-pane="sabian" onclick="pickPane('sabian')">サビアン</button>
     </div>
-
-    <!-- 経過図の日時を移動(今に戻る/日食・月食・四季図へ移動/前後へ)。
-         円の上の日時欄の「今▾」から開く。パネルの外に置いて、出す/隠すで
-         円の大きさが変わらない(絶対配置のポップアップ)ようにしている。 -->
     <div id="special-popover" style="display:none;">
         <div id="t-jump-section">
-        <button class="seg-btn" style="width:100%; margin-bottom:12px; font-weight:700;" onclick="resetTransitToNow(); closeSpecialMenu();">今の日時に戻る</button>
         <span class="field-label" id="t-jump-label">経過図の日時を移動</span>
         <!-- 四季図(春分/夏至/秋分/冬至)も日食/月食と同じく実際に検索して
              ジャンプできるようにした(2026-09-10、「四季図も、次の春分、
@@ -1637,10 +1740,12 @@
       </div>
       <div class="panel-body">
         <p class="scrub-note" style="margin-top:0;">経過図の日付・時刻を、選んだ場所の時計で表示します。「今」の天体の位置は、どの場所を選んでも同じです。日時を手で入力したときは、選んだ場所の時刻として読みます。</p>
+        <button type="button" class="row-btn" id="tz-birth-btn" style="display:none; width:100%; margin:14px 0 16px;" onclick="applyBirthPlaceToTransit()"><span>出生地(<span id="tz-birth-label"></span>)</span><span class="row-btn-value" id="tz-birth-check"></span></button>
         <label class="field-label" for="tz-country-select">国</label>
-        <select id="tz-country-select" class="pe-input" onchange="applyTransitCountrySelection()"></select>
+        <select id="tz-country-select" class="pe-input" onchange="onPlaceCountryChange('tz')"></select>
         <label class="field-label" for="tz-select" style="margin-top:14px;">都市</label>
-        <select id="tz-select" class="pe-input" onchange="applyTransitTimezoneSelection()"></select>
+        <select id="tz-select" class="pe-input" onchange="onPlaceCityChange('tz')"></select>
+        <div id="tz-place-tools"></div>
       </div>
     </div>
 
@@ -1655,8 +1760,11 @@
           恒星・銀河との合は、二重円では表示しません(情報量が多すぎるため)。
         </div>
         <div class="star-conj-control">
-          <div class="toggle-row">
-            <span class="field-label" style="margin-bottom:0;">恒星・銀河との合(コンジャンクション)を表示</span>
+          <!-- 書き方を変更(2026-10-01、「名前＋サイン＋度数はセットで、表示するか
+               非表示にするかの切り替えができれば十分」より) -- 円の外の表示だけを
+               切り替えるスイッチ(一覧は消えない)。スマホは円の外に出さないので隠す。 -->
+          <div class="toggle-row desktop-only">
+            <span class="field-label" style="margin-bottom:0;">円の外に恒星を表示(名前・サイン・度数)</span>
             <div class="switch on" id="conj-switch" onclick="toggleSwitch(this); buildChart();"></div>
           </div>
           <!-- 検索範囲の3分類(2026-09-10、「恒星リスト選択はGCS/主要な
@@ -1679,7 +1787,7 @@
           <div id="conj-groups"></div>
 
           <p style="font-size: 0.8rem; color:var(--ink-faint); line-height:1.6; margin-top:16px;">
-            チェックした星だけが図の外周にマーク表示されます。選択はすぐに反映されます。出生図・経過図それぞれ、選択中の人物・瞬間の実際の位置で毎回計算しています。
+            チェックした星は、PCでは円の外側に名前とサイン・度数を表示します(スマホでは、この一覧で見られます)。度数とサビアンは、図と同じ起点で数えています。出生図・経過図それぞれ、選択中の人物・瞬間の実際の位置で毎回計算しています。
           </p>
         </div>
       </div>
@@ -1699,7 +1807,7 @@
             <span class="field-label" style="margin-bottom:0;">円の中に度数を表示</span>
             <div class="switch on" id="wheel-degree-switch" onclick="toggleSwitch(this); updateWheelDegreeVisibility();"></div>
           </div>
-          <p class="scrub-note" style="margin-top:8px;">円の下の度数リストは、「度数」タブでいつでも見られます。</p>
+          <p class="scrub-note" style="margin-top:8px;">度数の一覧は、「度数」タブでいつでも見られます。</p>
         </div>
 
         <div class="panel-section">
@@ -1709,24 +1817,15 @@
         </div>
 
         <div class="panel-section conj-only-control">
-          <div class="panel-section-label">恒星名</div>
-          <div class="toggle-row">
-            <span class="field-label" style="margin-bottom:0;">円の中に恒星名を表示</span>
-            <div class="switch on" id="star-name-switch" onclick="toggleSwitch(this); drawConjunctionMarkers();"></div>
-          </div>
-          <p class="scrub-note" style="margin-top:8px;">オフにすると円の外側は★/◆マークだけになり、名前は「恒星の合」パネルでいつでも見られます(初期値はスマホ幅ではオフ、PC幅ではオンです)。</p>
-        </div>
-
-        <div class="panel-section conj-only-control">
           <div class="panel-section-label">アスペクト</div>
           <div class="toggle-row">
             <span class="field-label" style="margin-bottom:0;">円の中にアスペクト線を表示</span>
             <div class="switch on" id="aspect-switch" onclick="toggleSwitch(this); redrawAspects();"></div>
           </div>
-          <p class="scrub-note" style="margin-top:8px;">円の下のアスペクト表は、「アスペクト」タブでいつでも見られます。対象は、上で表示を選んだ天体(主要9天体+チェックした小惑星)です。</p>
+          <p class="scrub-note" style="margin-top:8px;">アスペクトの表は、「アスペクト」タブでいつでも見られます。対象は、上で表示を選んだ天体(主要9天体+チェックした小惑星)です。</p>
           <div id="aspect-type-list" style="margin-top:8px;"></div>
           <p class="scrub-note" style="margin-top:10px;">数字は各アスペクトのオーブ(許容する度数のずれ、0〜15度・0.5度きざみ)です。出生図には「出生図」の列、経過図には「経過図」の列を使います。変えるとすぐ反映され、次回も同じ値で開きます。</p>
-          <button class="orb-reset-btn" onclick="resetAspectOrbs()">松村潔基準に戻す</button>
+          <button class="orb-reset-btn" onclick="resetAspectOrbs()">初期値に戻す</button>
         </div>
       </div>
     </div>
@@ -1790,13 +1889,16 @@
       <select id="pe-pref" class="pe-input" onchange="applyPrefectureToPersonEdit()">
         <option value="">都道府県から選ぶ(緯度経度を自動入力)</option>
       </select>
+      <select id="pe-country" class="pe-input" style="margin-top:8px;" onchange="onPlaceCountryChange('pe')"></select>
+      <select id="pe-city" class="pe-input" style="margin-top:8px;" onchange="onPlaceCityChange('pe')"></select>
+      <div id="pe-place-tools"></div>
       <input type="text" id="pe-place" class="pe-input" style="margin-top:8px;" placeholder="例: 東京都渋谷区(自由入力、任意で詳しく)">
 
       <div class="pe-row" style="margin-top:8px;">
         <input type="text" id="pe-lat" class="pe-input" placeholder="緯度 (例: 35.66)">
         <input type="text" id="pe-lon" class="pe-input" placeholder="経度 (例: 139.70)">
       </div>
-      <p class="scrub-note" style="margin-top:6px;">ヘリオセントリック(太陽中心)図はハウスを使わないため、緯度経度は時差の判定にしか影響しません。都道府県レベルの精度で十分です。海外の場合は下の緯度経度欄に直接入力してください。</p>
+      <p class="scrub-note" style="margin-top:6px;">ヘリオセントリック(太陽中心)図はハウスを使わないため、緯度経度は時差の判定にしか影響しません。都道府県レベルの精度で十分です。海外の場合は、上の「国から選ぶ」か、下の緯度経度欄に直接入力してください。</p>
 
       <span class="field-label" style="margin-top:8px;">タイムゾーン<span id="pe-tz-auto" style="font-weight:normal; color:var(--ink-faint);"></span></span>
       <input type="text" id="pe-tz" class="pe-input" placeholder="例: Asia/Tokyo">
@@ -1863,6 +1965,9 @@
   function showView(name) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + name).classList.add('active');
+    // 図を見ていない画面(人物選択など)では、トップバーに前の図の状態
+    // ボタンや「設定」を出さない(2026-10-01、紛らわしいため)。
+    document.getElementById('app').classList.toggle('on-chart', name === 'chart');
     closeAllPanels();
   }
 
@@ -1969,13 +2074,33 @@
     const sel = document.getElementById('pe-pref');
     if (!sel.value) return;
     const [name, lat, lon] = sel.value.split('|');
-    const placeEl = document.getElementById('pe-place');
-    if (!placeEl.value.trim()) placeEl.value = name;
+    setPersonPlaceNameAuto(name);
+    refreshPlaceSelects('pe', null);  // 国・都市の選択は外す(どちらか一方で選ぶ)
     const latEl = document.getElementById('pe-lat');
     const lonEl = document.getElementById('pe-lon');
     latEl.value = lat;
     lonEl.value = lon;
     latEl.dispatchEvent(new Event('change'));
+  }
+  // 出生地の地名欄: 空か、前に自動で入れた名前のままなら選んだ場所の名前に
+  // 書き換える(自分で書き直した名前は消さない)。
+  function setPersonPlaceNameAuto(name) {
+    const placeEl = document.getElementById('pe-place');
+    if (!placeEl.value.trim() || placeEl.value === placeEl.dataset.auto) {
+      placeEl.value = name;
+      placeEl.dataset.auto = name;
+    }
+  }
+  // 「国から選ぶ」で選んだ場所(一覧の都市・自分で追加した場所)を出生地欄に
+  // 入れる -- 緯度経度とタイムゾーンが自動で入る(タイムゾーンは選んだ場所の
+  // ものをそのまま使う)。
+  function applyPlaceToPersonEdit(place) {
+    setPersonPlaceNameAuto(personPlaceLabel(place));
+    document.getElementById('pe-pref').value = '';
+    document.getElementById('pe-lat').value = place.lat;
+    document.getElementById('pe-lon').value = place.lon;
+    document.getElementById('pe-tz').value = place.tz;
+    document.getElementById('pe-tz-auto').textContent = '(選んだ場所から自動入力)';
   }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2120,6 +2245,8 @@
     nType = 'normal';
     tSpecialMoment = null;
     transitTime = Date.now();
+    transitIsLive = true;
+    resetTransitPlaceFor(personRecord);  // 経過図の場所はこの人物の出生地から始める
     displayMode = 'N';
     document.getElementById('t-eclipse-stepper').style.display = 'none';
     document.querySelectorAll('.display-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.display === 'N'));
@@ -2153,6 +2280,8 @@
     nType = 'normal';
     tSpecialMoment = null;
     transitTime = Date.now();
+    transitIsLive = true;
+    resetTransitPlaceFor(null);  // 人物なし: いつもの経過図の場所
     displayMode = 'T';
     document.getElementById('t-eclipse-stepper').style.display = 'none';
     document.querySelectorAll('.display-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.display === 'T'));
@@ -2197,6 +2326,10 @@
   function openPersonEdit(id) {
     populatePrefectureSelect();
     document.getElementById('pe-pref').value = '';
+    mountPlaceTools('pe');
+    refreshPlaceSelects('pe', null);
+    closePlaceForm('pe');
+    delete document.getElementById('pe-place').dataset.auto;
     editingPersonId = id;
     const isNew = id === null;
     document.getElementById('person-edit-title').textContent = isNew ? '人物を追加' : '人物を編集';
@@ -2337,7 +2470,7 @@
     // 「二重円では表示しません」という一文が出るだけだった。disabledの
     // ボタンはhoverのtitleも出ないブラウザがあるため、理由は親のtitleに
     // 付けず、ボタン自身のtitleに入れておく(出るブラウザでは出る)。
-    document.querySelectorAll('.pane-tab-btn[data-pane="aspects"], .pane-tab-btn[data-pane="sabian"]').forEach(b => {
+    document.querySelectorAll('.pane-tab-btn[data-pane="aspects"], .pane-tab-btn[data-pane="sabian"], .pane-opt[data-pane="aspects"], .pane-opt[data-pane="sabian"]').forEach(b => {
       b.disabled = isBiwheel;
       b.title = isBiwheel ? '二重円では表示しません' : '';
     });
@@ -2365,15 +2498,8 @@
     const showScrubHandles = displayMode !== 'N';
     document.getElementById('badge-scrub-prev').style.display = showScrubHandles ? 'flex' : 'none';
     document.getElementById('badge-scrub-next').style.display = showScrubHandles ? 'flex' : 'none';
-    document.getElementById('badge-now-btn').style.display = showScrubHandles ? 'flex' : 'none';
-    // 経過図/二重円では、‹ › 今▾の3ボタン+日時の全桁が名前と同じ1行に
-    // 収まりきらない(2026-09-30、実機で「経過図が…だけになって切れて
-    // 見える/ぐるぐるできない」の報告 -- #badge-line2のellipsisで見た目
-    // 上は省略されるだけだったが、実際に数字も操作ボタンも隠れていた)。
-    // .stacked-timeを付けて、日時+ボタンの行を名前の下に折り返す
-    // (#person-badgeはposition:staticなので、2行になった分は自動的に
-    // 後続要素を押し下げる -- 上のコメント参照)。
-    document.getElementById('person-badge').classList.toggle('stacked-time', showScrubHandles);
+    // 2026-10-01: 今/日食・四季へ/送る単位は、まとめて#time-toolsに入れた。
+    document.getElementById('time-tools').style.display = showScrubHandles ? '' : 'none';
   }
   const DISPLAY_MODE_LABELS = { N: '出生図', T: '経過図', both: '二重円' };
   function setDisplayMode(btn, mode) {
@@ -2429,6 +2555,7 @@
       ANCHOR_DATA.transit[special] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
       tSpecialMoment = special;
       transitTime = result.utcMs;
+      transitIsLive = false;
       stepper.style.display = 'flex';
     } catch (err) {
       console.error('[engine] transit special-moment search failed', err);
@@ -2457,6 +2584,7 @@
       const result = await searchTransitSpecial(kind, searchFrom, direction > 0 ? 'next' : 'previous');
       ANCHOR_DATA.transit[kind] = { lons: result.lons, date: formatUtcMs(result.utcMs) };
       transitTime = result.utcMs;
+      transitIsLive = false;
       if (displayMode !== 'N') buildChart();
       updateBadge();
       refreshConjunctionsAndUI();
@@ -2494,7 +2622,10 @@
   function updateSpecialLine() {
     const box = document.getElementById('badge-special-line');
     const parts = [];
-    if (displayMode !== 'T' && nType !== 'normal') {
+    // 出生図だけのときは、図の種類ボタン(「生前日食」など)と2段目の日時で
+    // 足りるので出さない(2026-10-01)。二重円では2段目が経過図側の日時
+    // なので、出生図側の種類と日時はここに出す。
+    if (displayMode === 'both' && nType !== 'normal') {
       const nEntry = ANCHOR_DATA.natal[nType];
       if (nEntry) parts.push(`${displayMode === 'both' ? '出生図' : ''}${natalTypeLabelJa(nType, nEntry)}　${specialDateText(nEntry.date)}`);
     }
@@ -2507,57 +2638,47 @@
     box.innerHTML = '';
     parts.forEach(text => { const row = document.createElement('div'); row.textContent = text; box.appendChild(row); });
   }
+  // 円の上の状態ボタン・日時の行を、今の状態に合わせて書き直す
+  // (2026-10-01、メニュー再設計で旧バッジ+#current-state-lineを置き換え)。
+  // 1段目: [人物▾] [図の種類▾] [起点▾] [恒星の合▾]。2段目: 出生図は出生
+  // 日時+出生地(動かさないので文字だけ)、経過図・二重円は ‹ 日時 › 場所
+  // (場所は押すと変えられる)。
   function updateBadge() {
     const line1 = document.getElementById('badge-line1');
     const line2 = document.getElementById('badge-line2');
+    const placeEl = document.getElementById('badge-place');
 
-    if (displayMode === 'both') {
-      // Biwheel shows the person's name on top and T's own (live) data
-      // below. Plain natal needs nothing extra on the name line -- but
-      // if N itself is an eclipse chart, that has to say so, or there's
-      // no way to tell "this person's natal" from "this person's eclipse"
-      // apart at a glance.
-      line1.textContent = currentPersonName;
-      // 「経過図」の接頭辞は付けない(2026-09-30) -- 二重円では狭い画面
-      // だと.badge-line2-row自体の幅が足りず、接頭辞込みだと日時の末尾
-      // (秒)が隠れてしまっていた(実測)。名前(1行目)・「図: 二重円」
-      // (現在値の行)・特別行の「経過図…」ラベルで、これが経過図側の
-      // 日時であることは既に分かるため、ここでは省く。
-      renderEditableTime(line2, '');
-      updateSpecialLine();
-      return;
-    }
-    if (displayMode === 'T') {
-      // 場所ラベルを添える(2026-09-11) -- 天体の位置計算自体には影響
-      // しないが、表示中の日付がどのタイムゾームの読みかを常に見える
-      // ようにしておく(「海外の場所だと日が一日ずれる」の混乱対策)。
-      // 地名の部分だけ押せるようにし、押すと場所パネルを直接開く
-      // (2026-09-29) -- 残りの部分は従来どおり人物選択へ。
-      line1.textContent = '経過図(';
-      const place = document.createElement('span');
-      place.className = 'badge-place';
-      place.textContent = transitTzLabel;
-      place.title = '押すと場所を変更';
-      place.addEventListener('click', openTransitPlacePanel);
-      line1.append(place, ')');
-      // 日食/春分などの種別は名前の側(1段目)に置く。日時の前に付けると
-      // 幅の狭い画面で日時のほうが「…」で省略されてしまうため。
-      renderEditableTime(line2, '');
-      updateSpecialLine();
-      return;
-    }
-    // displayMode === 'N' -- birth data is a fixed fact about the person
-    // (edited via person management, not here), so this stays plain text.
-    // 並びは経過図の「トランジット(東京)　日時」にそろえる(2026-09-26、
-    // 「日輪の下のバーが、出生図だけ違う」より) -- 名前+種別(+出生地)を
-    // 太字の1段目、日時だけを2段目に置く。出生データはここでは動かさない
-    // ので、‹ › 今 のボタンは出さない(updateControlAvailability参照)。
-    // 日食/月食図の日時はUTCの瞬間なので、出生地は通常の出生図だけに付ける。
+    // 人物ボタン: 「経過図(今)を見る」から来たときは人物が選ばれていない。
+    const hasPerson = !(currentPersonId === null && currentPersonName === '');
+    line1.textContent = hasPerson ? currentPersonName : '人物を選ぶ';
+    document.getElementById('chip-person').classList.toggle('chip-empty', !hasPerson);
+
+    // 図の種類ボタン: 出生図の日食/月食図は「生前日食」などをそのまま出す
+    // (旧バッジの1段目に出していた種別)。
     const nEntry = nType === 'normal' ? null : ANCHOR_DATA.natal[nType];
-    const nLabel = natalTypeLabelJa(nType, nEntry);
-    const nPlace = nType === 'normal' ? ANCHOR_DATA.natal.normal.place : null;
-    line1.textContent = `${currentPersonName}　${nLabel || '出生図'}${nPlace ? '(' + nPlace + ')' : ''}`;
-    line2.textContent = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : specialDateText(nEntry.date);
+    let modeLabel = DISPLAY_MODE_LABELS[displayMode];
+    if (displayMode === 'N' && nType !== 'normal') modeLabel = natalTypeLabelJa(nType, nEntry) || modeLabel;
+    document.getElementById('menu-mode-label').textContent = modeLabel;
+
+    placeEl.innerHTML = '';
+    if (displayMode === 'N') {
+      // 出生データは人物の固定の事実(人物管理で直すもの)なので、ここでは
+      // 動かさない -- ‹ › などは出さない(updateControlAvailability参照)。
+      // 日食/月食図の日時はUTCの瞬間なので、出生地は通常の出生図だけ。
+      line2.textContent = nType === 'normal' ? ANCHOR_DATA.natal.normal.date : specialDateText(nEntry.date);
+      const nPlace = nType === 'normal' ? ANCHOR_DATA.natal.normal.place : null;
+      if (nPlace) placeEl.textContent = nPlace;
+      updateSpecialLine();
+      return;
+    }
+    // 経過図・二重円(二重円の日時は外側=経過図のもの)。場所は、表示中の
+    // 日付をどの時計で読んでいるか(2026-09-11)。押すと場所パネルを開く。
+    renderEditableTime(line2, '');
+    const place = document.createElement('button');
+    place.className = 'place-btn';
+    place.textContent = transitTzLabel;
+    place.addEventListener('click', openTransitPlacePanel);
+    placeEl.appendChild(place);
     updateSpecialLine();
   }
 
@@ -2605,8 +2726,7 @@
       input.size = unit === 'year' ? 4 : 2;
       input.value = timeSegText(unit, timeSegValue(unit, d));
       input.addEventListener('focus', () => {
-        scrubUnit = unit;
-        row.querySelectorAll('.time-seg').forEach((el) => el.classList.toggle('active', el === input));
+        setScrubUnit(unit);
         input.select();
       });
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
@@ -2625,6 +2745,13 @@
     });
     container.appendChild(row);
   }
+  // ‹ › で送る単位 -- 日付の数字(年・月・日・時・分・秒)を押すと、その数字が
+  // 反転して選ばれる(2026-10-01、単位のボタン列は「円の上に乗るのは嫌」で
+  // 撤去し、この前からの仕組みに戻した。説明は⚙設定の「使い方」)。
+  function setScrubUnit(unit) {
+    scrubUnit = unit;
+    document.querySelectorAll('#badge-line2 .time-seg').forEach((el) => el.classList.toggle('active', el.dataset.unit === unit));
+  }
   function applyTransitFieldEdit(unit, value) {
     const d = zonedDateFor(transitTime, transitTzName);
     if (unit === 'year') d.setUTCFullYear(value);
@@ -2634,6 +2761,7 @@
     else if (unit === 'minute') d.setUTCMinutes(value);
     else if (unit === 'second') d.setUTCSeconds(value);
     transitTime = utcMsFromZonedDate(d, transitTzName);
+    transitIsLive = false;
     if (tSpecialMoment) {
       tSpecialMoment = null;
       document.querySelectorAll('#t-jump-segmented .seg-btn').forEach((b) => b.classList.remove('active'));
@@ -2654,6 +2782,7 @@
     else if (scrubUnit === 'minute') d.setUTCMinutes(d.getUTCMinutes() + direction);
     else if (scrubUnit === 'second') d.setUTCSeconds(d.getUTCSeconds() + direction);
     transitTime = utcMsFromZonedDate(d, transitTzName);
+    transitIsLive = false;
     // Moved off whatever special moment we were on (if any) -- it's no
     // longer "the eclipse", just some other point in time now.
     if (tSpecialMoment) {
@@ -2688,6 +2817,7 @@
   }
   async function resetTransitToNow() {
     transitTime = Date.now();
+    transitIsLive = true;
     tSpecialMoment = null;
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('t-eclipse-stepper').style.display = 'none';
@@ -2699,6 +2829,7 @@
     await refreshTransitNowAnchor();
     if (displayMode !== 'N' && !tSpecialMoment) {
       transitTime = Date.now();
+      transitIsLive = true;
       buildChart();
       updateBadge();
       refreshConjunctionsAndUI();
@@ -2733,12 +2864,92 @@
   }
   function setPane(name) {
     PANES.forEach(p => document.getElementById('pane-' + p).classList.toggle('mobile-active', p === name));
-    document.querySelectorAll('.pane-tabs .pane-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === name));
+    document.querySelectorAll('#pane-menu .pane-opt').forEach(b => b.classList.toggle('active', b.dataset.pane === name));
     if (name !== 'wheel') {
       DATA_PANES.forEach(p => document.getElementById('pane-' + p).classList.toggle('data-active', p === name));
     }
     const dataName = name === 'wheel' ? currentDataPane() : name;
     document.querySelectorAll('.data-panel-tabs .pane-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === dataName));
+    // スマホ(2026-10-01): 「円だけ」は円だけ、度数・アスペクト・サビアンは円の
+    // 下にその一覧(引き出し)を出す。PCはこのクラスを使わない(CSSはスマホ幅のみ)。
+    document.querySelector('.chart-stage').classList.toggle('with-sheet', name !== 'wheel');
+    document.getElementById('sheet-title').textContent = PANE_LABELS[name];
+  }
+  const PANE_LABELS = { wheel: '円だけ', degrees: '度数', aspects: 'アスペクト', sabian: 'サビアン' };
+  // スマホの見出し「度数▾」などを押したときの選択肢(日食・四季へ▾と同じ出方)。
+  // 見出しは画面の下の方にあるので、ボタンの上に向かって開く。
+  function togglePaneMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const menu = document.getElementById('pane-menu');
+    if (menu.style.display !== 'none') { closePaneMenu(); return; }
+    menu.style.display = 'flex';
+    const r = document.getElementById('sheet-pick').getBoundingClientRect();
+    const h = menu.getBoundingClientRect().height;
+    const top = r.top - h - 6 >= 8 ? r.top - h - 6 : r.bottom + 6;  // 上に入らなければ下に
+    menu.style.top = top + 'px';
+    menu.style.left = Math.max(8, r.left) + 'px';
+  }
+  function closePaneMenu() { document.getElementById('pane-menu').style.display = 'none'; }
+  function pickPane(name) {
+    closePaneMenu();
+    setPane(name);
+  }
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('pane-menu');
+    if (menu.style.display !== 'none' && !menu.contains(e.target) && !e.target.closest('#sheet-pick')) closePaneMenu();
+  });
+  // 最初に出す一覧(PCは円の右、スマホは最初のタブ)。サビアンの文章は権利の
+  // 確認がまだ取れていないため、それまでは度数にしておく(2026-10-01、ユーザーと
+  // 合意)。許可が出たら、ここをtrueにするだけでサビアンが最初に出る。
+  const SABIAN_TEXT_READY = false;
+  const DEFAULT_DATA_PANE = SABIAN_TEXT_READY ? 'sabian' : 'degrees';
+
+  // スマホの引き出し(円の下の一覧) -- 見出しの行を上にシュッとするか、▲を
+  // 押すか、見出しの空いているところを押すと一覧が画面いっぱいに広がり(円を
+  // 隠す)、下にシュッ/▼/もう一度押すと円+一覧に戻る。途中の位置では止めず、
+  // 指を離したときにどちらかに決める。広げた状態は端末ごとに覚える(表示する
+  // ものを切り替えてもそのまま)。見出しの「度数▾」などのボタンは、押すと
+  // 選択肢を開く(togglePaneMenu)。「円だけ」のときは広げるものがないので
+  // 何もしない。
+  let sheetExpanded = false;
+  function setSheetExpanded(expanded) {
+    sheetExpanded = expanded;
+    document.querySelector('.chart-stage').classList.toggle('sheet-expanded', expanded);
+    document.getElementById('sheet-arrow').textContent = expanded ? '▼' : '▲';
+    saveSetting('sheetExpanded', expanded);
+  }
+  function wireSheetHandle() {
+    const head = document.getElementById('sheet-head');
+    const canExpand = () => document.querySelector('.chart-stage').classList.contains('with-sheet');
+    let startY = null, moved = false, downOnPick = false;
+    head.addEventListener('pointerdown', (e) => {
+      startY = e.clientY; moved = false;
+      downOnPick = !!e.target.closest('#sheet-pick');
+    });
+    head.addEventListener('pointermove', (e) => {
+      if (startY === null || moved || Math.abs(e.clientY - startY) <= 8) return;
+      moved = true;
+      // 指が動き出してから捕まえる -- 最初から捕まえると、「度数▾」ボタンを
+      // 押しただけのときにボタンのclickが届かなくなるため。
+      try { head.setPointerCapture(e.pointerId); } catch (err) { /* 捕まえられなくても動く */ }
+    });
+    head.addEventListener('pointerup', (e) => {
+      if (startY === null) return;
+      const dy = e.clientY - startY;
+      startY = null;
+      if (!moved) {
+        // 押しただけ: 「度数▾」ボタンならそのclickで選択肢が開くので、ここでは何もしない
+        if (!downOnPick && canExpand()) setSheetExpanded(!sheetExpanded);
+        return;
+      }
+      if (!canExpand()) return;
+      if (dy < -30) setSheetExpanded(true);
+      else if (dy > 30) setSheetExpanded(false);
+    });
+    head.addEventListener('pointercancel', () => { startY = null; });
+    document.getElementById('sheet-arrow').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSheetExpanded(!sheetExpanded); }
+    });
   }
 
   // Wheel-inline degree labels are toggled via a class on their shared
@@ -2805,25 +3016,23 @@
   // 7.78: パネルが開いている間、呼び出し元のアイコンボタンに.activeを
   // 付けて「選択中」と分かるようにする(「選択したときは、選択したのが
   // わかる表示にしてほしい」より)。closeAllPanels()側で全部まとめて外す。
-  function setActiveIconBtn(btnId) {
-    document.querySelectorAll('.topbar-actions .icon-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(btnId)?.classList.add('active');
+  function setActiveIconBtn(btn) {
+    document.querySelectorAll('#icon-btn-settings, .chip').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
   }
-  function openMainMenu() {
+  // 2026-10-01、メニュー再設計: ☰👁◎の3つを「⚙ 設定」と、円の上の状態
+  // ボタン(押すとそのパネルが開く)に置き換えた。
+  function openSettingsMenu() {
     if (!document.getElementById('view-chart').classList.contains('active')) return;
+    closeAllPanels();
     openPanel('main-menu-panel');
-    setActiveIconBtn('icon-btn-main-menu');
+    setActiveIconBtn(document.getElementById('icon-btn-settings'));
   }
-  // 7.72: 👁・◎も☰と同じガード(チャート画面以外では何もしない)。
-  function openViewMenu() {
+  function openChipPanel(panelId, chipEl) {
     if (!document.getElementById('view-chart').classList.contains('active')) return;
-    openPanel('view-menu-panel');
-    setActiveIconBtn('icon-btn-view');
-  }
-  function openChartTypeMenu() {
-    if (!document.getElementById('view-chart').classList.contains('active')) return;
-    openPanel('chart-type-panel');
-    setActiveIconBtn('icon-btn-chart-type');
+    closeAllPanels();
+    openPanel(panelId);
+    setActiveIconBtn(chipEl);
   }
   // 「このアプリについて」の支援・連絡リンク。空のままなら表示しない。
   // 配布用のURL(Ko-fi等の支援ページ、問い合わせフォームや連絡先)が
@@ -2850,13 +3059,14 @@
   function closeSpecialMenu() { document.getElementById('special-popover').style.display = 'none'; }
   document.addEventListener('click', (e) => {
     const pop = document.getElementById('special-popover');
-    if (pop.style.display !== 'none' && !pop.contains(e.target) && !e.target.closest('#badge-now-btn')) closeSpecialMenu();
+    if (pop.style.display !== 'none' && !pop.contains(e.target) && !e.target.closest('#badge-jump-btn')) closeSpecialMenu();
   });
   function closeAllPanels() {
     closeSpecialMenu();
+    closePaneMenu();
     document.getElementById('scrim').classList.remove('show');
     document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('show'));
-    document.querySelectorAll('.topbar-actions .icon-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#icon-btn-settings, .chip').forEach(b => b.classList.remove('active'));
   }
   let currentRef = 'tropical';
   let currentRefLabel = 'トロピカル';
@@ -2889,6 +3099,7 @@
       }
     }
     buildChart();  // selection propagates immediately, no separate "apply" step
+    updateConjunctionUI();  // 恒星の合の一覧の度数も、新しい起点の座標で出し直す
     closeAllPanels();
   }
   function toggleMini(el) {
@@ -3061,6 +3272,8 @@
   // ことは保証される。
   let TRANSIT_BASE_TIME = Date.UTC(2026, 7, 28, 12, 0, 0);  // month is 0-indexed: 7 = August
   let transitTime = Date.now();
+  // transitTimeが「今」(Date.now())のままか(場所を変えたときの動きが変わる、setTransitPlace参照)は、
+  // 場所まわりのコードの近く(transitIsLive)で宣言している。
   let scrubUnit = 'day';
 
   // N and T are always both "loaded" independently -- each has its own
@@ -3073,156 +3286,468 @@
   let displayMode = 'N';
   let conjOrb = 1.5;
 
-  // ---------- transit "今" の表示タイムゾーン(2026-09-11、「海外の場所
-  // だと、日が一日ずれますよね？」より) ----------
+  // ---------- 場所の一覧と経過図の場所(2026-09-11に新設、2026-10-01 7.113で拡充) ----------
   // ヘリオセントリック黄経の計算自体は場所に関係ない(同じ瞬間なら地球上
   // どこで見ても同じヘリオ図になる)ため、ここで選ぶ「場所」は天体の位置
-  // 計算には一切影響しない -- 「経過図(今)を見る」で表示される日付・
-  // 時刻の"読み方"(どのタイムゾームのカレンダーで見せるか)だけを変える。
-  // 既定は東京。緯度経度は不要(タイムゾーン名だけで表示の変換が完結する
-  // ため)、出生地の都道府県セレクターとは別に、世界の代表的なタイム
-  // ゾーンをまとめた軽量な一覧を用意した(下のTRANSIT_TZ_COUNTRIES)。
-  // 国 -> 都市の2段で選ぶ(2026-09-29、「国、都市名を選択すると切り替え
-  // られる方がいい」より) -- 以前は地域(アジア/ヨーロッパ...)ごとに
-  // 代表都市を1つの<select>に並べていた。国の一覧自体は地域ごとの
-  // <optgroup>にまとめて探しやすくする。同じ国の中でタイムゾーンが
-  // 同じ都市(大阪・札幌など)も、ユーザーが自分の街の名前で選べるように
-  // 別項目として置いている(表示される地名が変わるだけで、時刻は同じ)。
-  // 都市名は一覧全体で重複させない(保存値の照合に使うため)。
-  const TRANSIT_TZ_COUNTRIES = [
+  // 計算には一切影響しない -- 経過図で表示される日付・時刻の"読み方"(どの
+  // タイムゾーンのカレンダーで見せるか)だけを変える。
+  // 7.113: 場所の一覧は1つにまとめ、経過図の場所と人物の出生地の両方で
+  // 「国 -> 都市」で選べる(緯度経度付き)。人物の出生地を選ぶとタイムゾーン
+  // と緯度経度が自動で入る。自分で追加した場所は端末のブラウザ内
+  // (localStorage、設定と同じ)に保存する。都市名は一覧全体で重複させない
+  // (保存値・選択の照合に使うため)。同じ国の中でタイムゾーンが同じ都市
+  // (大阪・札幌など)も、自分の街の名前で選べるよう別項目として置いている。
+  // 形式: [都市名, タイムゾーン, 緯度, 経度]
+  const BUILTIN_PLACE_REGIONS = [
     { region: 'アジア', countries: [
-      { country: '日本', cities: [['東京', 'Asia/Tokyo'], ['大阪', 'Asia/Tokyo'], ['名古屋', 'Asia/Tokyo'], ['札幌', 'Asia/Tokyo'], ['福岡', 'Asia/Tokyo'], ['那覇', 'Asia/Tokyo']] },
-      { country: '韓国', cities: [['ソウル', 'Asia/Seoul'], ['釜山', 'Asia/Seoul']] },
-      { country: '中国', cities: [['北京', 'Asia/Shanghai'], ['上海', 'Asia/Shanghai']] },
-      { country: '香港', cities: [['香港', 'Asia/Hong_Kong']] },
-      { country: '台湾', cities: [['台北', 'Asia/Taipei']] },
-      { country: 'フィリピン', cities: [['マニラ', 'Asia/Manila']] },
-      { country: 'ベトナム', cities: [['ハノイ', 'Asia/Ho_Chi_Minh'], ['ホーチミン', 'Asia/Ho_Chi_Minh']] },
-      { country: 'タイ', cities: [['バンコク', 'Asia/Bangkok']] },
-      { country: 'シンガポール', cities: [['シンガポール', 'Asia/Singapore']] },
-      { country: 'マレーシア', cities: [['クアラルンプール', 'Asia/Kuala_Lumpur']] },
-      { country: 'インドネシア', cities: [['ジャカルタ', 'Asia/Jakarta'], ['バリ島', 'Asia/Makassar']] },
-      { country: 'インド', cities: [['デリー', 'Asia/Kolkata'], ['ムンバイ', 'Asia/Kolkata']] },
-      { country: 'ネパール', cities: [['カトマンズ', 'Asia/Kathmandu']] },
-      { country: 'アラブ首長国連邦', cities: [['ドバイ', 'Asia/Dubai']] },
-      { country: 'トルコ', cities: [['イスタンブール', 'Europe/Istanbul']] },
-      { country: 'イスラエル', cities: [['エルサレム', 'Asia/Jerusalem']] },
+      ['日本', [['東京', 'Asia/Tokyo', 35.69, 139.69], ['横浜', 'Asia/Tokyo', 35.44, 139.64], ['名古屋', 'Asia/Tokyo', 35.18, 136.91], ['大阪', 'Asia/Tokyo', 34.69, 135.50], ['京都', 'Asia/Tokyo', 35.01, 135.77], ['神戸', 'Asia/Tokyo', 34.69, 135.20], ['札幌', 'Asia/Tokyo', 43.06, 141.35], ['仙台', 'Asia/Tokyo', 38.27, 140.87], ['広島', 'Asia/Tokyo', 34.39, 132.46], ['福岡', 'Asia/Tokyo', 33.59, 130.40], ['那覇', 'Asia/Tokyo', 26.21, 127.68]]],
+      ['韓国', [['ソウル', 'Asia/Seoul', 37.57, 126.98], ['釜山', 'Asia/Seoul', 35.18, 129.08]]],
+      ['北朝鮮', [['平壌', 'Asia/Pyongyang', 39.04, 125.76]]],
+      ['中国', [['北京', 'Asia/Shanghai', 39.90, 116.41], ['上海', 'Asia/Shanghai', 31.23, 121.47], ['広州', 'Asia/Shanghai', 23.13, 113.26], ['深圳', 'Asia/Shanghai', 22.54, 114.06]]],
+      ['香港', [['香港', 'Asia/Hong_Kong', 22.32, 114.17]]],
+      ['台湾', [['台北', 'Asia/Taipei', 25.03, 121.57]]],
+      ['モンゴル', [['ウランバートル', 'Asia/Ulaanbaatar', 47.89, 106.91]]],
+      ['フィリピン', [['マニラ', 'Asia/Manila', 14.60, 120.98]]],
+      ['ベトナム', [['ハノイ', 'Asia/Ho_Chi_Minh', 21.03, 105.85], ['ホーチミン', 'Asia/Ho_Chi_Minh', 10.82, 106.63]]],
+      ['カンボジア', [['プノンペン', 'Asia/Phnom_Penh', 11.56, 104.93]]],
+      ['ラオス', [['ビエンチャン', 'Asia/Vientiane', 17.97, 102.63]]],
+      ['ミャンマー', [['ヤンゴン', 'Asia/Yangon', 16.84, 96.17]]],
+      ['タイ', [['バンコク', 'Asia/Bangkok', 13.76, 100.50]]],
+      ['シンガポール', [['シンガポール', 'Asia/Singapore', 1.35, 103.82]]],
+      ['マレーシア', [['クアラルンプール', 'Asia/Kuala_Lumpur', 3.14, 101.69]]],
+      ['インドネシア', [['ジャカルタ', 'Asia/Jakarta', -6.21, 106.85], ['バリ島', 'Asia/Makassar', -8.65, 115.22]]],
+      ['インド', [['デリー', 'Asia/Kolkata', 28.61, 77.21], ['ムンバイ', 'Asia/Kolkata', 19.08, 72.88], ['コルカタ', 'Asia/Kolkata', 22.57, 88.36], ['ベンガルール', 'Asia/Kolkata', 12.97, 77.59], ['チェンナイ', 'Asia/Kolkata', 13.08, 80.27]]],
+      ['パキスタン', [['カラチ', 'Asia/Karachi', 24.86, 67.01], ['イスラマバード', 'Asia/Karachi', 33.68, 73.05]]],
+      ['バングラデシュ', [['ダッカ', 'Asia/Dhaka', 23.81, 90.41]]],
+      ['スリランカ', [['コロンボ', 'Asia/Colombo', 6.93, 79.86]]],
+      ['ネパール', [['カトマンズ', 'Asia/Kathmandu', 27.72, 85.32]]],
+      ['ブータン', [['ティンプー', 'Asia/Thimphu', 27.47, 89.64]]],
+      ['アフガニスタン', [['カブール', 'Asia/Kabul', 34.53, 69.17]]],
+      ['ウズベキスタン', [['タシケント', 'Asia/Tashkent', 41.30, 69.24]]],
+      ['カザフスタン', [['アルマトイ', 'Asia/Almaty', 43.24, 76.89]]],
+      ['イラン', [['テヘラン', 'Asia/Tehran', 35.69, 51.39]]],
+      ['イラク', [['バグダッド', 'Asia/Baghdad', 33.31, 44.36]]],
+      ['サウジアラビア', [['リヤド', 'Asia/Riyadh', 24.71, 46.68]]],
+      ['カタール', [['ドーハ', 'Asia/Qatar', 25.29, 51.53]]],
+      ['アラブ首長国連邦', [['ドバイ', 'Asia/Dubai', 25.20, 55.27], ['アブダビ', 'Asia/Dubai', 24.45, 54.38]]],
+      ['イスラエル', [['エルサレム', 'Asia/Jerusalem', 31.77, 35.21], ['テルアビブ', 'Asia/Jerusalem', 32.09, 34.78]]],
+      ['ヨルダン', [['アンマン', 'Asia/Amman', 31.95, 35.93]]],
+      ['レバノン', [['ベイルート', 'Asia/Beirut', 33.89, 35.50]]],
+      ['トルコ', [['イスタンブール', 'Europe/Istanbul', 41.01, 28.98], ['アンカラ', 'Europe/Istanbul', 39.93, 32.86]]],
     ] },
     { region: 'オセアニア', countries: [
-      { country: 'オーストラリア', cities: [['シドニー', 'Australia/Sydney'], ['メルボルン', 'Australia/Melbourne'], ['ブリスベン', 'Australia/Brisbane'], ['アデレード', 'Australia/Adelaide'], ['パース', 'Australia/Perth']] },
-      { country: 'ニュージーランド', cities: [['オークランド', 'Pacific/Auckland']] },
-      { country: 'グアム', cities: [['グアム', 'Pacific/Guam']] },
+      ['オーストラリア', [['シドニー', 'Australia/Sydney', -33.87, 151.21], ['メルボルン', 'Australia/Melbourne', -37.81, 144.96], ['ブリスベン', 'Australia/Brisbane', -27.47, 153.03], ['アデレード', 'Australia/Adelaide', -34.93, 138.60], ['パース', 'Australia/Perth', -31.95, 115.86], ['ダーウィン', 'Australia/Darwin', -12.46, 130.84]]],
+      ['ニュージーランド', [['オークランド', 'Pacific/Auckland', -36.85, 174.76], ['ウェリントン', 'Pacific/Auckland', -41.29, 174.78]]],
+      ['フィジー', [['スバ', 'Pacific/Fiji', -18.14, 178.44]]],
+      ['グアム', [['グアム', 'Pacific/Guam', 13.44, 144.79]]],
+      ['パプアニューギニア', [['ポートモレスビー', 'Pacific/Port_Moresby', -9.44, 147.18]]],
+      ['フランス領ポリネシア', [['パペーテ', 'Pacific/Tahiti', -17.54, -149.57]]],
     ] },
     { region: 'ヨーロッパ', countries: [
-      { country: 'イギリス', cities: [['ロンドン', 'Europe/London']] },
-      { country: 'アイルランド', cities: [['ダブリン', 'Europe/Dublin']] },
-      { country: 'フランス', cities: [['パリ', 'Europe/Paris']] },
-      { country: 'ドイツ', cities: [['ベルリン', 'Europe/Berlin'], ['ミュンヘン', 'Europe/Berlin'], ['フランクフルト', 'Europe/Berlin']] },
-      { country: 'イタリア', cities: [['ローマ', 'Europe/Rome'], ['ミラノ', 'Europe/Rome']] },
-      { country: 'スペイン', cities: [['マドリード', 'Europe/Madrid'], ['バルセロナ', 'Europe/Madrid']] },
-      { country: 'ポルトガル', cities: [['リスボン', 'Europe/Lisbon']] },
-      { country: 'オランダ', cities: [['アムステルダム', 'Europe/Amsterdam']] },
-      { country: 'ベルギー', cities: [['ブリュッセル', 'Europe/Brussels']] },
-      { country: 'スイス', cities: [['チューリッヒ', 'Europe/Zurich'], ['ジュネーブ', 'Europe/Zurich']] },
-      { country: 'オーストリア', cities: [['ウィーン', 'Europe/Vienna']] },
-      { country: 'チェコ', cities: [['プラハ', 'Europe/Prague']] },
-      { country: 'スウェーデン', cities: [['ストックホルム', 'Europe/Stockholm']] },
-      { country: 'フィンランド', cities: [['ヘルシンキ', 'Europe/Helsinki']] },
-      { country: 'ギリシャ', cities: [['アテネ', 'Europe/Athens']] },
-      { country: 'ロシア', cities: [['モスクワ', 'Europe/Moscow']] },
+      ['イギリス', [['ロンドン', 'Europe/London', 51.51, -0.13], ['エディンバラ', 'Europe/London', 55.95, -3.19], ['グラスゴー', 'Europe/London', 55.86, -4.25], ['マンチェスター', 'Europe/London', 53.48, -2.24], ['ベルファスト', 'Europe/London', 54.60, -5.93]]],
+      ['アイルランド', [['ダブリン', 'Europe/Dublin', 53.35, -6.26]]],
+      ['フランス', [['パリ', 'Europe/Paris', 48.86, 2.35], ['マルセイユ', 'Europe/Paris', 43.30, 5.37], ['リヨン', 'Europe/Paris', 45.76, 4.84]]],
+      ['ドイツ', [['ベルリン', 'Europe/Berlin', 52.52, 13.40], ['ミュンヘン', 'Europe/Berlin', 48.14, 11.58], ['フランクフルト', 'Europe/Berlin', 50.11, 8.68], ['ハンブルク', 'Europe/Berlin', 53.55, 9.99], ['ウルム', 'Europe/Berlin', 48.40, 9.99]]],
+      ['イタリア', [['ローマ', 'Europe/Rome', 41.90, 12.50], ['ミラノ', 'Europe/Rome', 45.46, 9.19], ['ナポリ', 'Europe/Rome', 40.85, 14.27], ['フィレンツェ', 'Europe/Rome', 43.77, 11.26]]],
+      ['スペイン', [['マドリード', 'Europe/Madrid', 40.42, -3.70], ['バルセロナ', 'Europe/Madrid', 41.39, 2.17]]],
+      ['ポルトガル', [['リスボン', 'Europe/Lisbon', 38.72, -9.14]]],
+      ['オランダ', [['アムステルダム', 'Europe/Amsterdam', 52.37, 4.90]]],
+      ['ベルギー', [['ブリュッセル', 'Europe/Brussels', 50.85, 4.35]]],
+      ['スイス', [['チューリッヒ', 'Europe/Zurich', 47.38, 8.54], ['ジュネーブ', 'Europe/Zurich', 46.20, 6.14], ['ベルン', 'Europe/Zurich', 46.95, 7.45]]],
+      ['オーストリア', [['ウィーン', 'Europe/Vienna', 48.21, 16.37]]],
+      ['チェコ', [['プラハ', 'Europe/Prague', 50.08, 14.44]]],
+      ['ポーランド', [['ワルシャワ', 'Europe/Warsaw', 52.23, 21.01]]],
+      ['ハンガリー', [['ブダペスト', 'Europe/Budapest', 47.50, 19.04]]],
+      ['ルーマニア', [['ブカレスト', 'Europe/Bucharest', 44.43, 26.10]]],
+      ['ブルガリア', [['ソフィア', 'Europe/Sofia', 42.70, 23.32]]],
+      ['クロアチア', [['ザグレブ', 'Europe/Zagreb', 45.81, 15.98]]],
+      ['セルビア', [['ベオグラード', 'Europe/Belgrade', 44.79, 20.45]]],
+      ['ギリシャ', [['アテネ', 'Europe/Athens', 37.98, 23.73]]],
+      ['デンマーク', [['コペンハーゲン', 'Europe/Copenhagen', 55.68, 12.57]]],
+      ['ノルウェー', [['オスロ', 'Europe/Oslo', 59.91, 10.75]]],
+      ['スウェーデン', [['ストックホルム', 'Europe/Stockholm', 59.33, 18.07]]],
+      ['フィンランド', [['ヘルシンキ', 'Europe/Helsinki', 60.17, 24.94]]],
+      ['アイスランド', [['レイキャビク', 'Atlantic/Reykjavik', 64.15, -21.94]]],
+      ['エストニア', [['タリン', 'Europe/Tallinn', 59.44, 24.75]]],
+      ['ラトビア', [['リガ', 'Europe/Riga', 56.95, 24.11]]],
+      ['リトアニア', [['ビリニュス', 'Europe/Vilnius', 54.69, 25.28]]],
+      ['ウクライナ', [['キーウ', 'Europe/Kiev', 50.45, 30.52]]],
+      ['ベラルーシ', [['ミンスク', 'Europe/Minsk', 53.90, 27.57]]],
+      ['ロシア', [['モスクワ', 'Europe/Moscow', 55.76, 37.62], ['サンクトペテルブルク', 'Europe/Moscow', 59.93, 30.34], ['ノボシビルスク', 'Asia/Novosibirsk', 55.03, 82.92], ['ウラジオストク', 'Asia/Vladivostok', 43.12, 131.89]]],
     ] },
     { region: 'アフリカ', countries: [
-      { country: 'エジプト', cities: [['カイロ', 'Africa/Cairo']] },
-      { country: 'ケニア', cities: [['ナイロビ', 'Africa/Nairobi']] },
-      { country: '南アフリカ', cities: [['ヨハネスブルグ', 'Africa/Johannesburg']] },
+      ['エジプト', [['カイロ', 'Africa/Cairo', 30.04, 31.24]]],
+      ['モロッコ', [['カサブランカ', 'Africa/Casablanca', 33.57, -7.59]]],
+      ['アルジェリア', [['アルジェ', 'Africa/Algiers', 36.75, 3.06]]],
+      ['チュニジア', [['チュニス', 'Africa/Tunis', 36.81, 10.18]]],
+      ['ナイジェリア', [['ラゴス', 'Africa/Lagos', 6.52, 3.38]]],
+      ['ガーナ', [['アクラ', 'Africa/Accra', 5.60, -0.19]]],
+      ['セネガル', [['ダカール', 'Africa/Dakar', 14.72, -17.47]]],
+      ['エチオピア', [['アディスアベバ', 'Africa/Addis_Ababa', 9.03, 38.74]]],
+      ['ケニア', [['ナイロビ', 'Africa/Nairobi', -1.29, 36.82]]],
+      ['タンザニア', [['ダルエスサラーム', 'Africa/Dar_es_Salaam', -6.79, 39.21]]],
+      ['南アフリカ', [['ヨハネスブルグ', 'Africa/Johannesburg', -26.20, 28.05], ['ケープタウン', 'Africa/Johannesburg', -33.92, 18.42]]],
     ] },
-    { region: '北米', countries: [
-      { country: 'アメリカ', cities: [['ニューヨーク', 'America/New_York'], ['ワシントンD.C.', 'America/New_York'], ['シカゴ', 'America/Chicago'], ['デンバー', 'America/Denver'], ['フェニックス', 'America/Phoenix'], ['ロサンゼルス', 'America/Los_Angeles'], ['サンフランシスコ', 'America/Los_Angeles'], ['シアトル', 'America/Los_Angeles'], ['アンカレッジ', 'America/Anchorage'], ['ホノルル', 'Pacific/Honolulu']] },
-      { country: 'カナダ', cities: [['トロント', 'America/Toronto'], ['バンクーバー', 'America/Vancouver']] },
-      { country: 'メキシコ', cities: [['メキシコシティ', 'America/Mexico_City']] },
+    { region: '北米・中米', countries: [
+      ['アメリカ', [['ニューヨーク', 'America/New_York', 40.71, -74.01], ['ワシントンD.C.', 'America/New_York', 38.91, -77.04], ['ボストン', 'America/New_York', 42.36, -71.06], ['マイアミ', 'America/New_York', 25.76, -80.19], ['アトランタ', 'America/New_York', 33.75, -84.39], ['シカゴ', 'America/Chicago', 41.88, -87.63], ['ヒューストン', 'America/Chicago', 29.76, -95.37], ['デンバー', 'America/Denver', 39.74, -104.99], ['フェニックス', 'America/Phoenix', 33.45, -112.07], ['ロサンゼルス', 'America/Los_Angeles', 34.05, -118.24], ['サンフランシスコ', 'America/Los_Angeles', 37.77, -122.42], ['シアトル', 'America/Los_Angeles', 47.61, -122.33], ['ラスベガス', 'America/Los_Angeles', 36.17, -115.14], ['アンカレッジ', 'America/Anchorage', 61.22, -149.90], ['ホノルル', 'Pacific/Honolulu', 21.31, -157.86]]],
+      ['カナダ', [['トロント', 'America/Toronto', 43.65, -79.38], ['モントリオール', 'America/Toronto', 45.50, -73.57], ['バンクーバー', 'America/Vancouver', 49.28, -123.12], ['カルガリー', 'America/Edmonton', 51.05, -114.07], ['ハリファックス', 'America/Halifax', 44.65, -63.57]]],
+      ['メキシコ', [['メキシコシティ', 'America/Mexico_City', 19.43, -99.13], ['カンクン', 'America/Cancun', 21.16, -86.85]]],
+      ['キューバ', [['ハバナ', 'America/Havana', 23.11, -82.37]]],
+      ['ジャマイカ', [['キングストン', 'America/Jamaica', 17.97, -76.79]]],
+      ['パナマ', [['パナマシティ', 'America/Panama', 8.98, -79.52]]],
+      ['コスタリカ', [['サンホセ', 'America/Costa_Rica', 9.93, -84.08]]],
+      ['グアテマラ', [['グアテマラシティ', 'America/Guatemala', 14.63, -90.51]]],
     ] },
     { region: '南米', countries: [
-      { country: 'ブラジル', cities: [['サンパウロ', 'America/Sao_Paulo']] },
-      { country: 'アルゼンチン', cities: [['ブエノスアイレス', 'America/Argentina/Buenos_Aires']] },
-      { country: 'ペルー', cities: [['リマ', 'America/Lima']] },
+      ['ブラジル', [['サンパウロ', 'America/Sao_Paulo', -23.55, -46.63], ['リオデジャネイロ', 'America/Sao_Paulo', -22.91, -43.17], ['ブラジリア', 'America/Sao_Paulo', -15.79, -47.88]]],
+      ['アルゼンチン', [['ブエノスアイレス', 'America/Argentina/Buenos_Aires', -34.60, -58.38]]],
+      ['チリ', [['サンティアゴ', 'America/Santiago', -33.45, -70.67]]],
+      ['ペルー', [['リマ', 'America/Lima', -12.05, -77.04]]],
+      ['コロンビア', [['ボゴタ', 'America/Bogota', 4.71, -74.07]]],
+      ['ベネズエラ', [['カラカス', 'America/Caracas', 10.48, -66.90]]],
+      ['エクアドル', [['キト', 'America/Guayaquil', -0.18, -78.47]]],
+      ['ボリビア', [['ラパス', 'America/La_Paz', -16.50, -68.15]]],
+      ['ウルグアイ', [['モンテビデオ', 'America/Montevideo', -34.90, -56.16]]],
+      ['パラグアイ', [['アスンシオン', 'America/Asuncion', -25.26, -57.58]]],
     ] },
   ];
-  const TRANSIT_TZ_ALL = TRANSIT_TZ_COUNTRIES.flatMap(r => r.countries.flatMap(c => c.cities.map(([name, tz]) => ({ country: c.country, name, tz }))));
+  const BUILTIN_PLACES = BUILTIN_PLACE_REGIONS.flatMap(r => r.countries.flatMap(([country, cities]) =>
+    cities.map(([name, tz, lat, lon]) => ({ country, name, tz, lat, lon }))));
+  const CUSTOM_PLACE_COUNTRY = '自分で追加した場所';
+  // 自分で追加した場所: [{name, tz, lat, lon, ref}] (refは「同じ時刻の都市を
+  // 選ぶ」で作ったときの都市名、緯度経度で作ったときはnull)
+  let customPlaces = (() => {
+    const raw = loadSetting('customPlaces', []);
+    return Array.isArray(raw) ? raw.filter(c => c && typeof c.name === 'string' && typeof c.tz === 'string' && isFinite(c.lat) && isFinite(c.lon)) : [];
+  })();
+  function saveCustomPlaces() { saveSetting('customPlaces', customPlaces); }
+  function allPlaces() {
+    return BUILTIN_PLACES.concat(customPlaces.map(c => ({ country: CUSTOM_PLACE_COUNTRY, name: c.name, tz: c.tz, lat: c.lat, lon: c.lon, ref: c.ref || null, custom: true })));
+  }
+  function findPlaceByName(name) { return allPlaces().find(c => c.name === name) || null; }
+  function isValidTz(tz) {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch (e) { return false; }
+  }
+  // 人物の出生地の名前(例: 「ドイツ ウルム」)。日本・自分で追加した場所・
+  // 国名と同じ都市(香港など)は都市名だけ。
+  function personPlaceLabel(place) {
+    if (place.custom || place.country === '日本' || place.country === place.name) return place.name;
+    return `${place.country} ${place.name}`;
+  }
+
+  // 国・都市のセレクト(経過図の場所パネル'tz'と人物の出生地'pe'で共通)
+  const PLACE_CTX = {
+    tz: { country: 'tz-country-select', city: 'tz-select', countryPlaceholder: '国を選ぶ', cityPlaceholder: null },
+    pe: { country: 'pe-country', city: 'pe-city', countryPlaceholder: '国から選ぶ(海外など)', cityPlaceholder: '都市を選ぶ' },
+  };
+  function fillPlaceCountrySelect(sel, selectedCountry, placeholder) {
+    sel.innerHTML = '';
+    const addOpt = (parent, value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; parent.appendChild(o); };
+    if (placeholder) addOpt(sel, '', placeholder);
+    for (const { region, countries } of BUILTIN_PLACE_REGIONS) {
+      const group = document.createElement('optgroup');
+      group.label = region;
+      for (const [country] of countries) addOpt(group, country, country);
+      sel.appendChild(group);
+    }
+    if (customPlaces.length) {
+      const group = document.createElement('optgroup');
+      group.label = CUSTOM_PLACE_COUNTRY;
+      addOpt(group, CUSTOM_PLACE_COUNTRY, CUSTOM_PLACE_COUNTRY);
+      sel.appendChild(group);
+    }
+    if (selectedCountry) sel.value = selectedCountry;
+  }
+  function fillPlaceCitySelect(sel, country, selectedName, placeholder) {
+    sel.innerHTML = '';
+    if (placeholder) { const o = document.createElement('option'); o.value = ''; o.textContent = placeholder; sel.appendChild(o); }
+    allPlaces().filter(c => c.country === country).forEach(c => {
+      const o = document.createElement('option');
+      o.value = `${c.name}|${c.tz}`;
+      o.textContent = c.name;
+      sel.appendChild(o);
+    });
+    const hit = selectedName && allPlaces().find(c => c.name === selectedName && c.country === country);
+    if (hit) sel.value = `${hit.name}|${hit.tz}`;
+  }
+  function selectedPlaceOf(key) {
+    const v = document.getElementById(PLACE_CTX[key].city).value;
+    return v ? findPlaceByName(v.split('|')[0]) : null;
+  }
+  // 選ばれている場所が自分で追加したものなら、「編集」「削除」を出す
+  function updateCustomPlaceActions(key) {
+    const box = document.getElementById(key + '-custom-actions');
+    if (!box) return;
+    const p = selectedPlaceOf(key);
+    box.style.display = p && p.custom ? '' : 'none';
+  }
+  function refreshPlaceSelects(key, place) {
+    const ctx = PLACE_CTX[key];
+    fillPlaceCountrySelect(document.getElementById(ctx.country), place ? place.country : '', ctx.countryPlaceholder);
+    fillPlaceCitySelect(document.getElementById(ctx.city), place ? place.country : '', place ? place.name : '', ctx.cityPlaceholder);
+    updateCustomPlaceActions(key);
+  }
+  function onPlaceCountryChange(key) {
+    const ctx = PLACE_CTX[key];
+    const country = document.getElementById(ctx.country).value;
+    fillPlaceCitySelect(document.getElementById(ctx.city), country, null, ctx.cityPlaceholder);
+    updateCustomPlaceActions(key);
+    // 経過図の場所は、国を変えたらその国の最初の都市をすぐ適用する(選択の
+    // 自動反映 -- 「適用」ボタンは置かない、というこのアプリ全体の方針どおり)。
+    if (key === 'tz') onPlaceCityChange('tz');
+  }
+  function onPlaceCityChange(key) {
+    const place = selectedPlaceOf(key);
+    updateCustomPlaceActions(key);
+    if (!place) return;
+    if (key === 'tz') applyTransitPlace(place);
+    else applyPlaceToPersonEdit(place);
+  }
+
+  // ---------- 経過図の場所(今表示している場所) ----------
+  // transitTzName/transitTzLabel は「今、日時の読み方に使っている場所」。
+  // 人物を選んでいるときは出生地(person.place_name / person.timezone)から
+  // 始まり、場所を変えてもその人物を見ている間だけ有効(保存しない)。人物を
+  // 選んでいないとき(「経過図(今)を見る」)は、いつもの場所
+  // (transitDefault、保存される、既定は東京)を使い、変えると保存する。
   let transitTzName = loadSetting('transitTzName', 'Asia/Tokyo');
   let transitTzLabel = loadSetting('transitTzLabel', '東京');
-  // 以前の一覧で保存された地名(「デリー/ムンバイ」など)が新しい一覧に
-  // 無い場合は、同じタイムゾーンの最初の都市に読み替える(それも無ければ東京)。
+  // 以前の一覧で保存された地名が今の一覧に無い場合は、同じタイムゾーンの
+  // 最初の都市に読み替える(それも無ければ東京)。
   (function normalizeSavedTransitPlace() {
-    const hit = TRANSIT_TZ_ALL.find(c => c.name === transitTzLabel && c.tz === transitTzName)
-      || TRANSIT_TZ_ALL.find(c => c.tz === transitTzName)
-      || TRANSIT_TZ_ALL[0];
+    const all = allPlaces();
+    const hit = all.find(c => c.name === transitTzLabel && c.tz === transitTzName)
+      || all.find(c => c.tz === transitTzName)
+      || all[0];
     transitTzName = hit.tz;
     transitTzLabel = hit.name;
   })();
-  function currentTransitPlace() {
-    return TRANSIT_TZ_ALL.find(c => c.name === transitTzLabel) || TRANSIT_TZ_ALL[0];
-  }
-  function populateTzSelect() {
-    const countrySel = document.getElementById('tz-country-select');
-    if (!countrySel || countrySel.dataset.populated) return;
-    countrySel.dataset.populated = '1';
-    for (const { region, countries } of TRANSIT_TZ_COUNTRIES) {
-      const group = document.createElement('optgroup');
-      group.label = region;
-      for (const { country } of countries) {
-        const opt = document.createElement('option');
-        opt.value = country;
-        opt.textContent = country;
-        group.appendChild(opt);
+  let transitDefault = { tz: transitTzName, label: transitTzLabel };
+  let birthPlace = null;          // 選択中の人物の出生地 {tz, label}(人物なしならnull)
+  let transitAtBirth = false;     // 今、出生地で読んでいるか
+  let transitIsLive = true;       // 今見ている瞬間が「今」(Date.now())のままか
+  // 場所を変える。「今」を見ているときは瞬間はそのままで、その場所の今の
+  // 時刻で表示する。日時を動かした/入力した/日食などへ移動したあとは、時計の
+  // 数字はそのままで「その場所のその時刻」として読み直す(図が変わる)。
+  function setTransitPlace(tz, label, atBirth) {
+    const oldTz = transitTzName;
+    transitTzName = tz;
+    transitTzLabel = label;
+    transitAtBirth = !!atBirth;
+    if (!birthPlace) {
+      transitDefault = { tz, label };
+      saveSetting('transitTzName', tz);
+      saveSetting('transitTzLabel', label);
+    }
+    let moved = false;
+    if (!transitIsLive && oldTz !== tz) {
+      const reread = utcMsFromZonedDate(zonedDateFor(transitTime, oldTz), tz);
+      if (reread !== transitTime) {
+        transitTime = reread;
+        moved = true;
+        if (tSpecialMoment) {
+          tSpecialMoment = null;
+          document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
+          document.getElementById('t-eclipse-stepper').style.display = 'none';
+        }
       }
-      countrySel.appendChild(group);
+    }
+    if (moved && displayMode !== 'N') buildChart();
+    updateBadge();
+    if (moved) refreshConjunctionsAndUI();
+  }
+  function applyTransitPlace(place) { setTransitPlace(place.tz, place.name, false); }
+  function applyBirthPlaceToTransit() {
+    if (!birthPlace) return;
+    setTransitPlace(birthPlace.tz, birthPlace.label, true);
+    syncTzSelects();
+  }
+  // 人物を選んだ/「経過図(今)を見る」にしたときに、場所をその状態の初期値へ
+  function resetTransitPlaceFor(person) {
+    if (person && isValidTz(person.timezone)) {
+      birthPlace = { tz: person.timezone, label: person.place_name || person.timezone };
+      transitTzName = birthPlace.tz;
+      transitTzLabel = birthPlace.label;
+      transitAtBirth = true;
+    } else {
+      birthPlace = person ? { tz: transitDefault.tz, label: transitDefault.label } : null;
+      transitTzName = transitDefault.tz;
+      transitTzLabel = transitDefault.label;
+      transitAtBirth = false;
     }
   }
-  function fillTzCitySelect(country, selectedName) {
-    const citySel = document.getElementById('tz-select');
-    citySel.innerHTML = '';
-    TRANSIT_TZ_ALL.filter(c => c.country === country).forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = `${c.name}|${c.tz}`;
-      opt.textContent = c.name;
-      citySel.appendChild(opt);
-    });
-    if (selectedName) citySel.value = `${selectedName}|${TRANSIT_TZ_ALL.find(c => c.name === selectedName).tz}`;
-  }
-  // パネルの2つのセレクトを、今選ばれている都市に合わせる
+  // 経過図の場所パネルの中身を、今の場所に合わせる
   function syncTzSelects() {
-    populateTzSelect();
-    const place = currentTransitPlace();
-    document.getElementById('tz-country-select').value = place.country;
-    fillTzCitySelect(place.country, place.name);
+    const birthBtn = document.getElementById('tz-birth-btn');
+    birthBtn.style.display = birthPlace ? '' : 'none';
+    if (birthPlace) {
+      document.getElementById('tz-birth-label').textContent = birthPlace.label;
+      document.getElementById('tz-birth-check').textContent = transitAtBirth ? '✓' : '';
+      birthBtn.classList.toggle('active', transitAtBirth);
+    }
+    const all = allPlaces();
+    const place = transitAtBirth ? null
+      : (all.find(c => c.name === transitTzLabel && c.tz === transitTzName) || all.find(c => c.name === transitTzLabel) || null);
+    refreshPlaceSelects('tz', place);
   }
-  // 国を変えたら、その国の最初の都市をすぐ適用する(選択の自動反映 --
-  // 「適用」ボタンは置かない、というこのアプリ全体の方針どおり)。
-  function applyTransitCountrySelection() {
-    const country = document.getElementById('tz-country-select').value;
-    fillTzCitySelect(country, null);
-    applyTransitTimezoneSelection();
-  }
-  // バーの「トランジット(東京)」の地名を押したとき用 -- メニューを経由
-  // せずに場所パネルを直接開く(2026-09-29)。
+  // バーの場所の地名を押したとき用 -- メニューを経由せずに場所パネルを直接
+  // 開く(2026-09-29)。
   function openTransitPlacePanel(event) {
     if (event) event.stopPropagation();  // #badge-line1自体のクリック(人物選択へ)を発火させない
     closeAllPanels();
     syncTzSelects();
     openPanel('tz-panel');
   }
-  function applyTransitTimezoneSelection() {
-    const sel = document.getElementById('tz-select');
-    if (!sel.value) return;
-    const [name, tz] = sel.value.split('|');
-    transitTzName = tz;
-    transitTzLabel = name;
-    saveSetting('transitTzName', tz);
-    saveSetting('transitTzLabel', name);
-    document.getElementById('menu-tz-label').textContent = name;
-    // 実際の瞬間(transitTime、UTCのエポックms)自体は変えない -- 表示の
-    // 読み替えだけなので、再計算は不要でバッジの再描画だけで足りる。
-    updateBadge();
+
+  // ---------- 場所の追加・編集・削除(2026-10-01、7.113) ----------
+  // 場所パネルと人物の出生地の両方に同じ部品を置く('tz' / 'pe')。入力は地名と、
+  // 時刻の決め方 -- 「同じ時刻の都市を選ぶ」(その都市のタイムゾーンと緯度経度を
+  // 使う)か「緯度・経度を入れる」(読み込み済みのtz-lookupでタイムゾーンを
+  // 自動判定)。保存先はこの端末のブラウザ(localStorage)。
+  const placeFormState = { tz: { mode: 'city', editing: null }, pe: { mode: 'city', editing: null } };
+  function mountPlaceTools(key) {
+    const box = document.getElementById(key + '-place-tools');
+    if (!box || box.dataset.mounted) return;
+    box.dataset.mounted = '1';
+    const k = key;
+    box.innerHTML = `
+      <div id="${k}-custom-actions" class="place-actions" style="display:none;">
+        <button type="button" class="place-link" onclick="openPlaceForm('${k}', 'edit')">この場所を編集</button>
+        <button type="button" class="place-link place-link-danger" onclick="deleteCustomPlace('${k}')">この場所を削除</button>
+      </div>
+      <button type="button" class="place-add-btn" id="${k}-add-open" onclick="openPlaceForm('${k}', 'new')">+ 場所を追加</button>
+      <div class="place-form" id="${k}-form" style="display:none;">
+        <span class="field-label">地名</span>
+        <input type="text" id="${k}-pf-name" class="pe-input" placeholder="例: 実家、友人の家">
+        <span class="field-label" style="margin-top:14px;">時刻の決め方</span>
+        <div class="segmented" style="grid-template-columns:1fr 1fr;">
+          <button type="button" class="seg-btn active" id="${k}-pf-mode-city" onclick="setPlaceFormMode('${k}', 'city')">同じ時刻の都市を選ぶ</button>
+          <button type="button" class="seg-btn" id="${k}-pf-mode-ll" onclick="setPlaceFormMode('${k}', 'll')">緯度・経度を入れる</button>
+        </div>
+        <div id="${k}-pf-city-block">
+          <select id="${k}-pf-country" class="pe-input" style="margin-top:10px;" onchange="onPlaceFormCountryChange('${k}')"></select>
+          <select id="${k}-pf-city" class="pe-input" style="margin-top:8px;"></select>
+        </div>
+        <div id="${k}-pf-ll-block" style="display:none;">
+          <div class="pe-row">
+            <input type="text" inputmode="decimal" id="${k}-pf-lat" class="pe-input" placeholder="緯度 (例: 55.95)" oninput="updatePlaceFormTz('${k}')">
+            <input type="text" inputmode="decimal" id="${k}-pf-lon" class="pe-input" placeholder="経度 (例: -3.19)" oninput="updatePlaceFormTz('${k}')">
+          </div>
+          <p class="scrub-note" id="${k}-pf-tz-note"></p>
+        </div>
+        <p class="scrub-note place-form-error" id="${k}-pf-error" style="display:none;"></p>
+        <div class="pe-row" style="margin-top:16px;">
+          <button type="button" class="add-btn" style="justify-content:center; padding:12px;" onclick="savePlaceForm('${k}')">保存</button>
+          <button type="button" class="add-btn" style="justify-content:center; padding:12px; background:var(--bg-elevated); color:var(--ink); border:1px solid var(--line-strong);" onclick="closePlaceForm('${k}')">キャンセル</button>
+        </div>
+      </div>`;
+  }
+  function setPlaceFormMode(key, mode) {
+    placeFormState[key].mode = mode;
+    document.getElementById(`${key}-pf-mode-city`).classList.toggle('active', mode === 'city');
+    document.getElementById(`${key}-pf-mode-ll`).classList.toggle('active', mode === 'll');
+    document.getElementById(`${key}-pf-city-block`).style.display = mode === 'city' ? '' : 'none';
+    document.getElementById(`${key}-pf-ll-block`).style.display = mode === 'll' ? '' : 'none';
+    if (mode === 'll') updatePlaceFormTz(key);
+  }
+  function onPlaceFormCountryChange(key) {
+    fillPlaceCitySelect(document.getElementById(`${key}-pf-city`), document.getElementById(`${key}-pf-country`).value, null, null);
+  }
+  function placeFormShowError(key, msg) {
+    const el = document.getElementById(`${key}-pf-error`);
+    el.textContent = msg || '';
+    el.style.display = msg ? '' : 'none';
+  }
+  // 緯度経度から判定したタイムゾーンを、入力欄の下に表示
+  function lookupTzFromFields(latStr, lonStr) {
+    const lat = parseFloat(latStr), lon = parseFloat(lonStr);
+    if (Number.isNaN(lat) || Number.isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    if (typeof tzlookup !== 'function') return null;
+    try { const tz = tzlookup(lat, lon); return isValidTz(tz) ? { tz, lat, lon } : null; } catch (e) { return null; }
+  }
+  function updatePlaceFormTz(key) {
+    const hit = lookupTzFromFields(document.getElementById(`${key}-pf-lat`).value, document.getElementById(`${key}-pf-lon`).value);
+    document.getElementById(`${key}-pf-tz-note`).textContent = hit ? `タイムゾーン: ${hit.tz}(緯度経度から自動判定)` : '';
+  }
+  function openPlaceForm(key, kind) {
+    const st = placeFormState[key];
+    const editing = kind === 'edit' ? selectedPlaceOf(key) : null;
+    if (kind === 'edit' && !(editing && editing.custom)) return;
+    st.editing = editing ? editing.name : null;
+    document.getElementById(`${key}-pf-name`).value = editing ? editing.name : '';
+    const ref = editing && editing.ref ? findPlaceByName(editing.ref) : null;
+    const countrySel = document.getElementById(`${key}-pf-country`);
+    fillPlaceCountrySelect(countrySel, ref ? ref.country : '日本', null);
+    fillPlaceCitySelect(document.getElementById(`${key}-pf-city`), countrySel.value, ref ? ref.name : null, null);
+    document.getElementById(`${key}-pf-lat`).value = editing ? String(editing.lat) : '';
+    document.getElementById(`${key}-pf-lon`).value = editing ? String(editing.lon) : '';
+    placeFormShowError(key, '');
+    setPlaceFormMode(key, editing && !ref ? 'll' : 'city');
+    document.getElementById(`${key}-form`).style.display = '';
+    document.getElementById(`${key}-add-open`).style.display = 'none';
+    document.getElementById(`${key}-custom-actions`).style.display = 'none';
+    document.getElementById(`${key}-pf-name`).focus();
+  }
+  function closePlaceForm(key) {
+    document.getElementById(`${key}-form`).style.display = 'none';
+    document.getElementById(`${key}-add-open`).style.display = '';
+    updateCustomPlaceActions(key);
+  }
+  function savePlaceForm(key) {
+    const st = placeFormState[key];
+    const name = document.getElementById(`${key}-pf-name`).value.trim();
+    if (!name) { placeFormShowError(key, '地名を入力してください'); return; }
+    if (name.includes('|')) { placeFormShowError(key, '地名に「|」は使えません'); return; }
+    if (allPlaces().some(c => c.name === name && c.name !== st.editing)) { placeFormShowError(key, '同じ名前の場所があります。別の名前にしてください'); return; }
+    let entry;
+    if (st.mode === 'city') {
+      const v = document.getElementById(`${key}-pf-city`).value;
+      const ref = v ? findPlaceByName(v.split('|')[0]) : null;
+      if (!ref) { placeFormShowError(key, '都市を選んでください'); return; }
+      entry = { name, tz: ref.tz, lat: ref.lat, lon: ref.lon, ref: ref.name };
+    } else {
+      const hit = lookupTzFromFields(document.getElementById(`${key}-pf-lat`).value, document.getElementById(`${key}-pf-lon`).value);
+      if (!hit) { placeFormShowError(key, '緯度(-90〜90)と経度(-180〜180)を数字で入れてください(タイムゾーンの自動判定にはインターネット接続が必要です)'); return; }
+      entry = { name, tz: hit.tz, lat: hit.lat, lon: hit.lon, ref: null };
+    }
+    const wasEditing = st.editing;
+    if (wasEditing) {
+      const i = customPlaces.findIndex(c => c.name === wasEditing);
+      if (i >= 0) customPlaces[i] = entry; else customPlaces.push(entry);
+    } else {
+      customPlaces.push(entry);
+    }
+    saveCustomPlaces();
+    st.editing = null;
+    if (wasEditing) reconcileTransitAfterPlaceChange(wasEditing, entry);
+    closePlaceForm(key);
+    const place = findPlaceByName(name);
+    refreshPlaceSelects(key, place);
+    if (key === 'tz') applyTransitPlace(place);
+    else applyPlaceToPersonEdit(place);
+  }
+  function deleteCustomPlace(key) {
+    const place = selectedPlaceOf(key);
+    if (!place || !place.custom) return;
+    if (!window.confirm(`「${place.name}」を削除しますか?\n(登録済みの人物のデータは変わりません)`)) return;
+    customPlaces = customPlaces.filter(c => c.name !== place.name);
+    saveCustomPlaces();
+    reconcileTransitAfterPlaceChange(place.name, null);
+    if (key === 'tz') syncTzSelects(); else refreshPlaceSelects('pe', null);
+  }
+  // 自分で追加した場所を編集・削除したとき、いつもの場所/今の場所がそれだった
+  // 場合は新しい内容に追従する(削除なら出生地か東京に戻す)。
+  function reconcileTransitAfterPlaceChange(oldName, newEntry) {
+    const next = newEntry ? { tz: newEntry.tz, label: newEntry.name } : { tz: 'Asia/Tokyo', label: '東京' };
+    if (transitDefault.label === oldName) {
+      transitDefault = next;
+      saveSetting('transitTzName', next.tz);
+      saveSetting('transitTzLabel', next.label);
+    }
+    if (!transitAtBirth && transitTzLabel === oldName) {
+      if (!newEntry && birthPlace) setTransitPlace(birthPlace.tz, birthPlace.label, true);
+      else setTransitPlace(next.tz, next.label, false);
+    }
   }
   // UTCのエポックms -> 「UTCゲッター/セッターで読み書きすると、実際には
   // tzName側の壁時計の値になっている」偽物のDateオブジェクト。既存の
@@ -3357,6 +3882,25 @@
     }
     return nType === 'normal' ? REF_LONGITUDES.tropical : ANCHOR_DATA.natal[nType].lons;
   }
+  // 恒星・銀河の、画面に出している座標系(起点を選んでいれば回転後)での
+  // 黄経(2026-10-01、円の外側と一覧に度数を出すため)。起点の回転は全体に
+  // 同じ量を引くだけなので、「合の相手の天体の画面上の黄経+(恒星−その天体
+  // のトロピカル黄経)」で求まる -- 起点ごと・図の種類ごとの回転の決まりを
+  // ここで繰り返さずに済む。
+  function conjStarDisplayLon(bodyKey, h, displayLons, tropicalLons) {
+    const diff = ((h.lon - tropicalLons[bodyKey]) % 360 + 540) % 360 - 180;
+    return ((displayLons[bodyKey] + diff) % 360 + 360) % 360;
+  }
+  // サイン番号・度・分(SVGで記号だけ別フォントにするため、formatAstroと
+  // 同じ切り捨て方で部品に分ける)。
+  function astroParts(deg) {
+    const norm = ((deg % 360) + 360) % 360;
+    const signIdx = Math.floor(norm / 30);
+    const inSign = norm - signIdx * 30;
+    const d = Math.floor(inSign);
+    const m = Math.floor((inSign - d) * 60);
+    return { signIdx, degText: d + "°" + String(m).padStart(2, "0") + "'" };
+  }
   // 恒星・銀河との合を実際に検索し直し、結果をキャッシュしてから再描画
   // する(2026-09-10) -- 人物・モード・瞬間・オーブ・検索範囲(GCS/主要
   // /その他)のいずれかが変わるたびに呼ぶ。呼び出し元をawaitさせない
@@ -3381,7 +3925,9 @@
       currentConjunctionSummary = PLANET_META
         .filter(p => hitsByBody[p.key])
         .map(p => {
-          const hits = hitsByBody[p.key].map(h => ({ key: h.refKey, name: h.labelJa, cat: h.constellationJa, kind: h.kind, sep: h.sep }));
+          // lon(恒星・銀河自身のトロピカル黄経)は、円の外側と一覧に度数を
+          // 出すために残す(2026-10-01)。
+          const hits = hitsByBody[p.key].map(h => ({ key: h.refKey, name: h.labelJa, cat: h.constellationJa, kind: h.kind, sep: h.sep, lon: h.lon }));
           hits.forEach(h => {
             const hitId = p.key + '|' + h.key;
             if (!seenHitIds.has(hitId)) { seenHitIds.add(hitId); checkedHits.add(hitId); }
@@ -3405,7 +3951,7 @@
     }
     note.style.display = 'none';
     const summary = currentConjunctionSummary;
-    menuLabel.textContent = summary.length ? `恒星の合 (${summary.length})` : '恒星の合';
+    menuLabel.textContent = summary.length ? `恒星の合 ${summary.length}` : '恒星の合';
 
     const container = document.getElementById('conj-groups');
     container.innerHTML = '';
@@ -3418,6 +3964,14 @@
       }
       container.innerHTML = `<p style="color:var(--ink-faint); font-size:0.85rem;">${msg}</p>`;
     } else {
+      // 一覧の1件(2026-10-01): 1行目「名前 星座名(小さく薄く) サイン+度数」、
+      // 2行目「サビアン(数え度数)」。度数・サビアンは画面の座標系(起点を
+      // 選んでいれば回転後)で、円の外側の表示と同じ値。サビアンの文章は
+      // 権利の確認が済むまで「準備中」。星座名は長いときだけ省略し、名前と
+      // 度数は必ず全部出す。離角(合のずれ)は一覧から外した(ホバーの
+      // 説明には残っている)。
+      const dispLons = currentConjunctionLongitudes();
+      const tropLons = currentConjunctionTropicalLongitudes();
       summary.forEach(body => {
         const group = document.createElement('div');
         group.className = 'conj-body-group';
@@ -3425,7 +3979,12 @@
           const hitId = body.key + '|' + h.key;
           const isOn = checkedHits.has(hitId);
           const catHtml = h.cat ? `<span class="conj-hit-cat">${h.cat}</span>` : '';
-          return `<div class="conj-hit"><span class="mini-check${isOn ? ' on' : ''}" data-hit="${hitId}" onclick="toggleMini(this)">${isOn ? '✓' : ''}</span><span class="conj-hit-main"><span class="conj-hit-name">${h.name}</span>${catHtml}</span><span class="conj-hit-sep mono">${h.sep.toFixed(2)}°</span></div>`;
+          const hasLon = typeof h.lon === 'number';
+          const lon = hasLon ? conjStarDisplayLon(body.key, h, dispLons, tropLons) : null;
+          const degHtml = hasLon ? `<span class="conj-hit-deg mono">${formatAstro(lon)}</span>` : '';
+          const sabianHtml = hasLon ? `<div class="conj-hit-sabian">サビアン <span class="mono">${formatSabianDegree(lon)}</span>(準備中)</div>` : '';
+          return `<div class="conj-hit"><span class="mini-check${isOn ? ' on' : ''}" data-hit="${hitId}" onclick="toggleMini(this)">${isOn ? '✓' : ''}</span>` +
+            `<div class="conj-hit-main"><div class="conj-hit-line1"><span class="conj-hit-name">${h.name}</span>${catHtml}${degHtml}</div>${sabianHtml}</div></div>`;
         }).join('');
         group.innerHTML = `<div class="conj-body-name"><span class="conj-body-glyph">${glyphHtml(body.glyph)}</span> ${body.name}</div>${hitsHtml}`;
         container.appendChild(group);
@@ -3492,18 +4051,26 @@
     // 情報自体は消さない(この関数のtitle要素によるホバー説明と、下の
     // 「恒星の合」パネルのconj-groupsに常に出ている)ので、単に円周上の
     // 表示密度だけを下げる。
-    const showNames = document.getElementById('star-name-switch')?.classList.contains('on');
-    const slots = [];  // { body, h, labelText, color, i }
+    // 2026-10-01: ★/◆マークをやめ、常に「名前 サイン+度数」(例: シリウス
+    // ♋14°05')を出す(「名前と度数は表示。★と◇マークはいらない」より)。
+    // サインの記号を付けるのは、重ならないように本当の位置から最大24度
+    // ずらして置くことがあり、隣のサインの横に出たときに度数だけだと
+    // どのサインか分からなくなるため。恒星/銀河の区別は色で残す。
+    // 恒星名の表示/非表示スイッチは廃止(常に名前を出す)。
+    const tropLons = currentConjunctionTropicalLongitudes();
+    const slots = [];  // { body, h, name, suffix, signIdx, degText, color, i }
     summary.forEach(body => {
       const hits = body.hits.filter(h => checkedHits.has(body.key + '|' + h.key) && bestBodyForStar[h.key].bodyKey === body.key);
       if (!hits.length) return;
       const maxSlots = 3;  // beyond this, fold the rest into a "他N件" tag on the last slot rather than stacking indefinitely
       hits.slice(0, maxSlots).forEach((h, i) => {
         const overflow = (i === maxSlots - 1) ? hits.length - maxSlots : 0;
-        const shortName = h.short || h.name;
-        const mark = h.kind === "star" ? "★" : "◆";
-        const labelText = showNames ? mark + shortName + (overflow > 0 ? ` 他${overflow}` : "") : mark;
-        slots.push({ body, h, i, labelText, color: h.kind === "star" ? "var(--accent)" : "var(--aspect-soft)" });
+        const starLon = typeof h.lon === 'number' ? conjStarDisplayLon(body.key, h, lons, tropLons) : lons[body.key];
+        const { signIdx, degText } = astroParts(starLon);
+        slots.push({
+          body, h, i, name: h.short || h.name, suffix: overflow > 0 ? ` 他${overflow}` : "",
+          signIdx, degText, color: h.kind === "star" ? "var(--accent)" : "var(--aspect-soft)",
+        });
       });
     });
     const labelFontSize = 10.5;
@@ -3547,8 +4114,7 @@
     });
     candidates.sort((a, b) => a.cost - b.cost);
     const placedBoxes = [];
-    function tryPlace(text, lon) {
-      const w = estimateLabelWidth(text, labelFontSize);
+    function tryPlace(w, lon) {
       for (const c of candidates) {
         const deg = ((lon + c.dDeg) % 360 + 360) % 360;
         const b = labelBox(c.r, deg, w);
@@ -3562,26 +4128,56 @@
     // 角度順・同じ天体内はスロット順に置く(隣り合うラベル同士が、
     // 輪の上で順番を入れ替えずに並びやすい)。
     slots.sort((a, b) => (lons[a.body.key] - lons[b.body.key]) || (a.i - b.i));
+    // ラベルの幅は、実際に描いて測る(2026-10-01) -- 名前+サイン記号+度数は
+    // 全角・半角・記号フォントが混ざり、文字数からの見積もりでは実際より
+    // 3割ほど大きく出て、置ける場所があるのに「どこにも置けない」扱いに
+    // なっていた(実測)。画面に出ていないとき(測れず0になる)だけ、文字数
+    // からの見積もりを使う。
+    function buildLabelSpans(textEl, name, s) {
+      const nameSpan = document.createElementNS(svgNS, "tspan");
+      nameSpan.textContent = name + s.suffix + ' ';
+      const signSpan = document.createElementNS(svgNS, "tspan");
+      signSpan.setAttribute("font-family", "'Astronomicon', sans-serif");
+      signSpan.textContent = SIGNS[s.signIdx];
+      const degSpan = document.createElementNS(svgNS, "tspan");
+      degSpan.textContent = s.degText;
+      textEl.append(nameSpan, signSpan, degSpan);
+    }
+    const measureEl = document.createElementNS(svgNS, "text");
+    measureEl.setAttribute("font-size", String(labelFontSize));
+    measureEl.setAttribute("opacity", "0");
+    group.appendChild(measureEl);
+    const labelWidth = (name, s) => {
+      measureEl.textContent = '';
+      buildLabelSpans(measureEl, name, s);
+      let w = 0;
+      try { w = measureEl.getComputedTextLength(); } catch (e) { w = 0; }
+      if (w > 0) return w + 4;
+      let em = 1;  // サイン記号
+      for (const ch of name + s.suffix + ' ' + s.degText) em += ch.charCodeAt(0) > 0xff ? 1 : 0.62;
+      return em * labelFontSize + 6;
+    };
     slots.forEach(s => {
       const lon = lons[s.body.key];
-      let text = s.labelText;
-      let spot = tryPlace(text, lon);
-      // 省略は「★」+2文字+「…」まで
-      while (!spot && text.length > 3) {
-        text = text.replace(/…$/, '').slice(0, -1);
-        spot = tryPlace(text + '…', lon);
-        if (spot) text = text + '…';
+      let name = s.name;
+      let spot = tryPlace(labelWidth(name, s), lon);
+      // 省略するのは名前だけ(2文字+「…」まで)。度数は絶対に省かない
+      // (「度数の曖昧表示はだめ」のルール)。
+      while (!spot && name.replace(/…$/, '').length > 2) {
+        name = name.replace(/…$/, '').slice(0, -1) + '…';
+        spot = tryPlace(labelWidth(name, s), lon);
       }
       if (!spot) {
         // それでも置けない(ラベルが極端に多い)ときは、重なりを許して本来の位置に置く
-        spot = { r: STAR_R, deg: lon, box: labelBox(STAR_R, lon, estimateLabelWidth(text, labelFontSize)) };
+        spot = { r: STAR_R, deg: lon, box: labelBox(STAR_R, lon, labelWidth(name, s)) };
       }
       placedBoxes.push(spot.box);
-      s.labelText = text;
+      s.name = name;
       s._pos = { r: spot.r, deg: spot.deg };
     });
+    measureEl.remove();
     slots.forEach(s => {
-      const { body, h, labelText, color } = s;
+      const { body, h, color } = s;
       const lon = lons[body.key];
       const pos = s._pos;
       // short spoke from the ring edge (at the body's *true* longitude)
@@ -3605,7 +4201,8 @@
       label.setAttribute("font-size", String(labelFontSize));
       label.setAttribute("fill", color);
       label.style.cursor = "default";
-      label.textContent = labelText;
+      // サイン記号だけAstronomiconフォント(SIGNSは英字コード)、他は通常の文字。
+      buildLabelSpans(label, s.name, s);
       // Hover (desktop) shows the exact name + separation; on touch,
       // the short label alone already answers "which star is conjunct
       // which planet" at a glance, so tap doesn't need to do anything extra.
@@ -3665,7 +4262,8 @@
     const signIdx = Math.floor(norm / 30);
     const inSign = norm - signIdx * 30;
     const counting = Math.min(30, Math.floor(inSign) + 1);
-    return signGlyphSpan(SIGNS[signIdx]) + counting + "°";
+    // 「度」で書く(2026-10-01、「サビアンの表記は、度でいい」より)。
+    return signGlyphSpan(SIGNS[signIdx]) + counting + "度";
   }
   // Same as formatAstro but without the sign glyph -- used right on the
   // wheel next to each body's marker, where the ring position already
@@ -3768,7 +4366,7 @@
     { type: "opposition",     angle: 180, color: "var(--aspect-hard)",    dash: "1,0", labelJa: "180度",  major: true },
   ];
   // オーブ(許容度数)はユーザーが変えられる(2026-09-29、7.96で依頼され
-  // 保留になっていたもの)。初期値=「松村潔基準に戻す」で戻る値は、
+  // 保留になっていたもの)。「初期値に戻す」で戻る値(松村潔先生の基準に合わせた初期値)は、
   // ユーザーの記憶に基づく目安: 出生図は広め(メジャー6度・マイナー3度・
   // 150度は1.5度)、経過図は狭め(メジャー3度・マイナー1.5度・150度は
   // 1度)。以前は全モード共通の固定値(メジャー6度、60度だけ4度、マイナー
@@ -4887,20 +5485,15 @@
   desktopMQ.addEventListener('change', updateWheelViewBox);
   updateWheelViewBox();
 
-  // 恒星名トグルの初期値: スマホ幅ではオフ(★マークのみ)、PC幅ではオン
-  // (フルネーム)。HTML側はデフォルトon(PC相当)なので、初回だけモバイル
-  // 幅なら外す(2026-09-03、恒星名トグル新設時)。保存済みの値がある場合は
-  // (下のrestoreSettings()で)そちらを優先し、この画面幅ベースの初期値は
-  // 「まだ一度も触ったことがない」場合だけのフォールバックにする。
-  if (!desktopMQ.matches) {
-    document.getElementById('star-name-switch')?.classList.remove('on');
-  }
+  // 恒星名トグル(旧#star-name-switch)は2026-10-01に廃止 -- 円の外側の
+  // 恒星は常に「名前+サイン+度数」を出す(★/◆マークだけの表示はなくした)。
   // 7.71: 保存済み設定の復元(localStorage) -- 「自分の好みの基本設定で
   // 使えないの嫌だ」より。fillMinorBodyList()/fillAspectTypeList()より
   // 前に呼び、Setの中身を復元済みの状態でそれらの一覧描画に反映させる。
   function restoreSettings() {
+    mountPlaceTools('tz');
     applyTheme(loadSetting('theme', null));
-    ['wheel-degree-switch', 'aspect-switch', 'conj-switch', 'star-name-switch'].forEach((id) => {
+    ['wheel-degree-switch', 'aspect-switch', 'conj-switch'].forEach((id) => {
       const saved = loadSetting('switch:' + id, null);
       if (saved === null) return;  // 未保存(初回)なら、HTML/画面幅ベースの初期値をそのまま使う
       document.getElementById(id)?.classList.toggle('on', saved);
@@ -4946,7 +5539,6 @@
     // 済み(デフォルト東京/Asia/Tokyo) -- ここではセレクトの中身を作り、
     // 選択状態とメニュー上のラベルをそれに合わせるだけ。
     syncTzSelects();
-    document.getElementById('menu-tz-label').textContent = transitTzLabel;
   }
   restoreSettings();
   fillMinorBodyList();
@@ -4957,6 +5549,10 @@
   // 復元後の最初のbuildChart()で自動的に反映される)、ここだけ明示的に
   // 呼んで復元済みのスイッチ状態を反映させる。
   updateWheelDegreeVisibility();
+  setScrubUnit(scrubUnit);
+  wireSheetHandle();
+  setSheetExpanded(loadSetting('sheetExpanded', false));
+  setPane(DEFAULT_DATA_PANE);
   buildChart();
   updateBadge();
   wirePersonEditTzAutofill();
@@ -4979,6 +5575,7 @@
     await refreshTransitNowAnchor();
     if (displayMode !== 'N' && !tSpecialMoment) {
       transitTime = Date.now();
+      transitIsLive = true;
       buildChart();
       updateBadge();
       refreshConjunctionsAndUI();
