@@ -43,9 +43,27 @@ const HelioEngine = (() => {
   // reloaded, with no error of any kind -- just silently stale code).
   // Left off for the ~31MB kernel, where the opposite is wanted (let
   // the browser/SW cache do its job, see sw.js's ASSET_CACHE).
+  // 2026-10-03(起動の高速化): 以前は、ファイルごとに「まず間違った場所を
+  // 試して404、次に正しい場所」を順番に繰り返していた(16回の無駄な往復)。
+  // 最初に1回だけ、2つの候補(そのまま/1つ上)を同時に確かめて、正しい方の
+  // 接頭辞を覚え、以後は迷わず取りに行く。確かめに失敗したときは、従来どおり
+  // 順番に試す方式に戻る。
+  let assetPrefixPromise = null;
+  function resolveAssetPrefix() {
+    if (!assetPrefixPromise) {
+      const probe = async (prefix) => {
+        const resp = await fetch(prefix + "src/helio/__init__.py", { method: "HEAD", cache: "no-store" });
+        if (!resp.ok) throw new Error("not found: " + prefix);
+        return prefix;
+      };
+      assetPrefixPromise = Promise.any(["", "../"].map(probe)).catch(() => null);
+    }
+    return assetPrefixPromise;
+  }
   async function fetchAsset(relPathFromSiteRoot, { noCache = false } = {}) {
-    const candidates = [relPathFromSiteRoot, "../" + relPathFromSiteRoot];
     const init = noCache ? { cache: "no-store" } : undefined;
+    const prefix = await resolveAssetPrefix();
+    const candidates = prefix === null ? [relPathFromSiteRoot, "../" + relPathFromSiteRoot] : [prefix + relPathFromSiteRoot];
     let lastErr;
     for (const path of candidates) {
       try {
@@ -71,14 +89,30 @@ const HelioEngine = (() => {
   async function bootOnce(onProgress) {
     const log = (msg) => { try { onProgress && onProgress(msg); } catch (_) {} };
     const t0 = performance.now();
+    // 2026-10-03(起動の高速化): 取ってくるファイル(helioのソース・天体暦
+    // 約31MB・小惑星テーブル・jplephem)を、Pythonの準備を待たずに最初から
+    // 並行して読み始める(以前は、Pythonの準備が全部終わってから1つずつ順番に
+    // 取っていた)。ここでは待たず、必要になった所でawaitする。
+    const pending = {
+      sources: Promise.all(HELIO_MODULES.map((name) => fetchAsset("src/helio/" + name, { noCache: true }).then((r) => r.text()))),
+      kernel: fetchAsset("web/assets/de440s.bsp").then((r) => r.arrayBuffer()),
+      minor: fetchAsset("web/assets/minor_bodies.bin").then((r) => r.arrayBuffer()),
+      jplephem: fetchAsset("web/assets/jplephem.zip").then((r) => r.arrayBuffer()),
+    };
+    Object.values(pending).forEach((p) => p.catch(() => {}));  // 未処理エラーの警告を出さない(待つ所で投げ直される)
     log("Pyodideを起動しています...");
     pyodide = await loadPyodide();
     // matplotlib/astroquery はブラウザ版では使わないので読み込まない(初回の読み込みを約半分近く軽くするため、2026-09-30)。
-    await pyodide.loadPackage(["numpy", "sqlite3"]);
-    await pyodide.loadPackage("micropip");
-    const micropip = pyodide.pyimport("micropip");
-    await micropip.install(["astropy", "jplephem", "tzdata", "certifi"]);
+    // 2026-10-03: micropip(とPyPIへの問い合わせ)をやめ、Pyodide配布の部品を1回で並行に
+    // 読み込む。jplephem(小さな純Pythonの部品)だけはPyodideの一覧に無いので、
+    // アプリに同梱した(web/assets/jplephem.zip、MITライセンスの表記を同梱)。
+    await pyodide.loadPackage(["numpy", "sqlite3", "astropy", "tzdata", "certifi"]);
+    pyodide.FS.mkdirTree("/home/pyodide/pkg/helio");
+    pyodide.unpackArchive(await pending.jplephem, "zip", { extractDir: "/home/pyodide/pkg" });
     log("Pythonパッケージの準備完了 (" + Math.round(performance.now() - t0) + "ms)");
+    // 重いimport(astropy、約2秒)を、ほかのファイルのダウンロードを待っている間に
+    // 先に済ませる(初回は、天体暦の31MBの読み込み中に重なるので、その分が短くなる)。
+    await pyodide.runPythonAsync("import astropy.time, astropy.coordinates, astropy.units");
 
     // See app.js's identical stub for the full rationale: h3 (a
     // timezonefinder dependency) has no WASM wheel, so lat/lon->tz
@@ -102,19 +136,13 @@ sys.modules["timezonefinder"] = _stub
 `);
 
     log("helio本体のソースコードを読み込んでいます...");
-    pyodide.FS.mkdirTree("/home/pyodide/pkg/helio");
-    for (const name of HELIO_MODULES) {
-      const resp = await fetchAsset("src/helio/" + name, { noCache: true });
-      const text = await resp.text();
-      pyodide.FS.writeFile("/home/pyodide/pkg/helio/" + name, text);
-    }
+    const sourceTexts = await pending.sources;
+    HELIO_MODULES.forEach((name, i) => pyodide.FS.writeFile("/home/pyodide/pkg/helio/" + name, sourceTexts[i]));
     log("helio本体のソースコード読み込み完了 (" + HELIO_MODULES.length + "ファイル)");
 
     log("天体暦データ(de440s、約31MB、初回のみ)を読み込んでいます...");
     const t1 = performance.now();
-    const kernelResp = await fetchAsset("web/assets/de440s.bsp");
-    const kernelBytes = new Uint8Array(await kernelResp.arrayBuffer());
-    pyodide.FS.writeFile("/home/pyodide/de440s.bsp", kernelBytes);
+    pyodide.FS.writeFile("/home/pyodide/de440s.bsp", new Uint8Array(await pending.kernel));
     log("天体暦データ読み込み完了 (" + Math.round(performance.now() - t1) + "ms)");
 
     // 小惑星・準惑星の黄経テーブル(minor_bodies.bin、約3MB、初回のみ) --
@@ -124,9 +152,7 @@ sys.modules["timezonefinder"] = _stub
     // だけを焼き込んだ自前の軽量テーブル形式にした(bake_minor_bodies.py
     // で1回だけ生成、詳細はminor_bodies.pyのdocstring参照)。
     const t2 = performance.now();
-    const minorResp = await fetchAsset("web/assets/minor_bodies.bin");
-    const minorBytes = new Uint8Array(await minorResp.arrayBuffer());
-    pyodide.FS.writeFile("/home/pyodide/minor_bodies.bin", minorBytes);
+    pyodide.FS.writeFile("/home/pyodide/minor_bodies.bin", new Uint8Array(await pending.minor));
     log("小惑星・準惑星データ読み込み完了 (" + Math.round(performance.now() - t2) + "ms)");
 
     pyodide.FS.mkdirTree("/home/pyodide/data");

@@ -435,6 +435,16 @@
     position: relative;
   }
   .wheel-wrap svg { width: 100%; height: 100%; overflow: visible; }
+  /* 図を描く前(エンジンの起動待ちなど)は、前に描いた円(見本や前の人物)を
+     見せず、「計算中…」だけを出す(2026-10-03、「別の円が見えて、そのあと
+     切り替わる」より)。一覧(度数など)も同様に隠す。 */
+  .wheel-busy {
+    display: none; position: absolute; inset: 0; align-items: center; justify-content: center;
+    color: var(--ink-faint); font-size: 0.9rem; letter-spacing: 0.08em;
+  }
+  .chart-stage.chart-busy .wheel-busy { display: flex; }
+  .chart-stage.chart-busy .wheel-wrap svg,
+  .chart-stage.chart-busy .data-panel .pane-content { visibility: hidden; }
   .wheel-wrap { border-radius: 50%; }
   .wheel-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
 
@@ -1391,6 +1401,7 @@
                  自体は以前よりやや小さく見える)にして、恒星ラベルの
                  逃げ場を優先した。(サインリング自体はその後7.55で
                  150〜170に狭め、浮いた分を惑星グリフ・度数帯に回した。) -->
+            <div class="wheel-busy" id="wheel-busy">計算中…</div>
             <svg id="wheel-svg" viewBox="-50 -50 500 500">
               <!-- 円の中心の淡い光(放射グラデーション)は、立体的な演出が不要との要望で削除(シンプルに)。 -->
               <!-- 太さ・不透明度を底上げ(2026-09-03、「線とか文字が、
@@ -2360,6 +2371,11 @@
     }
   }
 
+  // 図を描く準備ができるまで、古い円を隠して「計算中…」を出す(CSSの.chart-busy参照)
+  function setChartBusy(on) {
+    const stage = document.querySelector('.chart-stage');
+    if (stage) stage.classList.toggle('chart-busy', !!on);
+  }
   async function showChartForPerson(personRecord) {
     currentPersonId = personRecord.id;
     currentPersonName = personRecord.name;
@@ -2375,11 +2391,16 @@
     document.querySelectorAll('#n-type-segmented .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'normal'));
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     showView('chart');
+    setChartBusy(true);
     document.getElementById('badge-line1').textContent = `${personRecord.name}(計算中...)`;
-    await applyPersonNatalData(personRecord);
-    updateControlAvailability();
-    buildChart();
-    updateBadge();
+    try {
+      await applyPersonNatalData(personRecord);
+      updateControlAvailability();
+      buildChart();
+      updateBadge();
+    } finally {
+      setChartBusy(false);
+    }
   }
   async function selectPerson(personId) {
     const person = people.find(p => p.id === personId);
@@ -2410,10 +2431,15 @@
     document.querySelectorAll('#n-type-segmented .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'normal'));
     document.querySelectorAll('#t-jump-segmented .seg-btn').forEach(b => b.classList.remove('active'));
     showView('chart');
-    updateControlAvailability();
-    if (engineAvailable) await refreshTransitNowAnchor();
-    buildChart();
-    updateBadge();
+    setChartBusy(true);
+    try {
+      updateControlAvailability();
+      if (engineAvailable) await refreshTransitNowAnchor();
+      buildChart();
+      updateBadge();
+    } finally {
+      setChartBusy(false);
+    }
   }
 
   // ---------- person add/edit/delete ----------
