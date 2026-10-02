@@ -891,6 +891,10 @@
   .sheet-head { display: none; }
   @media (max-width: 899.98px) {
     .desktop-only { display: none !important; }
+    /* スマホでは画面いっぱいに使うので、アプリの枠の影(PCでカードに見せるための
+       もの)は付けない。付けたままだと、ページが少しでも横にずれたときに、右端に
+       影のグラデーションが見えてしまう(2026-10-02、iPhoneで指摘)。 */
+    .app { box-shadow: none; }
     .app.on-chart { height: 100vh; height: 100dvh; min-height: 0; }
     .chart-stage { overflow-y: auto; overscroll-behavior: contain; }
     .chart-columns { flex: 1 1 auto; min-height: 0; }
