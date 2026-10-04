@@ -1258,7 +1258,9 @@
      依存も解消)ことを確認できた。SIGNS/PLANET_META/MINOR_META側の
      グリフ文字列には、7.56で追加済みのVariation Selector-15(U+FE0E)が
      既に付いているため、絵文字カラー表示への化けも防げる。 -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Space+Mono:wght@400;700&family=Noto+Sans+Symbols+2&display=swap">
+<!-- 画面の文字(2026-10-05): Google Fontsから読み込む形をやめて、同じフォントのファイルをこのサイトに置いた(assets/fonts/、ライセンス文OFL-*.txt同梱)。
+     Googleにアクセスの記録が残らず、Googleが止まっても文字が出る。unicode-rangeで、画面に出る文字を含むファイルだけ読み込まれる。 -->
+<link rel="stylesheet" href="assets/fonts/fonts.css">
 
 <!-- Astronomicon(2026-09-14) -- サイン・惑星記号専用に作られたフォント
      (SIL Open Font License、assets/Astronomicon-OFL-License.txt同梱)に
@@ -1655,7 +1657,7 @@
           <li>保存した人物(名前・出生日時・場所)と設定は、<b>お使いの端末のブラウザの中にだけ</b>保存されます。作者のサーバーには送りません(データを受け取る仕組みがありません)。</li>
           <li>ブラウザのデータを消すと、保存した人物も消えます。大切なデータは、別にメモしておいてください。</li>
           <li>⚙設定の「データの書き出し・読み込み」で、人物・自分で追加した場所・設定を、ファイルやコピーした文字にして別の端末へ移せます。受け渡しは利用者ご自身で行うもので、メール・メッセージ・クラウドなどに載せたあとの扱いは利用者ご自身の責任となります。この場合も、データが作者のサーバーに送られることはありません。</li>
-          <li>画面の表示に必要なプログラムやフォントは、Google Fonts・jsDelivr・PyPI などから読み込みます。このため、それらの配信元には、アクセスの記録(IP アドレスなど)が残ることがあります。出生データは含まれません。</li>
+          <li>画面の表示に必要なプログラム(Pyodide など)は、jsDelivr などから読み込みます。このため、その配信元には、アクセスの記録(IP アドレスなど)が残ることがあります。フォントは、このサイトから配っています(Google には送られません)。出生データは含まれません。</li>
         </ul>
 
         <h3>使っているデータ・ソフトウェア</h3>
@@ -1664,7 +1666,7 @@
           <li>恒星の位置: Hipparcos 新還元(van Leeuwen 2007、VizieR I/311)</li>
           <li>深宇宙天体などの位置: SIMBAD データベース(CDS、ストラスブール)を利用しています。</li>
           <li>ソフトウェア: Pyodide(MPL-2.0)、NumPy・Astropy(BSD)、jplephem(MIT)、tz-lookup(CC0)</li>
-          <li>記号フォント: Astronomicon(Roberto Corona、SIL Open Font License 1.1)。ほかに Google Fonts(Shippori Mincho・Cormorant Garamond・Zen Kaku Gothic New・Space Mono・Noto Sans Symbols 2、いずれも SIL OFL)</li>
+          <li>記号フォント: Astronomicon(Roberto Corona、SIL Open Font License 1.1)。ほかに Shippori Mincho・Cormorant Garamond・Zen Kaku Gothic New・Space Mono・Noto Sans Symbols 2(いずれも SIL OFL。もとは Google Fonts で配られているもの)</li>
         </ul>
 
         <div id="about-links" style="display:none; margin-top:16px; display:none; flex-direction:column; gap:8px;">

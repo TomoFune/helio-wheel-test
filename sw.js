@@ -49,7 +49,9 @@ const ASSET_CACHE = "helio-wheel-assets-" + CACHE_VERSION;
 // (.bsp)、小惑星・準惑星の黄経テーブル(.bin、2026-09-11追加)だけは
 // 例外的にこちら(cache-first)に含める。
 function isHeavyAsset(url) {
-  return url.pathname.endsWith(".bsp") || url.pathname.endsWith(".bin") || url.origin !== self.location.origin;
+  // assets/fonts/(2026-10-05、フォントを自分のサイトに置いた): 約750個の
+  // ファイルで、中身は変わらないので、cache-first側に入れる。
+  return url.pathname.endsWith(".bsp") || url.pathname.endsWith(".bin") || url.pathname.includes("/assets/fonts/") || url.origin !== self.location.origin;
 }
 
 self.addEventListener("install", () => {

@@ -31,7 +31,7 @@ Astropy などは、さらにほかのパッケージ(pyerfa、PyYAML、packagin
 | 名前 | 何に使っているか | ライセンス |
 |---|---|---|
 | Astronomicon(Roberto Corona) | 惑星・サインの記号。`assets/Astronomicon.ttf`を同梱 | SIL Open Font License 1.1。ライセンス文は`assets/Astronomicon-OFL-License.txt`に同梱 |
-| Shippori Mincho、Cormorant Garamond、Zen Kaku Gothic New、Space Mono、Noto Sans Symbols 2 | 画面の文字。Google Fontsから読み込む(同梱はしていない) | いずれも SIL Open Font License 1.1 |
+| Shippori Mincho、Cormorant Garamond、Zen Kaku Gothic New、Space Mono、Noto Sans Symbols 2 | 画面の文字。`assets/fonts/`に同梱(もとは Google Fonts で配られているファイルと同じ)。ライセンス文は`assets/fonts/OFL-*.txt` | いずれも SIL Open Font License 1.1 |
 
 ## このリポジトリに入れていないもの
 
