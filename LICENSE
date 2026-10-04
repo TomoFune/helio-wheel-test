@@ -1,26 +1,90 @@
-Copyright (c) 2026 ふね (GitHub: TomoFune). All rights reserved.
-Copyright (c) 2026 Fune (GitHub: TomoFune). All rights reserved.
+Required Notice: Copyright (c) 2026 Fune (GitHub: TomoFune) (https://github.com/TomoFune/helio-wheel-test)
 
-【日本語】
-このアプリ「日輪 Helio Wheel」の独自のコード・画面・文章・デザイン(以下「本アプリ」)の著作権は、作者(ふね)にあります。すべての権利を留保します。
+【日本語のまとめ(参考。正式な条件は、下の英語のライセンス本文です)】
+このアプリ「日輪 Helio Wheel」の独自のコード・画面・文章・デザインは、PolyForm Noncommercial License 1.0.0 の条件で公開しています。
+- 個人での利用、学習、研究、非営利の活動のための利用は、自由にできます。
+- 非営利の目的であれば、コピー・改変・再配布もできます。そのときは、このライセンス(またはそのURL)と、上の「Required Notice」の行を、一緒に渡してください。
+- 売る、広告などで収益を得る、会社の業務に使うなど、営利の目的で使うには、作者の許可が必要です。
+- 許可を求める連絡先: https://github.com/TomoFune/helio-wheel-test/issues (GitHub の Issues に書いてください)
+- 本アプリが利用している第三者のデータ・ソフトウェア・フォントは、この条件の対象ではなく、それぞれのライセンスに従います(THIRD_PARTY_LICENSES.md)。
+- 著者の文章(サビアンの解釈文など)は、このリポジトリに含まれていません。含まれていても、この条件の対象ではありません。
 
-作者の事前の許可なく、本アプリの全部または一部を、コピー・改変・再配布・転載・販売・貸与・有料サービスへの組み込みなどに使うことはできません。使いたい場合は、先に作者に連絡して、許可を得てください。
-連絡先: https://github.com/TomoFune/helio-wheel-test/issues (GitHub の Issues に書いてください)
+[English summary -- the license text below is the binding one]
+The original code, screens, text and design of "Helio Wheel" are published under the PolyForm Noncommercial License 1.0.0. Personal use, study, research and other noncommercial use are free, and you may copy, modify and redistribute for noncommercial purposes if you keep the license (or its URL) and the Required Notice line above. Any commercial use needs the author's permission: https://github.com/TomoFune/helio-wheel-test/issues
+Third-party data, software and fonts are under their own licenses (see THIRD_PARTY_LICENSES.md). No texts by other authors are included in this repository.
 
-次のことは、許可なく行えます。
-- 公開されているアプリを、ブラウザで開いて、個人として使うこと。
-- GitHub の利用規約が、利用者に認めている範囲(閲覧、GitHub上でのフォークなど)。
+----------------------------------------------------------------------
 
-本アプリが利用している第三者のデータ・ソフトウェア・フォントは、この条件の対象ではなく、それぞれのライセンスに従います。一覧は THIRD_PARTY_LICENSES.md を見てください。
+# PolyForm Noncommercial License 1.0.0
 
-【English】
-The original code, screens, text and design of "Helio Wheel" (the "App") are copyrighted by the author (Fune). All rights are reserved.
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-You may not copy, modify, redistribute, republish, sell, rent, or incorporate all or part of the App into any other product or paid service without the author's prior written permission. If you wish to use it, please ask the author first.
-Contact: https://github.com/TomoFune/helio-wheel-test/issues (please open an Issue on GitHub)
+## Acceptance
 
-The following do not require permission:
-- Opening the published App in a web browser and using it personally.
-- What GitHub's Terms of Service allow users to do (viewing, forking on GitHub, etc.).
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
 
-Third-party data, software and fonts used by the App are not covered by these terms and remain under their own licenses; see THIRD_PARTY_LICENSES.md.
+## Copyright License
+
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose.  However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
+
+## Distribution License
+
+The licensor grants you an additional copyright license to distribute copies of the software.  Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software.  For example:
+
+> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+
+## Changes and New Works License
+
+The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
+
+## Patent License
+
+The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
+
+## Noncommercial Purposes
+
+Any noncommercial purpose is a permitted purpose.
+
+## Personal Uses
+
+Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
+
+## Noncommercial Organizations
+
+Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
+
+## Fair Use
+
+You may have "fair use" rights for the software under the law. These terms do not limit them.
+
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
+
+**You** refers to the individual or entity agreeing to these terms.
+
+**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
+
+**Your licenses** are all the licenses granted to you for the software under these terms.
+
+**Use** means anything you do with the software requiring one of your licenses.
