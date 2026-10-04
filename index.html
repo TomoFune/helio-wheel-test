@@ -821,6 +821,7 @@
     border: 1px solid var(--line-strong); background: var(--bg-elevated); color: var(--ink);
   }
   .pm-chip-danger { color: #c0392b; border-color: #c0392b; }
+  .pm-chip.active { background: var(--accent); border-color: var(--accent); color: var(--bg-sunken); }
   .pm-chip:disabled { opacity: 0.4; cursor: default; }
   .pm-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
   .pm-act {
@@ -1314,38 +1315,39 @@
     </div>
   </div>
 
-  <!-- ============ VIEW 1: 人物選択 ============ -->
+  <!-- ============ VIEW 1: 最初の画面 ============
+       2026-10-03: 人物一覧をやめ、ボタンは「経過図」「出生データ」の2つだけに
+       (人物が増えても最初の画面が長くならない。計算エンジンの起動を待たず、
+       すぐ押せる)。人物の一覧・検索・並べ替え・追加・編集・削除は「出生データ」
+       の画面(#view-person-manage)にまとめた。#person-select-listは、
+       起動中の進捗を出すだけの場所(起動が終わると隠れる)。 -->
   <div class="view active" id="view-person-select">
     <div class="screen-pad">
       <div class="eyebrow">Step 1</div>
-      <h1 style="font-size:1.5rem; margin-top:6px;">だれの図を見ますか</h1>
-      <p class="lead">保存済みの人物を選ぶか、その場で日時を入力してすぐに図を出せます。</p>
+      <h1 style="font-size:1.5rem; margin-top:6px;">なにを見ますか</h1>
+      <p class="lead"></p>
 
-      <button class="person-card" onclick="startTransitNow()" style="margin-bottom:18px;">
+      <button class="person-card" onclick="startTransitNow()" style="margin-bottom:12px;">
         <div class="person-avatar" style="background: var(--bg-sunken); display:flex; align-items:center; justify-content:center; font-size:1.1rem;">🌍</div>
         <div class="person-meta">
-          <div class="person-name" style="font-size:0.9rem;">経過図(今)を見る</div>
-          <div class="person-detail">現在の日時・現在地で、今の惑星配置をすぐに見る</div>
+          <div class="person-name" style="font-size:1rem;">経過図</div>
+          <div class="person-detail">今の惑星の配置を見る</div>
         </div>
         <span class="chevron">›</span>
       </button>
 
-      <div class="section-label">出生図</div>
-      <div class="person-list" id="person-select-list">
+      <button class="person-card" onclick="openPeopleList()">
+        <div class="person-avatar" style="background: var(--bg-sunken); display:flex; align-items:center; justify-content:center; font-size:1.1rem;">☉</div>
+        <div class="person-meta">
+          <div class="person-name" style="font-size:1rem;">出生データ</div>
+          <div class="person-detail">保存した人物の出生図を見る・管理する</div>
+        </div>
+        <span class="chevron">›</span>
+      </button>
+
+      <div class="person-list" id="person-select-list" style="margin-top:18px;">
         <div class="person-detail" style="padding:14px 4px;">読み込み中...</div>
       </div>
-
-      <button class="quick-entry-btn" onclick="openPersonEdit(null)">+ 保存せず、その場で日時を入力する</button>
-
-      <div class="section-label">その他</div>
-      <button class="person-card" onclick="showView('person-manage')">
-        <div class="person-avatar" style="background: var(--bg-sunken); display:flex; align-items:center; justify-content:center; font-size:1rem;">⚙︎</div>
-        <div class="person-meta">
-          <div class="person-name" style="font-size:0.85rem;">人物データを管理</div>
-          <div class="person-detail">追加・編集・削除、分類の整理</div>
-        </div>
-        <span class="chevron">›</span>
-      </button>
     </div>
   </div>
 
@@ -1360,7 +1362,7 @@
            person-badgeのまま)。 -->
       <div class="person-badge" id="person-badge">
         <div class="state-chips" id="state-chips">
-          <button class="chip" id="chip-person" onclick="showView('person-select')"><span id="badge-line1">サンプル花子</span><span class="chip-caret">▾</span></button>
+          <button class="chip" id="chip-person" onclick="openPeopleList()"><span id="badge-line1">サンプル花子</span><span class="chip-caret">▾</span></button>
           <button class="chip" id="chip-mode" onclick="openChipPanel('chart-type-panel', this)"><span id="menu-mode-label">出生図</span><span class="chip-caret">▾</span></button>
           <button class="chip" id="menu-ref-btn" onclick="openChipPanel('ref-panel', this)"><span class="chip-key">起点</span><span id="menu-ref-label">トロピカル</span><span class="chip-caret">▾</span></button>
           <button class="chip" id="menu-conj-btn" onclick="openChipPanel('conj-panel', this)"><span id="menu-conj-label">恒星の合</span><span class="chip-caret">▾</span></button>
@@ -1593,9 +1595,18 @@
           <li>スマホで一覧を大きく見たいときは、一覧の見出し(━ のある行)を上にシュッとするか、右端の ▲ を押します。戻すときは、下にシュッとするか、▼ を押します。</li>
         </ul>
 
+        <h3>出生データ(人物の一覧)</h3>
+        <ul>
+          <li>最初の画面の「出生データ」を押すと、保存した人物の一覧が出ます。人物を押すと、その人の出生図が出ます。</li>
+          <li>一覧の上の欄で、名前・出生地・分類・メモの文字から探せます。「並べ替え」で、名前・生年月日・登録した順に並べ替えられます(選んだ並べ替えは、次も同じになります)。分類のボタンを押すと、その分類の人だけが出ます。</li>
+          <li>名前の並べ替えは、「ふりがな」を入れた人はその読みで、入れていない人は名前の文字の順になります。漢字の名前をあいうえお順に並べたいときは、人物の編集画面で「ふりがな」を入れてください。</li>
+          <li>分類は自由に入力できます。「自分,家族」のようにカンマで区切ると、それぞれの分類として扱われます。</li>
+          <li>「+ 新規追加」で人物を足せます。保存しないで図だけ見たいときは、入力したあとに「保存せず、今だけ図を見る」を押します。</li>
+        </ul>
+
         <h3>人物を削除する</h3>
         <ul>
-          <li>最初の画面の「人物データを管理」を開くと、各人物の右に「削除」があります。押すと、確認が出てから消えます。</li>
+          <li>「出生データ」の一覧で、各人物の右の「削除」を押すと、確認が出てから消えます。</li>
           <li>たくさん消したいときは、「選んで削除」を押して、消したい人を選び、「選んだ○人を削除」を押します。「すべて選ぶ」もあります。</li>
           <li>消えるのは、この端末のデータだけです。書き出したファイルや、ほかの端末のデータは変わりません。大切なデータは、先に書き出しておくと安心です。</li>
         </ul>
@@ -1893,17 +1904,23 @@
     </div>
   </div>
 
-  <!-- ============ VIEW 3: 人物管理 ============ -->
+  <!-- ============ VIEW 3: 出生データ(人物の一覧・管理) ============
+       2026-10-03: 旧「人物選択」と旧「人物データを管理」を1つにした。人物を押す
+       と出生図、行の「編集」「削除」、「選んで削除」(まとめて)、検索・並べ替え
+       (名前・生年月日・登録順)・分類での絞り込み。並べ替えは端末ごとに記憶。 -->
   <div class="view" id="view-person-manage">
     <div class="subnav">
       <button class="back-btn" onclick="showView('person-select')">←</button>
-      <h2>人物データを管理</h2>
+      <h2>出生データ</h2>
     </div>
     <div class="screen-pad">
       <div class="pm-toolbar">
         <span style="font-size: 0.86rem; color:var(--ink-faint);" id="pm-count">0人 登録済み</span>
         <button class="add-btn" onclick="openPersonEdit(null)">+ 新規追加</button>
       </div>
+      <input type="search" id="pm-search" class="pe-input" style="margin:0 0 10px;" placeholder="名前・出生地・分類・メモで検索" autocomplete="off" oninput="onPeopleFilterChange()">
+      <select id="pm-sort" class="pe-input" style="margin:0 0 10px;" onchange="onPeopleSortChange()"></select>
+      <div class="pm-select-bar" id="pm-cats"></div>
       <!-- 一覧から削除(2026-10-02): 各行の「削除」と、まとめて選んで削除 -->
       <div class="pm-select-bar" id="pm-select-bar">
         <button type="button" class="pm-chip" id="pm-select-toggle" onclick="togglePmSelectMode()">選んで削除</button>
@@ -1986,6 +2003,9 @@
     <div class="screen-pad">
       <span class="field-label">名前</span>
       <input type="text" id="pe-name" class="pe-input" placeholder="例: 山田太郎">
+
+      <span class="field-label" style="margin-top:18px;">ふりがな(任意)</span>
+      <input type="text" id="pe-reading" class="pe-input" placeholder="例: やまだたろう">
 
       <span class="field-label" style="margin-top:18px;">生年月日</span>
       <div class="pe-row">
@@ -2118,9 +2138,9 @@
   let engineAvailable = true;
   const GCS_STAR_KEYS = ['sirius', 'arcturus', 'antares', 'alcyone', 'thuban', 'orion_belt', 'big_dipper', 'andromeda_galaxy'];
   const SEED_PEOPLE = [
-    { name: "サンプル花子", birthDate: "1990-06-15", birthTime: "09:30:00", timeUnknown: false,
+    { name: "サンプル花子", reading: "さんぷるはなこ", birthDate: "1990-06-15", birthTime: "09:30:00", timeUnknown: false,
       timezone: "Asia/Tokyo", latitude: 35.68, longitude: 139.65, placeName: "東京都", category: "サンプル", notes: "" },
-    { name: "アインシュタイン", birthDate: "1879-03-14", birthTime: null, timeUnknown: true,
+    { name: "アインシュタイン", reading: "あいんしゅたいん", birthDate: "1879-03-14", birthTime: null, timeUnknown: true,
       timezone: "Europe/Berlin", latitude: 48.40, longitude: 9.99, placeName: "ドイツ ウルム", category: "偉人", notes: "" },
   ];
   // ---------- 都道府県セレクター(出生地入力の補助、2026-09-07) ----------
@@ -2241,22 +2261,111 @@
         <div class="person-tags">${p.category ? `<span class="tag">${escapeHtml(p.category)}</span>` : ''}</div>
       </div>`;
   }
+  // 出生データの一覧(2026-10-03): 検索・並べ替え・分類での絞り込み。
+  // 並べ替えは端末ごとに記憶する。名前の並びは「ふりがな(あれば)→名前」の
+  // 順(ふりがなが無い漢字の名前は、読みではなく文字コード順になる)。
+  const PM_SORTS = [
+    ['created', '登録した順'],
+    ['name', '名前(あ→ん)'],
+    ['name_desc', '名前(ん→あ)'],
+    ['birth', '生年月日(古い順)'],
+    ['birth_desc', '生年月日(新しい順)'],
+  ];
+  let pmQuery = '';
+  let pmCategory = '';  // ''=すべて、'__none__'=分類なし
+  let pmSort = loadSetting('peopleSort', 'created');
+  if (!PM_SORTS.some(([k]) => k === pmSort)) pmSort = 'created';
+  const pmCollator = new Intl.Collator('ja', { numeric: true, sensitivity: 'base' });
+  // 分類は自由入力。「自分,家族」のようにカンマで区切ると、別々の分類として扱う。
+  function personCategories(p) {
+    return String(p.category || '').split(/[,、，]/).map(x => x.trim()).filter(Boolean);
+  }
+  function pmVisiblePeople() {
+    const q = pmQuery.trim().toLowerCase();
+    let list = people.filter(p => {
+      if (pmCategory === '__none__' && personCategories(p).length) return false;
+      if (pmCategory && pmCategory !== '__none__' && !personCategories(p).includes(pmCategory)) return false;
+      if (!q) return true;
+      return [p.name, p.reading, p.place_name, p.category, p.notes].some(v => String(v || '').toLowerCase().includes(q));
+    });
+    const nameKey = p => (p.reading || p.name || '').trim();
+    const byName = (a, b) => pmCollator.compare(nameKey(a), nameKey(b)) || String(a.birth_date).localeCompare(String(b.birth_date));
+    const byBirth = (a, b) => String(a.birth_date).localeCompare(String(b.birth_date)) || pmCollator.compare(nameKey(a), nameKey(b));
+    const byCreated = (a, b) => (a.id > 0 && b.id > 0 ? a.id - b.id : 0);
+    const cmp = { created: byCreated, name: byName, name_desc: (a, b) => byName(b, a), birth: byBirth, birth_desc: (a, b) => byBirth(b, a) }[pmSort] || byCreated;
+    return list.slice().sort(cmp);
+  }
+  function onPeopleFilterChange() {
+    pmQuery = document.getElementById('pm-search').value;
+    pmPruneSelection();
+    renderPersonLists();
+  }
+  function onPeopleSortChange() {
+    pmSort = document.getElementById('pm-sort').value;
+    saveSetting('peopleSort', pmSort);
+    renderPersonLists();
+  }
+  function setPeopleCategory(cat) {
+    pmCategory = cat;
+    pmPruneSelection();
+    renderPersonLists();
+  }
+  // 見えていない人は、選んだ状態から外す(「すべて選ぶ」や削除が、絞り込み中の人だけに効くように)
+  function pmPruneSelection() {
+    const visible = new Set(pmVisiblePeople().map(p => p.id));
+    [...pmSelected].forEach(id => { if (!visible.has(id)) pmSelected.delete(id); });
+  }
+  function openPeopleList() {
+    showView('person-manage');
+    renderPersonLists();
+  }
+  function renderPmControls() {
+    const sortSel = document.getElementById('pm-sort');
+    if (sortSel && !sortSel.dataset.filled) {
+      sortSel.dataset.filled = '1';
+      sortSel.innerHTML = PM_SORTS.map(([k, label]) => `<option value="${k}">並べ替え: ${label}</option>`).join('');
+    }
+    if (sortSel) sortSel.value = pmSort;
+    const catBox = document.getElementById('pm-cats');
+    if (!catBox) return;
+    const counts = new Map();
+    let none = 0;
+    for (const p of people) {
+      const cats = personCategories(p);
+      if (!cats.length) none++;
+      cats.forEach(c => counts.set(c, (counts.get(c) || 0) + 1));
+    }
+    if (pmCategory && pmCategory !== '__none__' && !counts.has(pmCategory)) pmCategory = '';
+    if (pmCategory === '__none__' && !none) pmCategory = '';
+    const chips = [['', `すべて ${people.length}`]];
+    [...counts.keys()].sort((a, b) => pmCollator.compare(a, b)).forEach(c => chips.push([c, `${c} ${counts.get(c)}`]));
+    if (none && counts.size) chips.push(['__none__', `分類なし ${none}`]);
+    catBox.style.display = counts.size ? '' : 'none';
+    catBox.innerHTML = chips.map(([key, label]) =>
+      `<button type="button" class="pm-chip${pmCategory === key ? ' active' : ''}" data-cat="${escapeHtml(key)}">${escapeHtml(label)}</button>`).join('');
+    catBox.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => setPeopleCategory(btn.dataset.cat)));
+  }
   function renderPersonLists() {
-    const selectList = document.getElementById('person-select-list');
-    if (selectList) {
-      selectList.innerHTML = people.length
-        ? people.map(p => `<button class="person-card" onclick="selectPerson(${p.id})">${personCardMetaHtml(p)}<span class="chevron">›</span></button>`).join('')
-        : '<div class="person-detail" style="padding:14px 4px;">まだ登録がありません。「人物データを管理」から追加できます。</div>';
-    }
+    // 最初の画面の#person-select-listは起動中の進捗を出す場所。人物が読み込めたら隠す。
+    const status = document.getElementById('person-select-list');
+    if (status) { status.innerHTML = ''; status.style.display = 'none'; }
     const manageList = document.getElementById('person-manage-list');
+    const visible = pmVisiblePeople();
     if (manageList) {
-      manageList.innerHTML = people.map(p => pmSelectMode
-        ? `<div class="person-card${pmSelected.has(p.id) ? ' pm-selected' : ''}" style="cursor:pointer;" onclick="togglePmSelected(${p.id})"><input type="checkbox" class="pm-check" ${pmSelected.has(p.id) ? 'checked' : ''} tabindex="-1" style="pointer-events:none;">${personCardMetaHtml(p)}</div>`
-        : `<div class="person-card" style="cursor:default;">${personCardMetaHtml(p)}<span class="pm-actions"><button type="button" class="pm-act" onclick="openPersonEdit(${p.id})">✎ 編集</button><button type="button" class="pm-act pm-del" onclick="deletePeople([${p.id}])">削除</button></span></div>`).join('');
-    updatePmSelectBar();
+      if (!people.length) {
+        manageList.innerHTML = '<div class="person-detail" style="padding:14px 4px;">まだ登録がありません。「+ 新規追加」から追加できます。</div>';
+      } else if (!visible.length) {
+        manageList.innerHTML = '<div class="person-detail" style="padding:14px 4px;">条件に合う人がいません。</div>';
+      } else {
+        manageList.innerHTML = visible.map(p => pmSelectMode
+          ? `<div class="person-card${pmSelected.has(p.id) ? ' pm-selected' : ''}" onclick="togglePmSelected(${p.id})"><input type="checkbox" class="pm-check" ${pmSelected.has(p.id) ? 'checked' : ''} tabindex="-1" style="pointer-events:none;">${personCardMetaHtml(p)}</div>`
+          : `<div class="person-card" onclick="selectPerson(${p.id})">${personCardMetaHtml(p)}<span class="pm-actions"><button type="button" class="pm-act" onclick="event.stopPropagation(); openPersonEdit(${p.id})">✎ 編集</button><button type="button" class="pm-act pm-del" onclick="event.stopPropagation(); deletePeople([${p.id}])">削除</button></span></div>`).join('');
+      }
     }
+    renderPmControls();
+    updatePmSelectBar();
     const countEl = document.getElementById('pm-count');
-    if (countEl) countEl.textContent = `${people.length}人 登録済み`;
+    if (countEl) countEl.textContent = visible.length === people.length ? `${people.length}人 登録済み` : `${visible.length}人を表示(全${people.length}人中)`;
   }
   async function ensureEngineReady() {
     if (!engineAvailable) {
@@ -2484,6 +2593,7 @@
     document.getElementById('pe-tz-auto').textContent = '';
     const p = isNew ? null : people.find(x => x.id === id);
     document.getElementById('pe-name').value = p ? p.name : '';
+    document.getElementById('pe-reading').value = p ? (p.reading || '') : '';
     const [py, pm, pd] = p ? p.birth_date.split('-') : ['', '', ''];
     document.getElementById('pe-year').value = py;
     document.getElementById('pe-month').value = pm ? String(Number(pm)) : '';
@@ -2521,6 +2631,7 @@
     }
     return {
       id: editingPersonId, name, birthDate, birthTime, timeUnknown,
+      reading: document.getElementById('pe-reading').value.trim(),
       timezone: tz, latitude: lat, longitude: lon,
       placeName: document.getElementById('pe-place').value.trim(),
       category: document.getElementById('pe-category').value.trim(),
@@ -2551,7 +2662,7 @@
         id: null, name: form.name, birth_date: form.birthDate, birth_time: form.birthTime,
         time_unknown: form.timeUnknown, timezone: form.timezone,
         latitude: form.latitude, longitude: form.longitude,
-        place_name: form.placeName, category: form.category, notes: form.notes,
+        place_name: form.placeName, category: form.category, notes: form.notes, reading: form.reading,
       };
     }
     await showChartForPerson(personRecord);
@@ -2593,8 +2704,9 @@
     renderPersonLists();
   }
   function pmSelectAll() {
-    if (pmSelected.size === people.length) pmSelected.clear();
-    else people.forEach(p => pmSelected.add(p.id));
+    const visible = pmVisiblePeople();
+    if (visible.length && visible.every(p => pmSelected.has(p.id))) pmSelected.clear();
+    else visible.forEach(p => pmSelected.add(p.id));
     renderPersonLists();
   }
   async function deleteSelectedPeople() {
@@ -2605,7 +2717,8 @@
     if (!toggle) return;
     toggle.textContent = pmSelectMode ? '選ぶのをやめる' : '選んで削除';
     document.getElementById('pm-select-all').style.display = pmSelectMode ? '' : 'none';
-    document.getElementById('pm-select-all').textContent = pmSelected.size === people.length && people.length ? 'すべて外す' : 'すべて選ぶ';
+    const visibleNow = pmVisiblePeople();
+    document.getElementById('pm-select-all').textContent = visibleNow.length && visibleNow.every(p => pmSelected.has(p.id)) ? 'すべて外す' : 'すべて選ぶ';
     const del = document.getElementById('pm-delete-selected');
     del.style.display = pmSelectMode ? '' : 'none';
     del.disabled = pmSelected.size === 0;
@@ -2685,7 +2798,7 @@
       version: DATA_VERSION,
       exportedAt: new Date().toISOString(),
       people: (list || []).map(p => ({
-        name: p.name, birth_date: p.birth_date, birth_time: p.birth_time, time_unknown: !!p.time_unknown,
+        name: p.name, reading: p.reading || '', birth_date: p.birth_date, birth_time: p.birth_time, time_unknown: !!p.time_unknown,
         timezone: p.timezone, latitude: p.latitude, longitude: p.longitude,
         place_name: p.place_name || '', category: p.category || '', notes: p.notes || '',
       })),
@@ -2762,7 +2875,7 @@
         && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude));
       if (!ok) { invalid++; continue; }
       peopleIn.push({
-        name: p.name.trim(), birth_date: p.birth_date, birth_time: p.birth_time || null, time_unknown: !!p.time_unknown,
+        name: p.name.trim(), reading: str(p.reading), birth_date: p.birth_date, birth_time: p.birth_time || null, time_unknown: !!p.time_unknown,
         timezone: p.timezone, latitude: Number(p.latitude), longitude: Number(p.longitude),
         place_name: str(p.place_name), category: str(p.category), notes: str(p.notes),
       });
@@ -2845,13 +2958,13 @@
         for (const p of local) { const k = personKey(p.name, p.birth_date); if (!byKey.has(k)) byKey.set(k, p); }
         for (const p of st.people) {
           const form = {
-            id: null, name: p.name, birthDate: p.birth_date, birthTime: p.birth_time, timeUnknown: p.time_unknown,
+            id: null, name: p.name, reading: p.reading, birthDate: p.birth_date, birthTime: p.birth_time, timeUnknown: p.time_unknown,
             timezone: p.timezone, latitude: p.latitude, longitude: p.longitude,
             placeName: p.place_name, category: p.category, notes: p.notes,
           };
           const existing = byKey.get(personKey(p.name, p.birth_date));
           if (existing && policy === 'skip') { r.skipped++; continue; }
-          if (existing && policy === 'overwrite') { form.id = existing.id; await HelioEngine.savePerson(form); r.updated++; continue; }
+          if (existing && policy === 'overwrite') { form.id = existing.id; if (!form.reading) form.reading = existing.reading || ''; await HelioEngine.savePerson(form); r.updated++; continue; }
           await HelioEngine.savePerson(form);
           r.added++;
         }
@@ -2978,7 +3091,7 @@
     // 選択画面へ案内する。
     if ((mode === 'N' || mode === 'both') && currentPersonId === null && currentPersonName === '') {
       showPeToast('先に人物を選んでください');
-      showView('person-select');
+      openPeopleList();
       return;
     }
     // By data-display, not by the clicked `btn` reference -- setNType()-

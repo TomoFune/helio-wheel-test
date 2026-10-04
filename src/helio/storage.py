@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS person (
     category TEXT NOT NULL DEFAULT '',  -- free-text user grouping (家族/偉人/芸能人/...)
     notes TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    reading TEXT NOT NULL DEFAULT ''   -- ふりがな(任意、名前の並び替え用)
 );
 """
 
@@ -53,6 +54,7 @@ class Person:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    reading: str = ""  # ふりがな(任意)。名前で並べ替えるときの読みに使う
 
 
 class Storage:
@@ -62,7 +64,15 @@ class Storage:
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Bring an older database up to the current schema (保存済みの
+        人物を消さずに、新しい列を足す)."""
+        columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(person)")}
+        if "reading" not in columns:
+            self._conn.execute("ALTER TABLE person ADD COLUMN reading TEXT NOT NULL DEFAULT ''")
 
     def close(self) -> None:
         self._conn.close()
@@ -81,12 +91,12 @@ class Storage:
             """INSERT INTO person
                (name, birth_date, birth_time, time_unknown, timezone,
                 latitude, longitude, place_name, category, notes,
-                created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                created_at, updated_at, reading)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (person.name, person.birth_date, person.birth_time,
              int(person.time_unknown), person.timezone,
              person.latitude, person.longitude, person.place_name,
-             person.category, person.notes, now, now),
+             person.category, person.notes, now, now, person.reading),
         )
         self._conn.commit()
         return cur.lastrowid
@@ -152,6 +162,7 @@ class Storage:
             notes=row["notes"] or "",
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            reading=row["reading"] or "",
         )
 
     # --- backup / restore ---
@@ -198,6 +209,7 @@ class Storage:
                 place_name=entry.get("place_name", ""),
                 category=entry.get("category", ""),
                 notes=entry.get("notes", ""),
+                reading=entry.get("reading", ""),
             )
             self.add_person(person)
             count += 1

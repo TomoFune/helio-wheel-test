@@ -384,6 +384,7 @@ json.dumps(people, ensure_ascii=False)
     pyodide.globals.set("_place_name", person.placeName || "");
     pyodide.globals.set("_category", person.category || "");
     pyodide.globals.set("_notes", person.notes || "");
+    pyodide.globals.set("_reading", person.reading || "");
     const savedId = await pyodide.runPythonAsync(`
 from helio.storage import Storage, Person
 
@@ -393,7 +394,7 @@ with Storage() as store:
             id=None, name=_name, birth_date=_birth_date, birth_time=_birth_time,
             time_unknown=bool(_time_unknown), timezone=_timezone,
             latitude=_latitude, longitude=_longitude, place_name=_place_name,
-            category=_category, notes=_notes,
+            category=_category, notes=_notes, reading=_reading,
         )
         result_id = store.add_person(new_person)
     else:
@@ -401,7 +402,7 @@ with Storage() as store:
             _id, name=_name, birth_date=_birth_date, birth_time=_birth_time,
             time_unknown=int(bool(_time_unknown)), timezone=_timezone,
             latitude=_latitude, longitude=_longitude, place_name=_place_name,
-            category=_category, notes=_notes,
+            category=_category, notes=_notes, reading=_reading,
         )
         result_id = _id
 result_id
