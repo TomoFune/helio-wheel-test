@@ -1575,7 +1575,7 @@
           <li>日時の数字(年・月・日・時・分・秒)のどれかを押すと、その数字の色が変わります。これが「動かす単位」です。</li>
           <li>‹ › を押すと、その単位ずつ戻る/進みます。押したままにすると、続けて動きます。</li>
           <li>PCでは、円の上でマウスのホイールを回すか、円を押してから ↑↓ キーでも動かせます。</li>
-          <li>数字を押してから、そのまま数字を入力することもできます。入力したら Enter を押すか、別の場所を押すと反映されます。</li>
+          <li>数字を押してから、そのまま数字を入力することもできます。年は4桁、ほかは2桁を打つと、自動で次の数字へ移ります(月の3〜9のように、1桁で決まるときもすぐ移ります)。Enter や Tab でも次へ、Shift+Tab で前へ、←→ で隣へ、↑↓ でその数字を1つ増減できます。最後の数字では、Enter で反映されます。</li>
           <li>「今」で今の日時に戻ります。「日食・四季へ」で、日食・月食・春分などの瞬間へ移動できます。</li>
           <li>日時の右の地名を押すと、日時をどの場所の時計で表示するかを変えられます(天体の位置は変わりません)。</li>
         </ul>
@@ -2559,6 +2559,23 @@
     document.getElementById('pe-hour').disabled = unknown;
     document.getElementById('pe-minute').disabled = unknown;
   }
+  // 出生データの入力も、打ち終わったら次の欄へ自動で移る(2026-10-05、
+  // 経過図の日時と同じ規則。出生時刻が不明のときは、使えない欄を飛ばす)。
+  const PE_AUTO_ORDER = [['pe-year', 'year'], ['pe-month', 'month'], ['pe-day', 'day'], ['pe-hour', 'hour'], ['pe-minute', 'minute']];
+  PE_AUTO_ORDER.forEach(([id, unit], i) => {
+    document.getElementById(id).addEventListener('input', () => {
+      const cur = document.getElementById(id);
+      const rest = splitOverflow(unit, cur);
+      if (!shouldAutoAdvance(unit, cur.value)) return;
+      for (let j = i + 1; j < PE_AUTO_ORDER.length; j++) {
+        const next = document.getElementById(PE_AUTO_ORDER[j][0]);
+        if (next.disabled) continue;
+        next.focus(); next.select();
+        if (rest) { next.value = rest; next.dispatchEvent(new Event('input', { bubbles: true })); }
+        return;
+      }
+    });
+  });
   // 緯度経度からタイムゾーンを自動判定(app.jsの`tz-lookup`ライブラリと同じ
   // 仕組み -- Pyodide側のtimezonefinderはh3のWASM非対応でスタブ止まりの
   // ため、JS側でtz-lookupを使い、明示的なtz_nameとして渡す設計)。
@@ -3280,6 +3297,61 @@
   function timeSegText(unit, v) {
     return unit === 'year' ? String(v).padStart(4, '0') : String(v).padStart(2, '0');
   }
+  // ---------- 数字入力の自動移動(2026-10-05) ----------
+  // 決まった桁数まで打つ(年4桁・ほかは2桁)、または次にどんな数字を打っても
+  // 範囲を超えてしまう(月の3〜9、日の4〜9、時の3〜9、分・秒の6〜9)と、
+  // 次の欄へ自動で移る。「12」と打てば時→分へ。経過図の日時と、出生データの
+  // 入力の両方で使う。
+  const AUTO_ADVANCE_RULES = {
+    year: { len: 4 }, month: { len: 2, max: 12 }, day: { len: 2, max: 31 },
+    hour: { len: 2, max: 23 }, minute: { len: 2, max: 59 }, second: { len: 2, max: 59 },
+  };
+  function shouldAutoAdvance(unit, text) {
+    const rule = AUTO_ADVANCE_RULES[unit];
+    const digits = String(text).replace(/[^0-9]/g, '');
+    if (!rule || !digits) return false;
+    if (digits.length >= rule.len) return true;
+    return rule.max !== undefined && digits.length === 1 && Number(digits) * 10 > rule.max;
+  }
+  // 打った数字が決まった桁数を超えていたとき(貼り付けなど、「0945」を一度に入れた
+  // とき)は、この欄には桁数ぶんだけ残し、あまりを次の欄へ回す。
+  function splitOverflow(unit, input) {
+    const rule = AUTO_ADVANCE_RULES[unit];
+    const digits = String(input.value).replace(/[^0-9]/g, '');
+    if (!rule || digits.length <= rule.len) return '';
+    input.value = digits.slice(0, rule.len);
+    return digits.slice(rule.len);
+  }
+  // 確定すると日時の表示が作り直されて、フォーカスが外れてしまうため、
+  // 「作り直したあと、この単位の欄にフォーカスを戻す」印を残しておく。
+  let pendingTimeFocusUnit = null;
+  function timeSegChanged(unit, input) {
+    return input.value !== timeSegText(unit, timeSegValue(unit, zonedDateFor(transitTime, transitTzName)));
+  }
+  function commitTimeSeg(unit, input) {
+    const n = parseInt(input.value, 10);
+    if (!Number.isNaN(n)) applyTransitFieldEdit(unit, n);
+    else input.value = timeSegText(unit, timeSegValue(unit, zonedDateFor(transitTime, transitTzName)));
+  }
+  // 次(dir=+1)・前(dir=-1)の欄へ。値を変えていれば、先に確定する(表示が作り直される)。
+  function moveTimeSegFocus(fromUnit, dir, input) {
+    const i = TIME_SEG_UNITS.indexOf(fromUnit) + dir;
+    if (i < 0) return;
+    const changed = timeSegChanged(fromUnit, input);
+    if (i >= TIME_SEG_UNITS.length) { // 最後の欄: 確定して、キーボードを閉じる
+      if (changed) commitTimeSeg(fromUnit, input);
+      input.blur();
+      return;
+    }
+    const target = TIME_SEG_UNITS[i];
+    pendingTimeFocusUnit = target;
+    if (changed) commitTimeSeg(fromUnit, input); // 作り直し→印の欄にフォーカスが戻る
+    if (pendingTimeFocusUnit) { // 作り直されなかった(値が変わっていない)ときは、そのまま移る
+      pendingTimeFocusUnit = null;
+      const el = document.querySelector('#badge-line2 .time-seg[data-unit="' + target + '"]');
+      if (el) el.focus({ preventScroll: true });
+    }
+  }
   function renderEditableTime(container, prefixText) {
     container.innerHTML = '';
     if (prefixText) {
@@ -3308,11 +3380,33 @@
         setScrubUnit(unit);
         input.select();
       });
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+      input.addEventListener('input', () => {
+        const rest = splitOverflow(unit, input);
+        if (!shouldAutoAdvance(unit, input.value)) return;
+        moveTimeSegFocus(unit, +1, input);
+        const next = document.activeElement;
+        if (rest && next && next.classList && next.classList.contains('time-seg')) {
+          next.value = rest;
+          next.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); moveTimeSegFocus(unit, +1, input); }
+        else if (e.key === 'Tab') { e.preventDefault(); moveTimeSegFocus(unit, e.shiftKey ? -1 : +1, input); }
+        else if (e.key === 'ArrowLeft' && input.selectionStart === 0) { e.preventDefault(); moveTimeSegFocus(unit, -1, input); }
+        else if (e.key === 'ArrowRight' && input.selectionEnd === input.value.length) { e.preventDefault(); moveTimeSegFocus(unit, +1, input); }
+        else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault(); e.stopPropagation();
+          pendingTimeFocusUnit = unit; // ↑↓は、この欄の値を1つ増減(‹ ›と同じ)
+          setScrubUnit(unit);
+          scrubTransit(e.key === 'ArrowUp' ? 1 : -1);
+          if (pendingTimeFocusUnit) pendingTimeFocusUnit = null;
+        }
+      });
+      // 値が変わっていなければ確定し直さない(自動移動で表示が作り直されるとき、
+      // 外れた古い欄からもう一度changeが飛んで、二重に確定→フォーカスが外れるのを防ぐ)。
       input.addEventListener('change', () => {
-        const n = parseInt(input.value, 10);
-        if (!Number.isNaN(n)) applyTransitFieldEdit(unit, n);
-        else input.value = timeSegText(unit, timeSegValue(unit, zonedDateFor(transitTime, transitTzName)));
+        if (Number.isNaN(parseInt(input.value, 10)) || timeSegChanged(unit, input)) commitTimeSeg(unit, input);
       });
       row.appendChild(input);
       if (TIME_SEG_SEP[unit]) {
@@ -3323,6 +3417,11 @@
       }
     });
     container.appendChild(row);
+    if (pendingTimeFocusUnit) {
+      const u = pendingTimeFocusUnit; pendingTimeFocusUnit = null;
+      const el = row.querySelector('.time-seg[data-unit="' + u + '"]');
+      if (el) el.focus({ preventScroll: true });
+    }
   }
   // ‹ › で送る単位 -- 日付の数字(年・月・日・時・分・秒)を押すと、その数字が
   // 反転して選ばれる(2026-10-01、単位のボタン列は「円の上に乗るのは嫌」で
