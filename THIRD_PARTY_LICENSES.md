@@ -33,6 +33,12 @@ Astropy などは、さらにほかのパッケージ(pyerfa、PyYAML、packagin
 | Astronomicon(Roberto Corona) | 惑星・サインの記号。`assets/Astronomicon.ttf`を同梱 | SIL Open Font License 1.1。ライセンス文は`assets/Astronomicon-OFL-License.txt`に同梱 |
 | Shippori Mincho、Cormorant Garamond、Zen Kaku Gothic New、Space Mono、Noto Sans Symbols 2 | 画面の文字。`assets/fonts/`に同梱(もとは Google Fonts で配られているファイルと同じ)。ライセンス文は`assets/fonts/OFL-*.txt` | いずれも SIL Open Font License 1.1 |
 
+## 考え方・参考にした文献
+
+| もの | 内容 |
+|---|---|
+| GCS(グレートセントラルサン)の考え方 | 松村潔『可変サイデリアル占星術』シリーズ(説話社)によります。アプリで起点として選べる8つ(シリウス・アルクトゥルス・アンタレス・アルシオン・トゥバン・オリオン・北斗七星・アンドロメダ銀河)は、この考え方に基づきます。文章は、アプリにもこのリポジトリにも、入っていません。お猿さんプロジェクトに、出典の書き方を、確認していただきました。 |
+
 ## このリポジトリに入れていないもの
 
 - 著者の文章(松村潔先生のサビアンシンボルの解釈文、石塚さんの訳など)は、**入っていません**。許諾なく入れることはしません。サビアンの画面は「準備中」の枠だけです。
